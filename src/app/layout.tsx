@@ -1,11 +1,10 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Magis — Personal Training",
   description: "Your personal training companion",
   manifest: "/manifest.json",
-  themeColor: "#1B3A2D",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -13,11 +12,12 @@ export const metadata: Metadata = {
   },
 };
 
-export const viewport = {
+export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  themeColor: "#1B3A2D",
 };
 
 export default function RootLayout({
