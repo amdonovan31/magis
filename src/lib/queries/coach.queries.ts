@@ -27,9 +27,11 @@ export async function getCoachDashboard(): Promise<CoachDashboardData | null> {
   if (!relationships) return { coach, clients: [] };
 
   // For each client, fetch their active program and last session
-  const clients: ClientWithProgram[] = await Promise.all(
+  const clientResults = await Promise.all(
     relationships.map(async (rel) => {
-      const profile = rel.profiles as unknown as import("@/types/app.types").Profile;
+      const profile = rel.profiles as unknown as import("@/types/app.types").Profile | null;
+
+      if (!profile?.id) return null;
 
       const [{ data: activeProgram }, { data: lastSession }] =
         await Promise.all([
@@ -59,6 +61,7 @@ export async function getCoachDashboard(): Promise<CoachDashboardData | null> {
     })
   );
 
+  const clients = clientResults.filter(Boolean) as ClientWithProgram[];
   return { coach, clients };
 }
 
