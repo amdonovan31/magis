@@ -33,7 +33,14 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Public routes that don't require auth
-  const publicPaths = ["/login", "/signup", "/auth/callback"];
+  // Signup is disabled — only invited clients and existing users can log in
+  if (pathname.startsWith("/signup")) {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/login";
+    return NextResponse.redirect(loginUrl);
+  }
+
+  const publicPaths = ["/login", "/auth/callback"];
   const isPublicPath = publicPaths.some((p) => pathname.startsWith(p));
 
   // No user → redirect to login (except public paths)
