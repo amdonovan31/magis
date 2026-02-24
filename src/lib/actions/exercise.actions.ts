@@ -11,10 +11,14 @@ export async function createExercise(formData: FormData) {
 
   if (!user) return { error: "Unauthorized" };
 
-  const name = formData.get("name") as string;
-  const muscleGroup = formData.get("muscle_group") as string | null;
-  const instructions = formData.get("instructions") as string | null;
-  const videoUrl = formData.get("video_url") as string | null;
+  const name = (formData.get("name") as string)?.trim();
+  const muscleGroup = (formData.get("muscle_group") as string)?.trim() || null;
+  const instructions = (formData.get("instructions") as string)?.trim() || null;
+  const videoUrl = (formData.get("video_url") as string)?.trim() || null;
+
+  if (!name) {
+    return { error: "Exercise name is required" };
+  }
 
   const { error } = await supabase.from("exercises").insert({
     created_by: user.id,
@@ -37,13 +41,16 @@ export async function updateExercise(id: string, formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Unauthorized" };
 
+  const name = (formData.get("name") as string)?.trim();
+  if (!name) return { error: "Exercise name is required" };
+
   const { error } = await supabase
     .from("exercises")
     .update({
-      name: formData.get("name") as string,
-      muscle_group: (formData.get("muscle_group") as string) || null,
-      instructions: (formData.get("instructions") as string) || null,
-      video_url: (formData.get("video_url") as string) || null,
+      name,
+      muscle_group: (formData.get("muscle_group") as string)?.trim() || null,
+      instructions: (formData.get("instructions") as string)?.trim() || null,
+      video_url: (formData.get("video_url") as string)?.trim() || null,
     })
     .eq("id", id)
     .eq("created_by", user.id);

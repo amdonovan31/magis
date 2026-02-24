@@ -107,6 +107,7 @@ export default function SetRow({
 
       {/* Complete button */}
       <button
+        type="button"
         onClick={handleComplete}
         disabled={optimisticDone}
         className={cn(

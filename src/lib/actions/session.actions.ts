@@ -112,12 +112,14 @@ export async function skipSession(workoutTemplateId: string, programId: string) 
   } = await supabase.auth.getUser();
   if (!user) return { error: "Unauthorized" };
 
-  await supabase.from("workout_sessions").insert({
+  const { error } = await supabase.from("workout_sessions").insert({
     client_id: user.id,
     workout_template_id: workoutTemplateId,
     program_id: programId,
     status: "skipped",
   });
+
+  if (error) return { error: error.message };
 
   revalidatePath("/home");
   return { success: true };

@@ -40,7 +40,7 @@ export async function getCoachDashboard(): Promise<CoachDashboardData | null> {
             .eq("is_active", true)
             .order("created_at", { ascending: false })
             .limit(1)
-            .single(),
+            .maybeSingle(),
           supabase
             .from("workout_sessions")
             .select("started_at")
@@ -48,7 +48,7 @@ export async function getCoachDashboard(): Promise<CoachDashboardData | null> {
             .eq("status", "completed")
             .order("started_at", { ascending: false })
             .limit(1)
-            .single(),
+            .maybeSingle(),
         ]);
 
       return {
@@ -74,5 +74,5 @@ export async function getCoachClients() {
     .select("client_id, profiles!client_id(*)")
     .eq("coach_id", user.id);
 
-  return data?.map((r) => r.profiles) ?? [];
+  return data?.map((r) => r.profiles).filter(Boolean) ?? [];
 }

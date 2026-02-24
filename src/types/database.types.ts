@@ -274,6 +274,20 @@ export interface Database {
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "workout_sessions_workout_template_id_fkey";
+            columns: ["workout_template_id"];
+            isOneToOne: false;
+            referencedRelation: "workout_templates";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "workout_sessions_program_id_fkey";
+            columns: ["program_id"];
+            isOneToOne: false;
+            referencedRelation: "programs";
+            referencedColumns: ["id"];
           }
         ];
       };

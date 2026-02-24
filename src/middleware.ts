@@ -47,6 +47,17 @@ export async function middleware(request: NextRequest) {
   if (user) {
     const role = user.app_metadata?.role as "coach" | "client" | undefined;
 
+    // If role is not set yet (race condition between signup and trigger),
+    // allow the request through — the page will handle it gracefully
+    if (!role) {
+      if (isPublicPath) return supabaseResponse;
+      // User exists but has no role — sign them out to avoid infinite loop
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = "/login";
+      loginUrl.searchParams.set("error", "missing_role");
+      return NextResponse.redirect(loginUrl);
+    }
+
     // Redirect away from auth pages
     if (isPublicPath && pathname !== "/auth/callback") {
       const redirectUrl = request.nextUrl.clone();

@@ -4,9 +4,16 @@ import { redirect } from "next/navigation";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 
 export async function signUp(formData: FormData) {
-  const email = formData.get("email") as string;
+  const email = (formData.get("email") as string)?.trim();
   const password = formData.get("password") as string;
-  const fullName = formData.get("full_name") as string;
+  const fullName = (formData.get("full_name") as string)?.trim();
+
+  if (!email || !password || !fullName) {
+    return { error: "All fields are required" };
+  }
+  if (password.length < 8) {
+    return { error: "Password must be at least 8 characters" };
+  }
 
   const supabase = await createClient();
 
@@ -29,8 +36,12 @@ export async function signUp(formData: FormData) {
 }
 
 export async function signIn(formData: FormData) {
-  const email = formData.get("email") as string;
+  const email = (formData.get("email") as string)?.trim();
   const password = formData.get("password") as string;
+
+  if (!email || !password) {
+    return { error: "Email and password are required" };
+  }
 
   const supabase = await createClient();
 
@@ -54,7 +65,11 @@ export async function signOut() {
 }
 
 export async function inviteClient(formData: FormData) {
-  const email = formData.get("email") as string;
+  const email = (formData.get("email") as string)?.trim();
+
+  if (!email) {
+    return { error: "Email is required" };
+  }
 
   const supabase = await createClient();
   const {

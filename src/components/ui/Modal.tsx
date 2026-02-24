@@ -69,6 +69,7 @@ export default function Modal({
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-primary">{title}</h2>
             <button
+              type="button"
               onClick={onClose}
               className="rounded-full p-1 hover:bg-primary/10"
               aria-label="Close"

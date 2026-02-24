@@ -31,12 +31,16 @@ export default async function HistoryPage() {
                 <p className="font-medium text-primary">
                   {session.workout_template?.title ?? "Workout"}
                 </p>
-                <p className="text-sm text-primary/60">
-                  {formatDate(session.started_at)}
-                </p>
-                <p className="text-xs text-primary/40 mt-0.5">
-                  {formatRelativeTime(session.started_at)}
-                </p>
+                {session.started_at && (
+                  <p className="text-sm text-primary/60">
+                    {formatDate(session.started_at)}
+                  </p>
+                )}
+                {session.started_at && (
+                  <p className="text-xs text-primary/40 mt-0.5">
+                    {formatRelativeTime(session.started_at)}
+                  </p>
+                )}
               </div>
               <Badge
                 variant={
