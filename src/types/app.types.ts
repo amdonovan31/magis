@@ -15,6 +15,21 @@ export type CoachClientRelationship =
   Database["public"]["Tables"]["coach_client_relationships"]["Row"];
 export type ClientWorkoutSchedule =
   Database["public"]["Tables"]["client_workout_schedules"]["Row"];
+export type PersonalRecord =
+  Database["public"]["Tables"]["personal_records"]["Row"];
+export type BodyMeasurement =
+  Database["public"]["Tables"]["body_measurements"]["Row"];
+export type AgentActivityLog =
+  Database["public"]["Tables"]["agent_activity_log"]["Row"];
+export type FeedGroup = Database["public"]["Tables"]["feed_groups"]["Row"];
+export type FeedGroupMember =
+  Database["public"]["Tables"]["feed_group_members"]["Row"];
+export type FeedPost = Database["public"]["Tables"]["feed_posts"]["Row"];
+export type FeedReaction =
+  Database["public"]["Tables"]["feed_reactions"]["Row"];
+export type FeedComment =
+  Database["public"]["Tables"]["feed_comments"]["Row"];
+export type UserFollow = Database["public"]["Tables"]["user_follows"]["Row"];
 
 // Composite types used throughout the app
 export type ExerciseWithCreator = Exercise & {

@@ -11,6 +11,20 @@ export async function GET(request: NextRequest) {
 
     if (!error && data.user) {
       const role = data.user.app_metadata?.role as "coach" | "client" | undefined;
+
+      // Check if client needs onboarding (no full_name set)
+      if (role === "client") {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("id", data.user.id)
+          .single();
+
+        if (!profile?.full_name) {
+          return NextResponse.redirect(`${origin}/onboarding`);
+        }
+      }
+
       const redirectPath = role === "coach" ? "/dashboard" : "/home";
       return NextResponse.redirect(`${origin}${redirectPath}`);
     }

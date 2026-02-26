@@ -19,7 +19,7 @@ export default function TopBar({
     <header
       className={cn(
         "flex h-14 items-center justify-between px-4",
-        "border-b border-primary/10 bg-white",
+        "border-b border-primary/10 bg-background",
         className
       )}
     >

@@ -51,8 +51,8 @@ export default function ExerciseLibraryClient({
   }
 
   return (
-    <div className="flex flex-col gap-4 px-4 pt-4">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-4 overflow-hidden px-4 pt-4">
+      <div className="min-w-0">
         <ExerciseSearch onSearch={handleSearch} />
       </div>
 

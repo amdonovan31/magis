@@ -21,7 +21,7 @@ export default function ExerciseSearch({ onSearch }: ExerciseSearchProps) {
   };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex w-full min-w-0 flex-col gap-3">
       <Input
         placeholder="Search exercises..."
         value={search}

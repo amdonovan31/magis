@@ -58,27 +58,49 @@ export async function signIn(formData: FormData) {
   redirect(role === "coach" ? "/dashboard" : "/home");
 }
 
-export async function sendMagicLink(formData: FormData) {
-  const email = (formData.get("email") as string)?.trim();
+export async function completeProfile(formData: FormData) {
+  const fullName = (formData.get("full_name") as string)?.trim();
+  const password = formData.get("password") as string;
+  const confirmPassword = formData.get("confirm_password") as string;
 
-  if (!email) {
-    return { error: "Email is required" };
+  if (!fullName) {
+    return { error: "Full name is required" };
+  }
+  if (!password || password.length < 8) {
+    return { error: "Password must be at least 8 characters" };
+  }
+  if (password !== confirmPassword) {
+    return { error: "Passwords do not match" };
   }
 
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
-    },
+  const { error: passwordError } = await supabase.auth.updateUser({
+    password,
   });
 
-  if (error) {
-    return { error: error.message };
+  if (passwordError) {
+    return { error: passwordError.message };
   }
 
-  return { success: true };
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Not authenticated" };
+  }
+
+  const { error: profileError } = await supabase
+    .from("profiles")
+    .update({ full_name: fullName })
+    .eq("id", user.id);
+
+  if (profileError) {
+    return { error: profileError.message };
+  }
+
+  redirect("/home");
 }
 
 export async function signOut() {

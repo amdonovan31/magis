@@ -1,18 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { signIn } from "@/lib/actions/auth.actions";
+import { completeProfile } from "@/lib/actions/auth.actions";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 
-export default function LoginForm() {
+export default function OnboardingForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(formData: FormData) {
     setError(null);
     setLoading(true);
-    const result = await signIn(formData);
+    const result = await completeProfile(formData);
     if (result?.error) {
       setError(result.error);
       setLoading(false);
@@ -22,18 +22,26 @@ export default function LoginForm() {
   return (
     <form action={handleSubmit} className="flex flex-col gap-4">
       <Input
-        label="Email"
-        name="email"
-        type="email"
-        autoComplete="email"
-        placeholder="you@example.com"
+        label="Full Name"
+        name="full_name"
+        type="text"
+        autoComplete="name"
+        placeholder="Your full name"
         required
       />
       <Input
         label="Password"
         name="password"
         type="password"
-        autoComplete="current-password"
+        autoComplete="new-password"
+        placeholder="••••••••"
+        required
+      />
+      <Input
+        label="Confirm Password"
+        name="confirm_password"
+        type="password"
+        autoComplete="new-password"
         placeholder="••••••••"
         required
       />
@@ -45,12 +53,8 @@ export default function LoginForm() {
       )}
 
       <Button type="submit" fullWidth loading={loading} size="lg">
-        Sign In
+        Complete Setup
       </Button>
-
-      <p className="text-center text-xs text-primary/50">
-        New client? Check your email for an invite link from your coach.
-      </p>
     </form>
   );
 }
