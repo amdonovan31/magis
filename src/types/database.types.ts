@@ -85,6 +85,9 @@ export interface Database {
           video_url: string | null;
           equipment: string | null;
           secondary_muscles: string[] | null;
+          movement_pattern: string | null;
+          difficulty: "beginner" | "intermediate" | "advanced";
+          is_custom: boolean;
           is_archived: boolean;
           created_at: string;
         };
@@ -97,6 +100,9 @@ export interface Database {
           video_url?: string | null;
           equipment?: string | null;
           secondary_muscles?: string[] | null;
+          movement_pattern?: string | null;
+          difficulty?: "beginner" | "intermediate" | "advanced";
+          is_custom?: boolean;
           is_archived?: boolean;
           created_at?: string;
         };
@@ -107,6 +113,9 @@ export interface Database {
           video_url?: string | null;
           equipment?: string | null;
           secondary_muscles?: string[] | null;
+          movement_pattern?: string | null;
+          difficulty?: "beginner" | "intermediate" | "advanced";
+          is_custom?: boolean;
           is_archived?: boolean;
         };
         Relationships: [
