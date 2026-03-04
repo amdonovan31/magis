@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { computeStreak, getTodayISO } from "@/lib/utils/date";
+import { computeStreak } from "@/lib/utils/date";
 import type { CoachDashboardData, ClientWithProgram } from "@/types/app.types";
 
 export async function getCoachDashboard(): Promise<CoachDashboardData | null> {
