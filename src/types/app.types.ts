@@ -61,6 +61,7 @@ export type ClientWithProgram = {
   profile: Profile;
   activeProgram: Program | null;
   lastSessionDate: string | null;
+  streak: number;
 };
 
 export type CoachDashboardData = {
@@ -73,7 +74,28 @@ export type TodayWorkout = {
   template: WorkoutTemplateWithExercises;
   activeSession: WorkoutSession | null;
   program: Program;
+  coachName: string | null;
 } | null;
+
+// Session summary data
+export type SessionSummary = {
+  sessionId: string;
+  templateTitle: string;
+  programTitle: string;
+  date: string;
+  durationSeconds: number | null;
+  exercisesCompleted: number;
+  totalExercises: number;
+  setsCompleted: number;
+  totalSets: number;
+  totalVolume: number;
+  prs: {
+    exerciseName: string;
+    prType: string;
+    value: number;
+    previousValue: number | null;
+  }[];
+};
 
 // Program builder form state
 export type ProgramBuilderStep = 1 | 2 | 3 | 4;

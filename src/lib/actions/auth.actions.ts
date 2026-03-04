@@ -7,12 +7,16 @@ export async function signUp(formData: FormData) {
   const email = (formData.get("email") as string)?.trim();
   const password = formData.get("password") as string;
   const fullName = (formData.get("full_name") as string)?.trim();
+  const role = (formData.get("role") as string) || "coach";
 
   if (!email || !password || !fullName) {
     return { error: "All fields are required" };
   }
   if (password.length < 8) {
     return { error: "Password must be at least 8 characters" };
+  }
+  if (role !== "coach" && role !== "solo") {
+    return { error: "Invalid role" };
   }
 
   const supabase = await createClient();
@@ -23,7 +27,7 @@ export async function signUp(formData: FormData) {
     options: {
       data: {
         full_name: fullName,
-        role: "coach",
+        role,
       },
     },
   });
@@ -32,7 +36,11 @@ export async function signUp(formData: FormData) {
     return { error: error.message };
   }
 
-  redirect("/dashboard");
+  if (role === "solo") {
+    redirect("/solo-onboarding");
+  } else {
+    redirect("/dashboard");
+  }
 }
 
 export async function signIn(formData: FormData) {
@@ -54,8 +62,26 @@ export async function signIn(formData: FormData) {
     return { error: error.message };
   }
 
-  const role = data.user?.app_metadata?.role as "coach" | "client" | undefined;
-  redirect(role === "coach" ? "/dashboard" : "/home");
+  const role = data.user?.app_metadata?.role as "coach" | "client" | "solo" | undefined;
+
+  // Solo users who haven't finished onboarding go back to onboarding
+  if (role === "solo") {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("onboarding_complete")
+      .eq("id", data.user.id)
+      .single();
+
+    if (!profile?.onboarding_complete) {
+      redirect("/solo-onboarding");
+    }
+  }
+
+  if (role === "coach") {
+    redirect("/dashboard");
+  } else {
+    redirect("/home");
+  }
 }
 
 export async function completeProfile(formData: FormData) {

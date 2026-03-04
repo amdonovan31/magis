@@ -29,6 +29,18 @@ export async function getExercises(opts?: {
   return data ?? [];
 }
 
+export async function getAllExerciseNames(): Promise<
+  { id: string; name: string; muscle_group: string | null }[]
+> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("exercises")
+    .select("id, name, muscle_group")
+    .eq("is_archived", false)
+    .order("name", { ascending: true });
+  return data ?? [];
+}
+
 export async function getExercise(id: string): Promise<Exercise | null> {
   const supabase = await createClient();
   const { data } = await supabase

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 /**
  * Root page — reads user role from JWT and redirects:
  * - coaches → /dashboard
- * - clients → /home
+ * - clients & solo → /home
  * - unauthenticated → /login
  */
 export default async function RootPage() {
@@ -17,7 +17,7 @@ export default async function RootPage() {
     redirect("/login");
   }
 
-  const role = user.app_metadata?.role as "coach" | "client" | undefined;
+  const role = user.app_metadata?.role as "coach" | "client" | "solo" | undefined;
 
   if (role === "coach") {
     redirect("/dashboard");

@@ -60,7 +60,7 @@ const clientNav: NavItem[] = [
 ];
 
 interface BottomNavProps {
-  role: "coach" | "client";
+  role: "coach" | "client" | "solo";
 }
 
 export default function BottomNav({ role }: BottomNavProps) {

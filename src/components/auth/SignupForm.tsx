@@ -5,7 +5,11 @@ import { signUp } from "@/lib/actions/auth.actions";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 
-export default function SignupForm() {
+interface SignupFormProps {
+  role: "coach" | "solo";
+}
+
+export default function SignupForm({ role }: SignupFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -21,6 +25,7 @@ export default function SignupForm() {
 
   return (
     <form action={handleSubmit} className="flex flex-col gap-4">
+      <input type="hidden" name="role" value={role} />
       <Input
         label="Full Name"
         name="full_name"
@@ -55,7 +60,7 @@ export default function SignupForm() {
       )}
 
       <Button type="submit" fullWidth loading={loading} size="lg">
-        Create Coach Account
+        {role === "coach" ? "Create Coach Account" : "Create Account"}
       </Button>
     </form>
   );

@@ -94,10 +94,22 @@ export async function getTodayWorkout(): Promise<TodayWorkout> {
     .eq("status", "in_progress")
     .maybeSingle();
 
+  // Fetch coach name if the program has a coach_id different from the user
+  let coachName: string | null = null;
+  if (activeProgram.coach_id && activeProgram.coach_id !== user.id) {
+    const { data: coachProfile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", activeProgram.coach_id)
+      .single();
+    coachName = coachProfile?.full_name ?? null;
+  }
+
   return {
     template: templateWithSortedExercises as unknown as import("@/types/app.types").WorkoutTemplateWithExercises,
     activeSession: activeSession as WorkoutSession | null,
     program: activeProgram as unknown as import("@/types/app.types").Program,
+    coachName,
   };
 }
 

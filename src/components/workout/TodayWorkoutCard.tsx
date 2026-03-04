@@ -21,7 +21,7 @@ export default function TodayWorkoutCard({ todayWorkout }: TodayWorkoutCardProps
     );
   }
 
-  const { template, activeSession, program } = todayWorkout;
+  const { template, activeSession, program, coachName } = todayWorkout;
   const exerciseCount = template.exercises?.length ?? 0;
 
   if (activeSession) {
@@ -56,6 +56,9 @@ export default function TodayWorkoutCard({ todayWorkout }: TodayWorkoutCardProps
       </div>
       <h2 className="text-xl font-bold text-primary">{template.title}</h2>
       <p className="text-sm text-primary/60 mt-1">{exerciseCount} exercises</p>
+      {coachName && (
+        <p className="text-xs text-primary/40 mt-1">Programmed by {coachName}</p>
+      )}
 
       {/* Exercise preview */}
       {template.exercises && template.exercises.length > 0 && (

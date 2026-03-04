@@ -13,6 +13,7 @@ interface SetRowProps {
   initialCompleted?: boolean;
   initialReps?: number | null;
   initialWeight?: string | null;
+  onSetComplete?: () => void;
 }
 
 export default function SetRow({
@@ -24,6 +25,7 @@ export default function SetRow({
   initialCompleted = false,
   initialReps = null,
   initialWeight = null,
+  onSetComplete,
 }: SetRowProps) {
   const [reps, setReps] = useState(
     initialReps?.toString() ?? ""
@@ -47,6 +49,8 @@ export default function SetRow({
       });
       if (result.error) {
         setOptimisticDone(false);
+      } else {
+        onSetComplete?.();
       }
     });
   }

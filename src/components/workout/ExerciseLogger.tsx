@@ -1,24 +1,52 @@
+"use client";
+
+import { useState } from "react";
 import SetRow from "./SetRow";
+import ExerciseDemoModal from "./ExerciseDemoModal";
 import type { WorkoutTemplateExerciseWithExercise, SetLog } from "@/types/app.types";
 
 interface ExerciseLoggerProps {
   sessionId: string;
   templateExercise: WorkoutTemplateExerciseWithExercise;
   existingLogs: SetLog[];
+  onSetComplete?: (restSeconds: number) => void;
 }
 
 export default function ExerciseLogger({
   sessionId,
   templateExercise,
   existingLogs,
+  onSetComplete,
 }: ExerciseLoggerProps) {
+  const [showDemo, setShowDemo] = useState(false);
   const setCount = templateExercise.prescribed_sets ?? 3;
+
+  function handleSetComplete() {
+    const rest = templateExercise.rest_seconds;
+    if (rest && onSetComplete) {
+      onSetComplete(rest);
+    }
+  }
 
   return (
     <div className="rounded-2xl bg-background overflow-hidden">
       {/* Exercise header */}
       <div className="px-4 py-3">
-        <h3 className="font-semibold text-primary">{templateExercise.exercise.name}</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="font-semibold text-primary flex-1">
+            {templateExercise.exercise.name}
+          </h3>
+          <button
+            type="button"
+            onClick={() => setShowDemo(true)}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-primary/40 hover:bg-primary/10 hover:text-primary transition-colors"
+            aria-label="Exercise info"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </button>
+        </div>
         <p className="text-xs text-primary/50 mt-0.5">
           {setCount} sets × {templateExercise.prescribed_reps ?? "—"}
           {templateExercise.prescribed_weight
@@ -62,6 +90,7 @@ export default function ExerciseLogger({
               initialCompleted={existingLog?.is_completed ?? false}
               initialReps={existingLog?.reps_completed ?? null}
               initialWeight={existingLog?.weight_used ?? null}
+              onSetComplete={handleSetComplete}
             />
           );
         })}
@@ -72,6 +101,13 @@ export default function ExerciseLogger({
           Note: {templateExercise.notes}
         </p>
       )}
+
+      {/* Demo modal */}
+      <ExerciseDemoModal
+        exercise={templateExercise.exercise}
+        isOpen={showDemo}
+        onClose={() => setShowDemo(false)}
+      />
     </div>
   );
 }

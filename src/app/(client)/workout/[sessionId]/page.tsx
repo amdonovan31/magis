@@ -1,7 +1,7 @@
 import { getSession } from "@/lib/queries/session.queries";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import ExerciseLogger from "@/components/workout/ExerciseLogger";
+import WorkoutClient from "@/components/workout/WorkoutClient";
 import WorkoutProgress from "@/components/workout/WorkoutProgress";
 import Button from "@/components/ui/Button";
 import Link from "next/link";
@@ -35,7 +35,7 @@ export default async function WorkoutPage({ params }: WorkoutPageProps) {
   const session = rawSession as unknown as RawSession | null;
 
   if (!session || session.client_id !== user.id) redirect("/home");
-  if (session.status === "completed") redirect("/home");
+  if (session.status === "completed") redirect(`/workout/${sessionId}/summary`);
 
   const template = session.workout_template;
   const setLogs = session.set_logs ?? [];
@@ -64,20 +64,14 @@ export default async function WorkoutPage({ params }: WorkoutPageProps) {
         <WorkoutProgress completed={completedSets} total={totalSets} />
       </div>
 
-      {/* Exercise loggers */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4 pb-32">
-        {template?.exercises?.map((te) => (
-          <div key={te.id} className="rounded-2xl bg-white shadow-sm overflow-hidden">
-            <ExerciseLogger
-              sessionId={sessionId}
-              templateExercise={te}
-              existingLogs={setLogs.filter(
-                (l) => l.template_exercise_id === te.id
-              )}
-            />
-          </div>
-        ))}
-      </div>
+      {/* Exercise loggers with rest timer */}
+      {template && (
+        <WorkoutClient
+          sessionId={sessionId}
+          template={template}
+          setLogs={setLogs}
+        />
+      )}
 
       {/* Complete workout CTA */}
       <div className="fixed bottom-0 left-1/2 w-full max-w-md -translate-x-1/2 bg-white p-4 pb-safe shadow-lg border-t border-primary/10">

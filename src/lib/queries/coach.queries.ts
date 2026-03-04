@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { computeStreak, getTodayISO } from "@/lib/utils/date";
 import type { CoachDashboardData, ClientWithProgram } from "@/types/app.types";
 
 export async function getCoachDashboard(): Promise<CoachDashboardData | null> {
@@ -26,14 +27,19 @@ export async function getCoachDashboard(): Promise<CoachDashboardData | null> {
 
   if (!relationships) return { coach, clients: [] };
 
-  // For each client, fetch their active program and last session
+  // For each client, fetch their active program, last session, and streak
   const clientResults = await Promise.all(
     relationships.map(async (rel) => {
       const profile = rel.profiles as unknown as import("@/types/app.types").Profile | null;
 
       if (!profile?.id) return null;
 
-      const [{ data: activeProgram }, { data: lastSession }] =
+      // Fetch last 60 days of completed sessions for streak calculation
+      const sixtyDaysAgo = new Date();
+      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+      const cutoff = sixtyDaysAgo.toISOString();
+
+      const [{ data: activeProgram }, { data: recentSessions }] =
         await Promise.all([
           supabase
             .from("programs")
@@ -48,15 +54,24 @@ export async function getCoachDashboard(): Promise<CoachDashboardData | null> {
             .select("started_at")
             .eq("client_id", profile.id)
             .eq("status", "completed")
-            .order("started_at", { ascending: false })
-            .limit(1)
-            .maybeSingle(),
+            .gte("started_at", cutoff)
+            .order("started_at", { ascending: true }),
         ]);
+
+      const sessionDates = (recentSessions ?? []).map((s) =>
+        s.started_at.slice(0, 10)
+      );
+      const streak = computeStreak(sessionDates);
+      const lastSessionDate =
+        sessionDates.length > 0
+          ? recentSessions![recentSessions!.length - 1].started_at
+          : null;
 
       return {
         profile,
         activeProgram: activeProgram ?? null,
-        lastSessionDate: lastSession?.started_at ?? null,
+        lastSessionDate,
+        streak,
       };
     })
   );

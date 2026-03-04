@@ -60,6 +60,44 @@ export function formatDuration(seconds: number): string {
 }
 
 /**
+ * Computes a streak of consecutive training days ending today or yesterday.
+ * Takes an array of date strings (YYYY-MM-DD), sorted ascending.
+ */
+export function computeStreak(dates: string[]): number {
+  if (dates.length === 0) return 0;
+
+  const today = getTodayISO();
+  const todayDate = new Date(today + "T00:00:00");
+
+  // Deduplicate and sort descending
+  const unique = Array.from(new Set(dates)).sort().reverse();
+
+  // The most recent date must be today or yesterday to count
+  const mostRecent = unique[0];
+  const mostRecentDate = new Date(mostRecent + "T00:00:00");
+  const diffDays = Math.floor(
+    (todayDate.getTime() - mostRecentDate.getTime()) / (1000 * 60 * 60 * 24)
+  );
+  if (diffDays > 1) return 0;
+
+  let streak = 1;
+  for (let i = 1; i < unique.length; i++) {
+    const prev = new Date(unique[i - 1] + "T00:00:00");
+    const curr = new Date(unique[i] + "T00:00:00");
+    const gap = Math.floor(
+      (prev.getTime() - curr.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    if (gap === 1) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+
+  return streak;
+}
+
+/**
  * Given a workout template's scheduled_days and scheduled_dates,
  * and an optional client override, determine if it's scheduled today.
  */

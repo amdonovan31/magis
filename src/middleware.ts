@@ -32,15 +32,7 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // Public routes that don't require auth
-  // Signup is disabled — only invited clients and existing users can log in
-  if (pathname.startsWith("/signup")) {
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = "/login";
-    return NextResponse.redirect(loginUrl);
-  }
-
-  const publicPaths = ["/login", "/auth/callback", "/onboarding"];
+  const publicPaths = ["/login", "/signup", "/auth/callback", "/onboarding", "/solo-onboarding"];
   const isPublicPath = publicPaths.some((p) => pathname.startsWith(p));
 
   // No user → redirect to login (except public paths)
@@ -52,7 +44,7 @@ export async function middleware(request: NextRequest) {
 
   // User is authenticated → enforce role-based routing
   if (user) {
-    const role = user.app_metadata?.role as "coach" | "client" | undefined;
+    const role = user.app_metadata?.role as "coach" | "client" | "solo" | undefined;
 
     // If role is not set yet (race condition between signup and trigger),
     // allow the request through — the page will handle it gracefully
@@ -65,14 +57,18 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
 
-    // Redirect away from auth pages (but allow /onboarding for new clients)
-    if (isPublicPath && pathname !== "/auth/callback" && !pathname.startsWith("/onboarding")) {
+    // Redirect away from auth pages (but allow /onboarding, /solo-onboarding, /auth/callback)
+    if (isPublicPath && pathname !== "/auth/callback" && !pathname.startsWith("/onboarding") && !pathname.startsWith("/solo-onboarding")) {
       const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = role === "coach" ? "/dashboard" : "/home";
+      if (role === "coach") {
+        redirectUrl.pathname = "/dashboard";
+      } else {
+        redirectUrl.pathname = "/home";
+      }
       return NextResponse.redirect(redirectUrl);
     }
 
-    // Protect coach routes from clients
+    // Protect coach routes from clients/solo
     if (pathname.startsWith("/dashboard") || pathname.startsWith("/clients") ||
         pathname.startsWith("/library") || pathname.startsWith("/programs")) {
       if (role !== "coach") {
@@ -82,10 +78,10 @@ export async function middleware(request: NextRequest) {
       }
     }
 
-    // Protect client routes from coaches
+    // Protect client routes — allow both client and solo roles
     if (pathname.startsWith("/home") || pathname.startsWith("/workout") ||
         pathname.startsWith("/history")) {
-      if (role !== "client") {
+      if (role !== "client" && role !== "solo") {
         const redirectUrl = request.nextUrl.clone();
         redirectUrl.pathname = "/dashboard";
         return NextResponse.redirect(redirectUrl);

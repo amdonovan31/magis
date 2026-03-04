@@ -18,6 +18,7 @@ export interface Database {
           role: "coach" | "client" | "solo";
           full_name: string | null;
           avatar_url: string | null;
+          onboarding_complete: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -26,6 +27,7 @@ export interface Database {
           role: "coach" | "client" | "solo";
           full_name?: string | null;
           avatar_url?: string | null;
+          onboarding_complete?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -34,6 +36,7 @@ export interface Database {
           role?: "coach" | "client" | "solo";
           full_name?: string | null;
           avatar_url?: string | null;
+          onboarding_complete?: boolean;
           updated_at?: string;
         };
         Relationships: [];
