@@ -19,7 +19,7 @@ export async function createProgram(state: ProgramBuilderState) {
     return { error: "Unauthorized" };
   }
 
-  const { details, days } = state;
+  const { details, weeks } = state;
 
   // 1. Insert program
   const { data: program, error: programError } = await supabase
@@ -39,45 +39,47 @@ export async function createProgram(state: ProgramBuilderState) {
     return { error: programError?.message ?? "Failed to create program" };
   }
 
-  // 2. Insert workout templates
-  for (let i = 0; i < days.length; i++) {
-    const day = days[i];
+  // 2. Insert workout templates (one per week × day)
+  for (const week of weeks) {
+    for (const day of week.days) {
+      const { data: template, error: templateError } = await supabase
+        .from("workout_templates")
+        .insert({
+          program_id: program.id,
+          title: day.title,
+          day_number: day.dayNumber,
+          notes: day.notes || null,
+          scheduled_days: day.scheduledDays.length > 0 ? day.scheduledDays : null,
+          week_number: week.weekNumber,
+          is_deload: week.isDeload,
+        })
+        .select("id")
+        .single();
 
-    const { data: template, error: templateError } = await supabase
-      .from("workout_templates")
-      .insert({
-        program_id: program.id,
-        title: day.title,
-        day_number: day.dayNumber,
-        notes: day.notes || null,
-        scheduled_days: day.scheduledDays.length > 0 ? day.scheduledDays : null,
-      })
-      .select("id")
-      .single();
+      if (templateError || !template) {
+        return { error: templateError?.message ?? "Failed to create workout template" };
+      }
 
-    if (templateError || !template) {
-      return { error: templateError?.message ?? "Failed to create workout template" };
-    }
+      // 3. Insert exercises for this template
+      if (day.exercises.length > 0) {
+        const exerciseRows = day.exercises.map((ex) => ({
+          workout_template_id: template.id,
+          exercise_id: ex.exerciseId,
+          position: ex.position,
+          prescribed_sets: ex.prescribedSets || null,
+          prescribed_reps: ex.prescribedReps || null,
+          prescribed_weight: ex.prescribedWeight || null,
+          rest_seconds: ex.restSeconds || null,
+          notes: ex.notes || null,
+        }));
 
-    // 3. Insert exercises for this template
-    if (day.exercises.length > 0) {
-      const exerciseRows = day.exercises.map((ex) => ({
-        workout_template_id: template.id,
-        exercise_id: ex.exerciseId,
-        position: ex.position,
-        prescribed_sets: ex.prescribedSets || null,
-        prescribed_reps: ex.prescribedReps || null,
-        prescribed_weight: ex.prescribedWeight || null,
-        rest_seconds: ex.restSeconds || null,
-        notes: ex.notes || null,
-      }));
+        const { error: exercisesError } = await supabase
+          .from("workout_template_exercises")
+          .insert(exerciseRows);
 
-      const { error: exercisesError } = await supabase
-        .from("workout_template_exercises")
-        .insert(exerciseRows);
-
-      if (exercisesError) {
-        return { error: exercisesError.message };
+        if (exercisesError) {
+          return { error: exercisesError.message };
+        }
       }
     }
   }

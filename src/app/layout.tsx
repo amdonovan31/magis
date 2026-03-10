@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import DevRoleSwitcher from "@/components/dev/DevRoleSwitcher";
 
 export const metadata: Metadata = {
   title: "Magis — Personal Training",
@@ -27,7 +28,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        {children}
+        {process.env.NODE_ENV === "development" && <DevRoleSwitcher />}
+      </body>
     </html>
   );
 }

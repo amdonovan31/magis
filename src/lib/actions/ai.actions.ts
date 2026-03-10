@@ -94,7 +94,7 @@ Rules:
 - scheduled_days uses 0=Sunday through 6=Saturday. Spread workouts across the week.
 - Each day should have 4-6 exercises.
 - Use exercise names from the provided list when possible.
-- Valid muscle groups: Chest, Back, Shoulders, Biceps, Triceps, Legs, Hamstrings, Glutes, Core, Calves, Full Body, Cardio.
+- Valid muscle groups: Chest, Back, Shoulders, Biceps, Triceps, Legs, Quads, Hamstrings, Glutes, Core, Calves, Full Body, Cardio.
 - rest_seconds should be between 60-180 based on exercise intensity.
 - Return ONLY the JSON object, no markdown fences or extra text.`;
 

@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
 import { getProgramWithTemplates } from "@/lib/queries/program.queries";
+import { createClient } from "@/lib/supabase/server";
 import TopBar from "@/components/layout/TopBar";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
+import AssignToMeButton from "@/components/coach/AssignToMeButton";
 import Link from "next/link";
 
 export default async function ProgramDetailPage({
@@ -11,9 +13,14 @@ export default async function ProgramDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const program = await getProgramWithTemplates(id);
+  const [program, supabase] = await Promise.all([
+    getProgramWithTemplates(id),
+    createClient(),
+  ]);
 
   if (!program) notFound();
+
+  const { data: { user } } = await supabase.auth.getUser();
 
   return (
     <>
@@ -30,14 +37,23 @@ export default async function ProgramDetailPage({
           <p className="text-sm text-primary/60">{program.description}</p>
         )}
 
-        <div className="flex items-center gap-2">
-          <Badge variant={program.is_active ? "success" : "default"}>
-            {program.is_active ? "Active" : "Inactive"}
-          </Badge>
-          {program.starts_on && (
-            <span className="text-xs text-primary/40">
-              Starts {program.starts_on}
-            </span>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Badge variant={program.is_active ? "success" : "default"}>
+              {program.is_active ? "Active" : "Inactive"}
+            </Badge>
+            {program.starts_on && (
+              <span className="text-xs text-primary/40">
+                Starts {program.starts_on}
+              </span>
+            )}
+          </div>
+          {user && (
+            <AssignToMeButton
+              programId={program.id}
+              coachId={user.id}
+              alreadyAssigned={program.client_id === user.id}
+            />
           )}
         </div>
 

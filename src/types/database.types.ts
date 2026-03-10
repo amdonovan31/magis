@@ -182,6 +182,8 @@ export interface Database {
           notes: string | null;
           scheduled_days: number[] | null;
           scheduled_dates: string[] | null;
+          week_number: number;
+          is_deload: boolean;
           created_at: string;
         };
         Insert: {
@@ -192,6 +194,8 @@ export interface Database {
           notes?: string | null;
           scheduled_days?: number[] | null;
           scheduled_dates?: string[] | null;
+          week_number?: number;
+          is_deload?: boolean;
           created_at?: string;
         };
         Update: {
@@ -200,6 +204,8 @@ export interface Database {
           notes?: string | null;
           scheduled_days?: number[] | null;
           scheduled_dates?: string[] | null;
+          week_number?: number;
+          is_deload?: boolean;
         };
         Relationships: [
           {

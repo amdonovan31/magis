@@ -5,7 +5,7 @@ import SignupForm from "@/components/auth/SignupForm";
 import Link from "next/link";
 
 export default function SignupPage() {
-  const [role, setRole] = useState<"coach" | "solo" | null>(null);
+  const [role, setRole] = useState<"coach" | "solo" | "client" | null>(null);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-4">
@@ -26,6 +26,14 @@ export default function SignupPage() {
               <span className="text-3xl">🏋️</span>
               <span className="text-lg font-semibold text-primary">I&apos;m a Coach</span>
               <span className="text-sm text-primary/60">Create programs for your clients</span>
+            </button>
+            <button
+              onClick={() => setRole("client")}
+              className="flex flex-col items-center gap-2 rounded-2xl border-2 border-primary/15 bg-white p-6 text-center transition-all hover:border-primary/40 active:scale-[0.98]"
+            >
+              <span className="text-3xl">📋</span>
+              <span className="text-lg font-semibold text-primary">I&apos;m a Client</span>
+              <span className="text-sm text-primary/60">Follow a program assigned by my coach</span>
             </button>
             <button
               onClick={() => setRole("solo")}

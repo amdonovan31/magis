@@ -126,9 +126,15 @@ export type ProgramBuilderExercise = {
   notes: string;
 };
 
+export type ProgramBuilderWeek = {
+  weekNumber: number;
+  isDeload: boolean;
+  days: ProgramBuilderDay[];
+};
+
 export type ProgramBuilderState = {
   details: ProgramBuilderDetails;
-  days: ProgramBuilderDay[];
+  weeks: ProgramBuilderWeek[];
 };
 
 // Muscle groups for exercise filter
@@ -139,6 +145,7 @@ export const MUSCLE_GROUPS = [
   "Biceps",
   "Triceps",
   "Legs",
+  "Quads",
   "Hamstrings",
   "Glutes",
   "Core",

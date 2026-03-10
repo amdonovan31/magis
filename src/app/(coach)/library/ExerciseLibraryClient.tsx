@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createExercise } from "@/lib/actions/exercise.actions";
 import ExerciseCard from "@/components/exercises/ExerciseCard";
 import ExerciseSearch from "@/components/exercises/ExerciseSearch";
+import ExerciseDemoModal from "@/components/workout/ExerciseDemoModal";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
@@ -19,6 +20,7 @@ export default function ExerciseLibraryClient({
 }: ExerciseLibraryClientProps) {
   const [exercises] = useState(initialExercises);
   const [filtered, setFiltered] = useState(initialExercises);
+  const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -72,11 +74,20 @@ export default function ExerciseLibraryClient({
             <ExerciseCard
               key={exercise.id}
               exercise={exercise}
-              onSelect={() => {}}
+              onSelect={setSelectedExercise}
             />
           ))
         )}
       </div>
+
+      {/* Exercise detail modal */}
+      {selectedExercise && (
+        <ExerciseDemoModal
+          exercise={selectedExercise}
+          isOpen={!!selectedExercise}
+          onClose={() => setSelectedExercise(null)}
+        />
+      )}
 
       {/* Create exercise modal */}
       <Modal

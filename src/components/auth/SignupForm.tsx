@@ -6,7 +6,7 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 
 interface SignupFormProps {
-  role: "coach" | "solo";
+  role: "coach" | "solo" | "client";
 }
 
 export default function SignupForm({ role }: SignupFormProps) {

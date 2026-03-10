@@ -15,7 +15,7 @@ export async function signUp(formData: FormData) {
   if (password.length < 8) {
     return { error: "Password must be at least 8 characters" };
   }
-  if (role !== "coach" && role !== "solo") {
+  if (role !== "coach" && role !== "solo" && role !== "client") {
     return { error: "Invalid role" };
   }
 
@@ -38,8 +38,10 @@ export async function signUp(formData: FormData) {
 
   if (role === "solo") {
     redirect("/solo-onboarding");
-  } else {
+  } else if (role === "coach") {
     redirect("/dashboard");
+  } else {
+    redirect("/home");
   }
 }
 
