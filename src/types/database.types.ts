@@ -278,6 +278,63 @@ export type Database = {
           },
         ]
       }
+      coach_guidelines: {
+        Row: {
+          additional_notes: string | null
+          client_id: string
+          coach_id: string
+          created_at: string
+          exercises_to_avoid: string[] | null
+          exercises_to_include: string[] | null
+          id: string
+          intensity_level: string
+          periodization_style: string
+          program_length_weeks: number
+          updated_at: string
+        }
+        Insert: {
+          additional_notes?: string | null
+          client_id: string
+          coach_id: string
+          created_at?: string
+          exercises_to_avoid?: string[] | null
+          exercises_to_include?: string[] | null
+          id?: string
+          intensity_level: string
+          periodization_style: string
+          program_length_weeks: number
+          updated_at?: string
+        }
+        Update: {
+          additional_notes?: string | null
+          client_id?: string
+          coach_id?: string
+          created_at?: string
+          exercises_to_avoid?: string[] | null
+          exercises_to_include?: string[] | null
+          id?: string
+          intensity_level?: string
+          periodization_style?: string
+          program_length_weeks?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_guidelines_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coach_guidelines_coach_id_fkey"
+            columns: ["coach_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exercises: {
         Row: {
           created_at: string

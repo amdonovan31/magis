@@ -90,6 +90,14 @@ export default async function ClientDetailPage({
           </div>
         </Card>
 
+        {/* Generate Program CTA */}
+        <Link
+          href={`/clients/${id}/generate`}
+          className="flex items-center justify-center rounded-xl bg-accent py-3.5 text-sm font-semibold uppercase tracking-widest text-accent-light transition-opacity active:opacity-80"
+        >
+          Generate Program
+        </Link>
+
         {/* Intake */}
         <h3 className="text-sm font-semibold uppercase tracking-wide text-primary/50">
           Intake
