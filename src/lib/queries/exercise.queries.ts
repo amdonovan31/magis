@@ -18,7 +18,10 @@ export async function getExercises(opts?: {
   }
 
   if (opts?.muscleGroup) {
-    query = query.eq("muscle_group", opts.muscleGroup);
+    const legsGroups = ["Legs", "Quads", "Hamstrings", "Calves", "Glutes"];
+    const groups =
+      opts.muscleGroup === "Legs" ? legsGroups : [opts.muscleGroup];
+    query = query.in("muscle_group", groups);
   }
 
   if (opts?.search) {

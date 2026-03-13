@@ -37,16 +37,16 @@ export default function RestTimer({ seconds, onDismiss }: RestTimerProps) {
 
   return (
     <div className="fixed bottom-20 left-1/2 z-40 w-full max-w-md -translate-x-1/2 px-4">
-      <div className="rounded-2xl bg-accent/95 px-4 py-3 shadow-lg backdrop-blur">
+      <div className="rounded-2xl bg-[#1B2E4B]/95 px-4 py-3 shadow-lg backdrop-blur">
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-white">Rest</span>
-          <span className="text-2xl font-bold tabular-nums text-white">
+          <span className="text-sm font-medium text-[#FAF9F6]">Rest</span>
+          <span className="text-2xl font-bold tabular-nums text-[#FAF9F6]">
             {String(mm).padStart(2, "0")}:{String(ss).padStart(2, "0")}
           </span>
           <button
             type="button"
             onClick={onDismiss}
-            className="rounded-full bg-white/20 px-3 py-1 text-xs font-medium text-white hover:bg-white/30 transition-colors"
+            className="rounded-full bg-[#FAF9F6]/20 px-3 py-1 text-xs font-medium text-[#FAF9F6] hover:bg-[#FAF9F6]/30 transition-colors"
           >
             Skip
           </button>

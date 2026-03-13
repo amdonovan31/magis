@@ -68,7 +68,7 @@ export default function BottomNav({ role }: BottomNavProps) {
   const items = role === "coach" ? coachNav : clientNav;
 
   return (
-    <nav className="fixed bottom-0 left-1/2 w-full max-w-md -translate-x-1/2 border-t border-primary/10 bg-white pb-safe">
+    <nav className="fixed bottom-0 left-1/2 w-full max-w-md -translate-x-1/2 border-t border-primary/10 bg-background pb-safe">
       <div className="flex items-center justify-around">
         {items.map((item) => {
           const isActive = pathname.startsWith(item.href);
@@ -79,11 +79,16 @@ export default function BottomNav({ role }: BottomNavProps) {
               className={cn(
                 "flex min-h-[56px] flex-1 flex-col items-center justify-center gap-0.5 text-xs",
                 "transition-colors",
-                isActive ? "text-primary font-semibold" : "text-primary/40"
+                isActive ? "text-primary font-medium" : "text-primary/40"
               )}
             >
               {isActive ? item.activeIcon : item.icon}
               {item.label}
+              {isActive ? (
+                <span className="h-1 w-1 rounded-full bg-[#1B2E4B]" />
+              ) : (
+                <span className="h-1 w-1" />
+              )}
             </Link>
           );
         })}

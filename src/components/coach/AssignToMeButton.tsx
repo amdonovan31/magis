@@ -31,7 +31,7 @@ export default function AssignToMeButton({
       className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
         assigned
           ? "border-primary/20 bg-primary/5 text-primary/50 hover:bg-red-50 hover:text-red-600 hover:border-red-200"
-          : "border-accent/40 bg-accent/10 text-primary hover:bg-accent/20"
+          : "border-[#1B2E4B]/40 bg-[#1B2E4B]/10 text-[#2C4A2E] hover:bg-[#1B2E4B]/20"
       }`}
     >
       {loading ? "…" : assigned ? "✓ Assigned to me — remove" : "Assign to me"}

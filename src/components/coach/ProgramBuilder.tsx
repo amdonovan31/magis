@@ -132,7 +132,7 @@ export default function ProgramBuilder({ clients, exercises }: ProgramBuilderPro
           }
           placeholder="Optional program description..."
           rows={3}
-          className="rounded-xl border border-primary/20 bg-white px-4 py-3 text-primary placeholder:text-primary/40 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+          className="rounded-xl border border-primary/20 bg-surface px-4 py-3 text-primary placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
         />
       </div>
 
@@ -166,7 +166,7 @@ export default function ProgramBuilder({ clients, exercises }: ProgramBuilderPro
           onChange={(e) =>
             setState((s) => ({ ...s, details: { ...s.details, clientId: e.target.value } }))
           }
-          className="h-12 rounded-xl border border-primary/20 bg-white px-4 text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+          className="h-12 rounded-xl border border-primary/20 bg-surface px-4 text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
         >
           <option value="">No client yet</option>
           {clients.map((c) => (
@@ -331,7 +331,7 @@ export default function ProgramBuilder({ clients, exercises }: ProgramBuilderPro
             className={cn(
               "rounded-full px-3 py-1 text-xs font-medium border transition-colors",
               activeWeek.isDeload
-                ? "bg-amber-50 text-amber-700 border-amber-200"
+                ? "bg-[#1B2E4B]/10 text-[#1B2E4B] border-[#1B2E4B]/20"
                 : "bg-primary/5 text-primary/50 border-primary/20 hover:bg-primary/10"
             )}
           >
@@ -488,7 +488,7 @@ export default function ProgramBuilder({ clients, exercises }: ProgramBuilderPro
   const StepReview = () => (
     <div className="flex flex-col gap-4">
       <h2 className="text-lg font-semibold text-primary">Review Program</h2>
-      <div className="rounded-xl bg-white p-4 shadow-sm">
+      <div className="rounded-xl border border-primary/10 bg-surface p-4">
         <p className="font-semibold">{state.details.title}</p>
         {state.details.description && (
           <p className="mt-1 text-sm text-primary/60">{state.details.description}</p>
@@ -503,11 +503,11 @@ export default function ProgramBuilder({ clients, exercises }: ProgramBuilderPro
         </p>
       </div>
       {state.weeks.map((week) => (
-        <div key={week.weekNumber} className="rounded-xl bg-white p-4 shadow-sm">
+        <div key={week.weekNumber} className="rounded-xl border border-primary/10 bg-surface p-4">
           <div className="flex items-center gap-2 mb-2">
             <p className="font-medium text-primary">Week {week.weekNumber}</p>
             {week.isDeload && (
-              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
+              <span className="rounded-full bg-[#1B2E4B]/10 px-2 py-0.5 text-xs text-[#1B2E4B]">
                 Deload
               </span>
             )}
@@ -618,7 +618,7 @@ function ExerciseSetEditor({
   onRemove: () => void;
 }) {
   return (
-    <div className="rounded-xl border border-primary/10 bg-white p-3">
+    <div className="rounded-xl border border-primary/10 bg-surface p-3">
       <div className="flex items-center justify-between mb-2">
         <p className="text-sm font-medium text-primary">{exercise.name}</p>
         <button
@@ -643,7 +643,7 @@ function ExerciseSetEditor({
             value={config.prescribedSets}
             min={1}
             onChange={(e) => onUpdate({ ...config, prescribedSets: Number(e.target.value) })}
-            className="h-9 rounded-lg border border-primary/20 bg-white px-2 text-center text-sm text-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="h-9 rounded-lg border border-primary/20 bg-surface px-2 text-center text-sm text-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
         <div className="flex flex-col gap-0.5">
@@ -653,7 +653,7 @@ function ExerciseSetEditor({
             value={config.prescribedReps}
             onChange={(e) => onUpdate({ ...config, prescribedReps: e.target.value })}
             placeholder="8-12"
-            className="h-9 rounded-lg border border-primary/20 bg-white px-2 text-center text-sm text-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="h-9 rounded-lg border border-primary/20 bg-surface px-2 text-center text-sm text-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
         <div className="flex flex-col gap-0.5">
@@ -663,7 +663,7 @@ function ExerciseSetEditor({
             value={config.prescribedWeight}
             onChange={(e) => onUpdate({ ...config, prescribedWeight: e.target.value })}
             placeholder="kg / BW"
-            className="h-9 rounded-lg border border-primary/20 bg-white px-2 text-center text-sm text-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="h-9 rounded-lg border border-primary/20 bg-surface px-2 text-center text-sm text-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
       </div>

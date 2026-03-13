@@ -27,15 +27,15 @@ export default async function DashboardPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-2xl bg-primary p-4 text-white">
+        <div className="rounded-2xl bg-[#2C4A2E] p-4 text-[#FAF9F6]">
           <p className="text-3xl font-bold">{clients.length}</p>
-          <p className="text-sm text-white/70">Active Clients</p>
+          <p className="text-sm text-[#FAF9F6]/70">Active Clients</p>
         </div>
-        <div className="rounded-2xl bg-accent p-4 text-white">
+        <div className="rounded-2xl bg-[#1B2E4B] p-4 text-[#FAF9F6]">
           <p className="text-3xl font-bold">
             {clients.filter((c) => c.activeProgram).length}
           </p>
-          <p className="text-sm text-white/70">On Programs</p>
+          <p className="text-sm text-[#FAF9F6]/70">On Programs</p>
         </div>
       </div>
 
@@ -43,13 +43,13 @@ export default async function DashboardPage() {
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-primary">My Clients</h2>
-          <Link href="/clients" className="text-sm text-accent font-medium">
+          <Link href="/clients" className="text-sm text-[#1B2E4B] font-medium">
             View all
           </Link>
         </div>
 
         {clients.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 rounded-2xl bg-white py-10 text-center shadow-sm">
+          <div className="flex flex-col items-center gap-3 rounded-xl border border-primary/10 bg-surface py-10 text-center">
             <p className="text-primary/60">No clients yet.</p>
             <Link href="/clients/invite">
               <Button size="sm">Invite your first client</Button>

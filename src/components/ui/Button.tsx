@@ -13,21 +13,21 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<Variant, string> = {
   primary:
-    "bg-primary text-white hover:bg-primary/90 active:bg-primary/80",
+    "bg-[#1B2E4B] text-[#FAF9F6] hover:opacity-90 active:opacity-80",
+  accent:
+    "bg-[#1B2E4B] text-[#FAF9F6] hover:opacity-90 active:opacity-80",
   secondary:
-    "bg-primary/10 text-primary hover:bg-primary/20 active:bg-primary/25",
+    "bg-transparent border border-[#2C4A2E] text-[#2C4A2E] hover:bg-[#F5F3EE] active:bg-[#F5F3EE]",
   ghost:
-    "bg-transparent text-primary hover:bg-primary/10 active:bg-primary/15",
+    "bg-transparent text-[#6B7B5E] hover:text-[#2C4A2E] active:text-[#2C4A2E]",
   danger:
     "bg-red-600 text-white hover:bg-red-700 active:bg-red-800",
-  accent:
-    "bg-accent text-white hover:bg-accent/90 active:bg-accent/80",
 };
 
 const sizeClasses: Record<Size, string> = {
-  sm: "h-9 px-3 text-sm",
-  md: "h-12 px-4 text-sm",
-  lg: "h-14 px-6 text-base",
+  sm: "h-9 px-4 text-xs",
+  md: "h-12 px-8 text-xs",
+  lg: "h-14 px-10 text-xs",
 };
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -48,9 +48,9 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         className={cn(
-          "inline-flex items-center justify-center gap-2 rounded-xl font-medium",
-          "transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2",
-          "focus-visible:ring-primary/50 disabled:pointer-events-none disabled:opacity-50",
+          "inline-flex items-center justify-center gap-2 rounded-xl font-body font-medium uppercase tracking-widest",
+          "transition-opacity duration-150 focus-visible:outline-none focus-visible:ring-2",
+          "focus-visible:ring-[#2C4A2E]/50 disabled:pointer-events-none disabled:opacity-50",
           variantClasses[variant],
           sizeClasses[size],
           fullWidth && "w-full",

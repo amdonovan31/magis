@@ -21,7 +21,7 @@ export default function Card({
   return (
     <div
       className={cn(
-        "rounded-2xl bg-white shadow-sm",
+        "rounded-xl border border-primary/10 bg-surface",
         paddingClasses[padding],
         className
       )}

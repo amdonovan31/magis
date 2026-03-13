@@ -33,7 +33,12 @@ export default function ExerciseLibraryClient({
       );
     }
     if (params.muscleGroup) {
-      result = result.filter((e) => e.muscle_group === params.muscleGroup);
+      const legsGroups = ["Legs", "Quads", "Hamstrings", "Calves", "Glutes"];
+      const groups =
+        params.muscleGroup === "Legs"
+          ? legsGroups
+          : [params.muscleGroup];
+      result = result.filter((e) => groups.includes(e.muscle_group ?? ""));
     }
     setFiltered(result);
   }
