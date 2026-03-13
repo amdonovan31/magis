@@ -74,7 +74,7 @@ export default async function WorkoutPage({ params }: WorkoutPageProps) {
       )}
 
       {/* Complete workout CTA */}
-      <div className="fixed bottom-0 left-1/2 w-full max-w-md -translate-x-1/2 bg-white p-4 pb-safe shadow-lg border-t border-primary/10">
+      <div className="fixed bottom-0 left-1/2 w-full max-w-md -translate-x-1/2 bg-surface p-4 pb-safe border-t border-primary/10">
         <form action={handleFinish}>
           <Button type="submit" fullWidth size="lg" variant="accent">
             Complete Workout ✓

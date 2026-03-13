@@ -21,7 +21,7 @@ export default function SignupPage() {
           <div className="flex flex-col gap-3">
             <button
               onClick={() => setRole("coach")}
-              className="flex flex-col items-center gap-2 rounded-2xl border-2 border-primary/15 bg-white p-6 text-center transition-all hover:border-primary/40 active:scale-[0.98]"
+              className="flex flex-col items-center gap-2 rounded-2xl border-2 border-primary/15 bg-surface p-6 text-center transition-all hover:border-primary/40 active:scale-[0.98]"
             >
               <span className="text-3xl">🏋️</span>
               <span className="text-lg font-semibold text-primary">I&apos;m a Coach</span>
@@ -29,7 +29,7 @@ export default function SignupPage() {
             </button>
             <button
               onClick={() => setRole("client")}
-              className="flex flex-col items-center gap-2 rounded-2xl border-2 border-primary/15 bg-white p-6 text-center transition-all hover:border-primary/40 active:scale-[0.98]"
+              className="flex flex-col items-center gap-2 rounded-2xl border-2 border-primary/15 bg-surface p-6 text-center transition-all hover:border-primary/40 active:scale-[0.98]"
             >
               <span className="text-3xl">📋</span>
               <span className="text-lg font-semibold text-primary">I&apos;m a Client</span>
@@ -37,7 +37,7 @@ export default function SignupPage() {
             </button>
             <button
               onClick={() => setRole("solo")}
-              className="flex flex-col items-center gap-2 rounded-2xl border-2 border-primary/15 bg-white p-6 text-center transition-all hover:border-primary/40 active:scale-[0.98]"
+              className="flex flex-col items-center gap-2 rounded-2xl border-2 border-primary/15 bg-surface p-6 text-center transition-all hover:border-primary/40 active:scale-[0.98]"
             >
               <span className="text-3xl">💪</span>
               <span className="text-lg font-semibold text-primary">I&apos;m Training Solo</span>

@@ -59,7 +59,7 @@ export default function SetRow({
     <div
       className={cn(
         "flex items-center gap-3 rounded-xl px-3 py-2 transition-colors",
-        optimisticDone ? "bg-primary/5" : "bg-white"
+        optimisticDone ? "bg-primary/5" : "bg-surface"
       )}
     >
       {/* Set number */}
@@ -83,7 +83,7 @@ export default function SetRow({
             "placeholder:text-primary/25",
             optimisticDone
               ? "border-transparent bg-transparent"
-              : "border-primary/20 bg-white"
+              : "border-primary/20 bg-surface"
           )}
         />
       </div>
@@ -104,7 +104,7 @@ export default function SetRow({
             "placeholder:text-primary/25",
             optimisticDone
               ? "border-transparent bg-transparent"
-              : "border-primary/20 bg-white"
+              : "border-primary/20 bg-surface"
           )}
         />
       </div>

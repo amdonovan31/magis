@@ -26,7 +26,7 @@ export default async function ProgramsPage() {
       />
       <div className="flex flex-col gap-3 px-4 pt-4">
         {programs.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 rounded-2xl bg-white py-10 text-center shadow-sm">
+          <div className="flex flex-col items-center gap-3 rounded-2xl bg-surface border border-primary/10 py-10 text-center">
             <p className="text-primary/60">No programs yet.</p>
             <Link href="/programs/new">
               <Button>Create your first program</Button>

@@ -106,7 +106,7 @@ export default function ExerciseLibraryClient({
             <label className="text-sm font-medium text-primary">Muscle Group</label>
             <select
               name="muscle_group"
-              className="h-12 rounded-xl border border-primary/20 bg-white px-4 text-primary focus:border-primary focus:outline-none"
+              className="h-12 rounded-xl border border-primary/20 bg-surface px-4 text-primary focus:border-primary focus:outline-none"
             >
               <option value="">Select muscle group</option>
               {MUSCLE_GROUPS.map((mg) => (
@@ -120,7 +120,7 @@ export default function ExerciseLibraryClient({
               name="instructions"
               rows={3}
               placeholder="How to perform this exercise..."
-              className="rounded-xl border border-primary/20 bg-white px-4 py-3 text-primary placeholder:text-primary/40 focus:border-primary focus:outline-none"
+              className="rounded-xl border border-primary/20 bg-surface px-4 py-3 text-primary placeholder:text-primary/40 focus:border-primary focus:outline-none"
             />
           </div>
           <Input label="Video URL" name="video_url" type="url" placeholder="https://..." />

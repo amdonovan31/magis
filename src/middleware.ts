@@ -80,7 +80,7 @@ export async function middleware(request: NextRequest) {
 
     // Protect client routes — allow both client and solo roles
     if (pathname.startsWith("/home") || pathname.startsWith("/workout") ||
-        pathname.startsWith("/history")) {
+        pathname.startsWith("/history") || pathname.startsWith("/calendar")) {
       if (role !== "client" && role !== "solo") {
         const redirectUrl = request.nextUrl.clone();
         redirectUrl.pathname = "/dashboard";

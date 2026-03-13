@@ -5,6 +5,7 @@ import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Link from "next/link";
 import { formatRelativeTime } from "@/lib/utils/date";
+import IntakeReadOnly from "@/components/intake/IntakeReadOnly";
 
 export default async function ClientDetailPage({
   params,
@@ -46,6 +47,15 @@ export default async function ClientDetailPage({
     .eq("coach_id", user.id)
     .order("created_at", { ascending: false });
 
+  // Get client intake
+  const { data: intake } = await supabase
+    .from("client_intake")
+    .select("*")
+    .eq("client_id", id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
   // Get recent sessions
   const { data: sessions } = await supabase
     .from("workout_sessions")
@@ -79,6 +89,18 @@ export default async function ClientDetailPage({
             </div>
           </div>
         </Card>
+
+        {/* Intake */}
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-primary/50">
+          Intake
+        </h3>
+        {intake ? (
+          <IntakeReadOnly intake={intake} />
+        ) : (
+          <p className="text-sm text-primary/40 italic">
+            This client hasn&apos;t completed their intake form yet.
+          </p>
+        )}
 
         {/* Programs */}
         <h3 className="text-sm font-semibold uppercase tracking-wide text-primary/50">

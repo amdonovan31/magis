@@ -23,7 +23,7 @@ export default async function ClientsPage() {
       />
       <div className="flex flex-col gap-3 px-4 pt-4">
         {clients.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 rounded-2xl bg-white py-10 text-center shadow-sm">
+          <div className="flex flex-col items-center gap-3 rounded-2xl bg-surface border border-primary/10 py-10 text-center">
             <p className="text-primary/60">No clients yet.</p>
             <Link href="/clients/invite">
               <Button>Invite your first client</Button>

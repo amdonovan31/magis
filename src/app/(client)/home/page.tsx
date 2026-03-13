@@ -37,7 +37,7 @@ export default async function ClientHomePage() {
 
       {/* Quick links */}
       {todayWorkout && (
-        <div className="rounded-2xl bg-white p-4 shadow-sm">
+        <div className="rounded-2xl bg-surface p-4 border border-primary/10">
           <p className="text-xs font-medium uppercase tracking-wide text-primary/40 mb-3">
             Quick Actions
           </p>
