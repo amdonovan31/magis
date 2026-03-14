@@ -295,7 +295,7 @@ export default function OnboardingForm({ role, needsPassword }: Props) {
             How many days per week?
           </h2>
           <div className="flex justify-center gap-3">
-            {[2, 3, 4, 5, 6].map((d) => (
+            {[2, 3, 4, 5, 6, 7].map((d) => (
               <button
                 key={d}
                 onClick={() => setDaysPerWeek(d)}

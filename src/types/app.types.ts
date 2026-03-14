@@ -63,6 +63,8 @@ export type ClientWithProgram = {
   lastSessionDate: string | null;
   streak: number;
   unreadNotes: number;
+  intakeComplete: boolean;
+  intakeRequested: boolean;
 };
 
 export type CoachDashboardData = {

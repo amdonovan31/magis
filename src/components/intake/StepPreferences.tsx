@@ -17,6 +17,7 @@ const FOCUS_OPTIONS = [
 ];
 
 const EQUIPMENT_OPTIONS = [
+  "Full Gym",
   "Barbell",
   "Dumbbells",
   "Kettlebells",

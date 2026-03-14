@@ -46,7 +46,7 @@ export async function getCoachDashboard(): Promise<CoachDashboardData | null> {
 
       const lastViewed = viewedMap[profile.id] ?? "1970-01-01T00:00:00Z";
 
-      const [{ data: activeProgram }, { data: recentSessions }, { count: unreadCount }] =
+      const [{ data: activeProgram }, { data: recentSessions }, { count: unreadCount }, { count: intakeCount }] =
         await Promise.all([
           supabase
             .from("programs")
@@ -69,6 +69,10 @@ export async function getCoachDashboard(): Promise<CoachDashboardData | null> {
             .eq("client_id", profile.id)
             .neq("note_type", "coach_observation")
             .gt("created_at", lastViewed),
+          supabase
+            .from("client_intake")
+            .select("id", { count: "exact", head: true })
+            .eq("client_id", profile.id),
         ]);
 
       const sessionDates = (recentSessions ?? []).map((s) =>
@@ -86,6 +90,8 @@ export async function getCoachDashboard(): Promise<CoachDashboardData | null> {
         lastSessionDate,
         streak,
         unreadNotes: unreadCount ?? 0,
+        intakeComplete: (intakeCount ?? 0) > 0,
+        intakeRequested: !!profile.intake_requested,
       };
     })
   );

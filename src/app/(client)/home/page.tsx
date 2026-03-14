@@ -1,7 +1,9 @@
 import { getTodayWorkout } from "@/lib/queries/session.queries";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import TodayWorkoutCard from "@/components/workout/TodayWorkoutCard";
+import Card from "@/components/ui/Card";
 import { formatDate } from "@/lib/utils/date";
 import type { Profile } from "@/types/app.types";
 
@@ -13,14 +15,21 @@ export default async function ClientHomePage() {
 
   if (!user) redirect("/login");
 
-  const { data: rawProfile } = await supabase
-    .from("profiles")
-    .select("full_name")
-    .eq("id", user.id)
-    .single();
+  const [{ data: rawProfile }, { count: intakeCount }, todayWorkout] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("full_name, intake_requested")
+      .eq("id", user.id)
+      .single(),
+    supabase
+      .from("client_intake")
+      .select("id", { count: "exact", head: true })
+      .eq("client_id", user.id),
+    getTodayWorkout(),
+  ]);
 
-  const profile = rawProfile as Pick<Profile, "full_name"> | null;
-  const todayWorkout = await getTodayWorkout();
+  const profile = rawProfile as Pick<Profile, "full_name" | "intake_requested"> | null;
+  const showIntakeBanner = profile?.intake_requested && (intakeCount ?? 0) === 0;
 
   return (
     <div className="flex flex-col gap-6 px-4 pt-6">
@@ -31,6 +40,21 @@ export default async function ClientHomePage() {
           Hi, {profile?.full_name?.split(" ")[0] ?? "there"}!
         </h1>
       </div>
+
+      {/* Intake banner */}
+      {showIntakeBanner && (
+        <Link href="/onboarding/intake">
+          <Card className="border border-accent bg-accent/5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-semibold text-primary">Complete Your Intake Form</p>
+                <p className="text-sm text-primary/60">Your coach needs this to build your program</p>
+              </div>
+              <span className="text-accent text-xl font-bold">&rarr;</span>
+            </div>
+          </Card>
+        </Link>
+      )}
 
       {/* Today's workout card */}
       <TodayWorkoutCard todayWorkout={todayWorkout} />

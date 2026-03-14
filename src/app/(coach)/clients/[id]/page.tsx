@@ -6,6 +6,7 @@ import Badge from "@/components/ui/Badge";
 import Link from "next/link";
 import { formatRelativeTime } from "@/lib/utils/date";
 import IntakeReadOnly from "@/components/intake/IntakeReadOnly";
+import SendIntakeRequestButton from "@/components/intake/SendIntakeRequestButton";
 import ClientNotes from "@/components/notes/ClientNotes";
 import { getClientNotes } from "@/lib/queries/notes.queries";
 import { recordClientView } from "@/lib/actions/notes.actions";
@@ -99,12 +100,12 @@ export default async function ClientDetailPage({
           </div>
         </Card>
 
-        {/* Generate Program CTA */}
+        {/* Design Program CTA */}
         <Link
           href={`/clients/${id}/generate`}
           className="flex items-center justify-center rounded-xl bg-accent py-3.5 text-sm font-semibold uppercase tracking-widest text-accent-light transition-opacity active:opacity-80"
         >
-          Generate Program
+          Design Program
         </Link>
 
         {/* Notes & Messages */}
@@ -119,10 +120,12 @@ export default async function ClientDetailPage({
         </h3>
         {intake ? (
           <IntakeReadOnly intake={intake} />
-        ) : (
-          <p className="text-sm text-primary/40 italic">
-            This client hasn&apos;t completed their intake form yet.
+        ) : profile.intake_requested ? (
+          <p className="text-sm text-primary/60 italic">
+            Intake request sent — waiting for client to complete.
           </p>
+        ) : (
+          <SendIntakeRequestButton clientId={id} />
         )}
 
         {/* Programs */}

@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
 export interface IntakeData {
@@ -49,11 +50,45 @@ export async function submitIntake(data: IntakeData) {
     return { error: error.message };
   }
 
-  // Mark onboarding as complete
+  // Mark onboarding as complete and clear intake request flag
   await supabase
     .from("profiles")
-    .update({ onboarding_complete: true })
+    .update({ onboarding_complete: true, intake_requested: false })
     .eq("id", user.id);
 
   redirect("/home");
+}
+
+export async function sendIntakeRequest(clientId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Not authenticated" };
+  }
+
+  // Verify coach-client relationship
+  const { data: relationship } = await supabase
+    .from("coach_client_relationships")
+    .select("client_id")
+    .eq("coach_id", user.id)
+    .eq("client_id", clientId)
+    .maybeSingle();
+
+  if (!relationship) {
+    return { error: "Client not found" };
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ intake_requested: true })
+    .eq("id", clientId);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath(`/clients/${clientId}`);
 }

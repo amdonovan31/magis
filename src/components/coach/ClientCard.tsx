@@ -9,7 +9,7 @@ interface ClientCardProps {
 }
 
 export default function ClientCard({ client }: ClientCardProps) {
-  const { profile, activeProgram, lastSessionDate, streak, unreadNotes } = client;
+  const { profile, activeProgram, lastSessionDate, streak, unreadNotes, intakeComplete, intakeRequested } = client;
 
   return (
     <Link href={`/clients/${profile.id}`}>
@@ -47,6 +47,9 @@ export default function ClientCard({ client }: ClientCardProps) {
             <Badge variant="success">Active</Badge>
           ) : (
             <Badge variant="default">No Program</Badge>
+          )}
+          {!intakeComplete && intakeRequested && (
+            <Badge variant="warning">Intake Pending</Badge>
           )}
           {streak > 0 && (
             <span className="flex items-center gap-1 text-xs font-medium text-[#1B2E4B]">
