@@ -32,7 +32,7 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  const publicPaths = ["/login", "/signup", "/auth/callback", "/onboarding"];
+  const publicPaths = ["/login", "/signup", "/auth/callback", "/onboarding", "/choose-role"];
   const isPublicPath = publicPaths.some((p) => pathname.startsWith(p));
 
   // No user → redirect to login (except public paths)
@@ -57,8 +57,8 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
 
-    // Redirect away from auth pages (but allow /onboarding, /auth/callback)
-    if (isPublicPath && pathname !== "/auth/callback" && !pathname.startsWith("/onboarding")) {
+    // Redirect away from auth pages (but allow /onboarding, /auth/callback, /choose-role)
+    if (isPublicPath && pathname !== "/auth/callback" && !pathname.startsWith("/onboarding") && !pathname.startsWith("/choose-role")) {
       const redirectUrl = request.nextUrl.clone();
       if (role === "coach") {
         redirectUrl.pathname = "/dashboard";

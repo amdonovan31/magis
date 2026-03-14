@@ -25,6 +25,17 @@ export async function GET(request: NextRequest) {
         }
       }
 
+      // Multi-role users see the role picker
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("roles")
+        .eq("id", data.user.id)
+        .single();
+
+      if (profileData && profileData.roles.length > 1) {
+        return NextResponse.redirect(`${origin}/choose-role`);
+      }
+
       const redirectPath = role === "coach" ? "/dashboard" : "/home";
       return NextResponse.redirect(`${origin}${redirectPath}`);
     }

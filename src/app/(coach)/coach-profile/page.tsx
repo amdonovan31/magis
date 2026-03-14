@@ -4,6 +4,7 @@ import { signOut } from "@/lib/actions/auth.actions";
 import TopBar from "@/components/layout/TopBar";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
+import EnrollAsClientButton from "@/components/coach/EnrollAsClientButton";
 import type { Profile } from "@/types/app.types";
 
 export default async function CoachProfilePage() {
@@ -62,6 +63,23 @@ export default async function CoachProfilePage() {
             </div>
           </div>
         </Card>
+
+        {/* Train as client — only show if not already enrolled */}
+        {profile && !profile.roles.includes("client") && !profile.roles.includes("solo") && (
+          <Card>
+            <div className="flex flex-col gap-3">
+              <div>
+                <p className="font-heading text-base font-semibold text-primary">
+                  Train with Magis
+                </p>
+                <p className="mt-1 text-sm text-muted">
+                  Use Magis for your own training. You&apos;ll get a personal intake form and workout tracking, separate from your coaching.
+                </p>
+              </div>
+              <EnrollAsClientButton />
+            </div>
+          </Card>
+        )}
 
         {/* Sign out */}
         <form action={signOut}>

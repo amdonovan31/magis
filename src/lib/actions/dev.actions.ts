@@ -29,5 +29,18 @@ export async function switchDevRole(role: "coach" | "client" | "solo") {
     .eq("id", user.id);
   if (profileError) return { error: profileError.message };
 
+  // Ensure the target role is in profiles.roles array
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("roles")
+    .eq("id", user.id)
+    .single();
+  if (profile && !profile.roles.includes(role)) {
+    await supabase
+      .from("profiles")
+      .update({ roles: [...profile.roles, role] })
+      .eq("id", user.id);
+  }
+
   return { success: true };
 }

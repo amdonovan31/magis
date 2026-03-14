@@ -79,6 +79,17 @@ export async function signIn(formData: FormData) {
     }
   }
 
+  // Multi-role users see the role picker
+  const { data: roleProfile } = await supabase
+    .from("profiles")
+    .select("roles")
+    .eq("id", data.user.id)
+    .single();
+
+  if (roleProfile && roleProfile.roles.length > 1) {
+    redirect("/choose-role");
+  }
+
   if (role === "coach") {
     redirect("/dashboard");
   } else {
