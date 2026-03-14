@@ -62,6 +62,7 @@ export type ClientWithProgram = {
   activeProgram: Program | null;
   lastSessionDate: string | null;
   streak: number;
+  unreadNotes: number;
 };
 
 export type CoachDashboardData = {

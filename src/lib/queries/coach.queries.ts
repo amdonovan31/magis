@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { computeStreak } from "@/lib/utils/date";
-import type { CoachDashboardData, ClientWithProgram } from "@/types/app.types";
+import type { CoachDashboardData, ClientWithProgram, Profile } from "@/types/app.types";
 
 export async function getCoachDashboard(): Promise<CoachDashboardData | null> {
   const supabase = await createClient();
@@ -10,27 +10,32 @@ export async function getCoachDashboard(): Promise<CoachDashboardData | null> {
 
   if (!user) return null;
 
-  // Get coach profile
-  const { data: coach } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
+  // Fetch coach profile, relationships, and views in parallel
+  const [{ data: coach }, { data: relationships }, { data: views }] =
+    await Promise.all([
+      supabase.from("profiles").select("*").eq("id", user.id).single(),
+      supabase
+        .from("coach_client_relationships")
+        .select("client_id, profiles!client_id(*)")
+        .eq("coach_id", user.id),
+      supabase
+        .from("coach_client_views")
+        .select("client_id, viewed_at")
+        .eq("coach_id", user.id),
+    ]);
 
   if (!coach) return null;
-
-  // Get all client relationships with their profiles
-  const { data: relationships } = await supabase
-    .from("coach_client_relationships")
-    .select("client_id, profiles!client_id(*)")
-    .eq("coach_id", user.id);
-
   if (!relationships) return { coach, clients: [] };
 
-  // For each client, fetch their active program, last session, and streak
+  const viewedMap: Record<string, string> = {};
+  for (const v of views ?? []) {
+    viewedMap[v.client_id] = v.viewed_at;
+  }
+
+  // For each client, fetch their active program, last session, streak, and unread notes
   const clientResults = await Promise.all(
     relationships.map(async (rel) => {
-      const profile = rel.profiles as unknown as import("@/types/app.types").Profile | null;
+      const profile = rel.profiles as unknown as Profile | null;
 
       if (!profile?.id) return null;
 
@@ -39,7 +44,9 @@ export async function getCoachDashboard(): Promise<CoachDashboardData | null> {
       sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
       const cutoff = sixtyDaysAgo.toISOString();
 
-      const [{ data: activeProgram }, { data: recentSessions }] =
+      const lastViewed = viewedMap[profile.id] ?? "1970-01-01T00:00:00Z";
+
+      const [{ data: activeProgram }, { data: recentSessions }, { count: unreadCount }] =
         await Promise.all([
           supabase
             .from("programs")
@@ -56,6 +63,12 @@ export async function getCoachDashboard(): Promise<CoachDashboardData | null> {
             .eq("status", "completed")
             .gte("started_at", cutoff)
             .order("started_at", { ascending: true }),
+          supabase
+            .from("client_notes")
+            .select("*", { count: "exact", head: true })
+            .eq("client_id", profile.id)
+            .neq("note_type", "coach_observation")
+            .gt("created_at", lastViewed),
         ]);
 
       const sessionDates = (recentSessions ?? []).map((s) =>
@@ -72,6 +85,7 @@ export async function getCoachDashboard(): Promise<CoachDashboardData | null> {
         activeProgram: activeProgram ?? null,
         lastSessionDate,
         streak,
+        unreadNotes: unreadCount ?? 0,
       };
     })
   );

@@ -6,6 +6,9 @@ import Badge from "@/components/ui/Badge";
 import Link from "next/link";
 import { formatRelativeTime } from "@/lib/utils/date";
 import IntakeReadOnly from "@/components/intake/IntakeReadOnly";
+import ClientNotes from "@/components/notes/ClientNotes";
+import { getClientNotes } from "@/lib/queries/notes.queries";
+import { recordClientView } from "@/lib/actions/notes.actions";
 
 export default async function ClientDetailPage({
   params,
@@ -56,13 +59,19 @@ export default async function ClientDetailPage({
     .limit(1)
     .maybeSingle();
 
-  // Get recent sessions
-  const { data: sessions } = await supabase
-    .from("workout_sessions")
-    .select("*, workout_template:workout_templates(title)")
-    .eq("client_id", id)
-    .order("started_at", { ascending: false })
-    .limit(10);
+  // Get recent sessions and notes in parallel
+  const [{ data: sessions }, notes] = await Promise.all([
+    supabase
+      .from("workout_sessions")
+      .select("*, workout_template:workout_templates(title)")
+      .eq("client_id", id)
+      .order("started_at", { ascending: false })
+      .limit(10),
+    getClientNotes(id),
+  ]);
+
+  // Record that the coach viewed this client (for unread indicator)
+  recordClientView(id);
 
   return (
     <>
@@ -97,6 +106,12 @@ export default async function ClientDetailPage({
         >
           Generate Program
         </Link>
+
+        {/* Notes & Messages */}
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-primary/50">
+          Notes &amp; Messages
+        </h3>
+        <ClientNotes clientId={id} coachId={user.id} initialNotes={notes} />
 
         {/* Intake */}
         <h3 className="text-sm font-semibold uppercase tracking-wide text-primary/50">

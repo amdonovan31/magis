@@ -36,6 +36,12 @@ const coachNav: NavItem[] = [
     icon: <ClipboardIcon />,
     activeIcon: <ClipboardIcon filled />,
   },
+  {
+    href: "/coach-profile",
+    label: "Profile",
+    icon: <UserIcon />,
+    activeIcon: <UserIcon filled />,
+  },
 ];
 
 const clientNav: NavItem[] = [

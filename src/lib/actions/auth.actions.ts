@@ -37,7 +37,7 @@ export async function signUp(formData: FormData) {
   }
 
   if (role === "solo") {
-    redirect("/solo-onboarding");
+    redirect("/onboarding");
   } else if (role === "coach") {
     redirect("/dashboard");
   } else {
@@ -66,8 +66,8 @@ export async function signIn(formData: FormData) {
 
   const role = data.user?.app_metadata?.role as "coach" | "client" | "solo" | undefined;
 
-  // Solo users who haven't finished onboarding go back to onboarding
-  if (role === "solo") {
+  // Solo and client users who haven't completed onboarding
+  if (role === "solo" || role === "client") {
     const { data: profile } = await supabase
       .from("profiles")
       .select("onboarding_complete")
@@ -75,7 +75,7 @@ export async function signIn(formData: FormData) {
       .single();
 
     if (!profile?.onboarding_complete) {
-      redirect("/solo-onboarding");
+      redirect("/onboarding");
     }
   }
 
@@ -86,30 +86,19 @@ export async function signIn(formData: FormData) {
   }
 }
 
-export async function completeProfile(formData: FormData) {
-  const fullName = (formData.get("full_name") as string)?.trim();
-  const password = formData.get("password") as string;
-  const confirmPassword = formData.get("confirm_password") as string;
-
-  if (!fullName) {
-    return { error: "Full name is required" };
-  }
-  if (!password || password.length < 8) {
-    return { error: "Password must be at least 8 characters" };
-  }
-  if (password !== confirmPassword) {
-    return { error: "Passwords do not match" };
-  }
-
+export async function completeOnboarding(input: {
+  fullName: string;
+  password?: string;
+  goals: string[];
+  equipment: string[];
+  daysPerWeek: number;
+}): Promise<{
+  error?: string;
+  programTitle?: string;
+  explanation?: string;
+  dayCount?: number;
+} | void> {
   const supabase = await createClient();
-
-  const { error: passwordError } = await supabase.auth.updateUser({
-    password,
-  });
-
-  if (passwordError) {
-    return { error: passwordError.message };
-  }
 
   const {
     data: { user },
@@ -119,15 +108,42 @@ export async function completeProfile(formData: FormData) {
     return { error: "Not authenticated" };
   }
 
+  // Set password if provided (invited clients)
+  if (input.password) {
+    const { error: passwordError } = await supabase.auth.updateUser({
+      password: input.password,
+    });
+    if (passwordError) {
+      return { error: passwordError.message };
+    }
+  }
+
+  // Update profile
   const { error: profileError } = await supabase
     .from("profiles")
-    .update({ full_name: fullName })
+    .update({
+      full_name: input.fullName,
+      onboarding_complete: true,
+    })
     .eq("id", user.id);
 
   if (profileError) {
     return { error: profileError.message };
   }
 
+  const role = user.app_metadata?.role;
+
+  // Solo users get an AI-generated program
+  if (role === "solo") {
+    const { generateSoloProgram } = await import("@/lib/actions/ai.actions");
+    return generateSoloProgram({
+      goals: input.goals,
+      equipment: input.equipment,
+      daysPerWeek: input.daysPerWeek,
+    });
+  }
+
+  // Clients redirect to home
   redirect("/home");
 }
 

@@ -12,21 +12,8 @@ export async function GET(request: NextRequest) {
     if (!error && data.user) {
       const role = data.user.app_metadata?.role as "coach" | "client" | "solo" | undefined;
 
-      // Check if client needs onboarding (no full_name set)
-      if (role === "client") {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("full_name")
-          .eq("id", data.user.id)
-          .single();
-
-        if (!profile?.full_name) {
-          return NextResponse.redirect(`${origin}/onboarding`);
-        }
-      }
-
-      // Solo users who haven't completed onboarding
-      if (role === "solo") {
+      // Clients and solo users who haven't completed onboarding
+      if (role === "client" || role === "solo") {
         const { data: profile } = await supabase
           .from("profiles")
           .select("onboarding_complete")
@@ -34,7 +21,7 @@ export async function GET(request: NextRequest) {
           .single();
 
         if (!profile?.onboarding_complete) {
-          return NextResponse.redirect(`${origin}/solo-onboarding`);
+          return NextResponse.redirect(`${origin}/onboarding`);
         }
       }
 

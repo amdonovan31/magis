@@ -4,6 +4,8 @@ import ClientCard from "@/components/coach/ClientCard";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
 
+export const dynamic = "force-dynamic";
+
 export default async function DashboardPage() {
   const data = await getCoachDashboard();
   if (!data) redirect("/login");

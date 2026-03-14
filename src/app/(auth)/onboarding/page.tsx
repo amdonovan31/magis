@@ -12,16 +12,26 @@ export default async function OnboardingPage() {
     redirect("/login");
   }
 
+  const role = user.app_metadata?.role as "coach" | "client" | "solo" | undefined;
+
+  // Coaches don't onboard here
+  if (role === "coach") {
+    redirect("/dashboard");
+  }
+
   // Check if already onboarded
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name")
+    .select("onboarding_complete")
     .eq("id", user.id)
     .single();
 
-  if (profile?.full_name) {
+  if (profile?.onboarding_complete) {
     redirect("/home");
   }
+
+  // Clients (invited via magic link) need to set a password
+  const needsPassword = role === "client";
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-4">
@@ -29,10 +39,12 @@ export default async function OnboardingPage() {
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-primary">Magis</h1>
           <p className="mt-2 text-sm text-primary/60">
-            Welcome! Set up your profile to get started.
+            {needsPassword
+              ? "Welcome! Set up your profile to get started."
+              : "Let\u2019s build your program"}
           </p>
         </div>
-        <OnboardingForm />
+        <OnboardingForm role={role ?? "solo"} needsPassword={needsPassword} />
       </div>
     </div>
   );

@@ -9,14 +9,19 @@ interface ClientCardProps {
 }
 
 export default function ClientCard({ client }: ClientCardProps) {
-  const { profile, activeProgram, lastSessionDate, streak } = client;
+  const { profile, activeProgram, lastSessionDate, streak, unreadNotes } = client;
 
   return (
     <Link href={`/clients/${profile.id}`}>
       <Card className="flex items-center gap-4 active:scale-[0.98] transition-transform">
         {/* Avatar */}
-        <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-lg font-semibold text-primary">
+        <div className="relative flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-lg font-semibold text-primary">
           {profile.full_name?.[0]?.toUpperCase() ?? "?"}
+          {unreadNotes > 0 && (
+            <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
+              {unreadNotes}
+            </span>
+          )}
         </div>
 
         {/* Info */}

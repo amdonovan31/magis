@@ -6,6 +6,7 @@ import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Link from "next/link";
+import PostSessionNote from "@/components/notes/PostSessionNote";
 
 interface SummaryPageProps {
   params: Promise<{ sessionId: string }>;
@@ -22,6 +23,13 @@ export default async function SummaryPage({ params }: SummaryPageProps) {
 
   const summary = await getSessionSummary(sessionId);
   if (!summary) redirect("/home");
+
+  // Get the client's coach for the note
+  const { data: relationship } = await supabase
+    .from("coach_client_relationships")
+    .select("coach_id")
+    .eq("client_id", user.id)
+    .maybeSingle();
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -96,6 +104,15 @@ export default async function SummaryPage({ params }: SummaryPageProps) {
               ))}
             </div>
           </Card>
+        )}
+
+        {/* Post-session note for coach */}
+        {relationship?.coach_id && (
+          <PostSessionNote
+            clientId={user.id}
+            coachId={relationship.coach_id}
+            sessionId={sessionId}
+          />
         )}
 
         {/* Share stub for Stage 3 */}
