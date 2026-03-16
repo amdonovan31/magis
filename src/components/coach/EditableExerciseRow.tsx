@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import type { ExerciseOption } from "@/components/coach/ExerciseSearchModal";
 
 interface TemplateExercise {
   id: string;
