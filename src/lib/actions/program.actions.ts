@@ -111,6 +111,7 @@ export async function saveGeneratedProgram(input: {
           reps: string;
           rest_seconds: number;
           notes?: string;
+          alternate_exercise_ids?: string[];
         }[];
       }[];
     }[];
@@ -185,6 +186,9 @@ export async function saveGeneratedProgram(input: {
           prescribed_reps: ex.reps,
           rest_seconds: ex.rest_seconds,
           notes: ex.notes || null,
+          alternate_exercise_ids: ex.alternate_exercise_ids?.length
+            ? ex.alternate_exercise_ids
+            : null,
         }));
 
         const { error: exError } = await supabase

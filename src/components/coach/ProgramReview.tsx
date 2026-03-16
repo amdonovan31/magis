@@ -14,6 +14,7 @@ interface GeneratedExercise {
   reps: string;
   rest_seconds: number;
   notes?: string;
+  alternate_exercise_ids?: string[];
 }
 
 interface GeneratedWorkout {

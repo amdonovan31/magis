@@ -3,7 +3,8 @@
 import { useState } from "react";
 import SetRow from "./SetRow";
 import ExerciseDemoModal from "./ExerciseDemoModal";
-import type { WorkoutTemplateExerciseWithExercise, SetLog } from "@/types/app.types";
+import AlternateExercises from "./AlternateExercises";
+import type { WorkoutTemplateExerciseWithExercise, SetLog, Exercise } from "@/types/app.types";
 
 interface ExerciseLoggerProps {
   sessionId: string;
@@ -101,6 +102,12 @@ export default function ExerciseLogger({
           Note: {templateExercise.notes}
         </p>
       )}
+
+      {/* Alternate exercises */}
+      {(() => {
+        const alts = (templateExercise as WorkoutTemplateExerciseWithExercise & { alternateExercises?: Exercise[] }).alternateExercises;
+        return alts && alts.length > 0 ? <AlternateExercises alternates={alts} /> : null;
+      })()}
 
       {/* Demo modal */}
       <ExerciseDemoModal

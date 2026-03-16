@@ -1,4 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
+import { getExercisesByIds } from "@/lib/queries/exercise.queries";
+
+export type AlternateExerciseSummary = {
+  id: string;
+  name: string;
+  muscle_group: string | null;
+  equipment: string | null;
+  instructions: string | null;
+};
 
 export type ScheduledWorkoutWithDetails = {
   id: string;
@@ -16,6 +25,8 @@ export type ScheduledWorkoutWithDetails = {
       prescribed_reps: string | null;
       prescribed_weight: string | null;
       rest_seconds: number | null;
+      alternate_exercise_ids: string[] | null;
+      alternateExercises?: AlternateExerciseSummary[];
       exercise: {
         id: string;
         name: string;
@@ -56,6 +67,7 @@ export async function getScheduledWorkouts(
           prescribed_reps,
           prescribed_weight,
           rest_seconds,
+          alternate_exercise_ids,
           exercise:exercises(id, name, muscle_group)
         )
       )
@@ -117,6 +129,7 @@ export async function getScheduledWorkout(
           prescribed_reps,
           prescribed_weight,
           rest_seconds,
+          alternate_exercise_ids,
           exercise:exercises(id, name, muscle_group)
         )
       )
@@ -130,6 +143,32 @@ export async function getScheduledWorkout(
   const program = data.program as unknown as { id: string; title: string };
   const template = data.template as unknown as ScheduledWorkoutWithDetails["template"];
 
+  // Resolve alternate exercises
+  const sortedExercises = (template.exercises ?? []).sort(
+    (a, b) => a.position - b.position
+  );
+  const allAltIds = sortedExercises
+    .flatMap((e) => (e.alternate_exercise_ids as string[]) ?? []);
+  const uniqueAltIds = Array.from(new Set(allAltIds));
+
+  let exercisesWithAlts = sortedExercises;
+  if (uniqueAltIds.length > 0) {
+    const altExercises = await getExercisesByIds(uniqueAltIds);
+    const altMap = new Map(altExercises.map((e) => [e.id, {
+      id: e.id,
+      name: e.name,
+      muscle_group: e.muscle_group,
+      equipment: e.equipment,
+      instructions: e.instructions,
+    } satisfies AlternateExerciseSummary]));
+    exercisesWithAlts = sortedExercises.map((e) => ({
+      ...e,
+      alternateExercises: ((e.alternate_exercise_ids as string[]) ?? [])
+        .map((id) => altMap.get(id))
+        .filter((x): x is AlternateExerciseSummary => !!x),
+    }));
+  }
+
   return {
     id: data.id,
     scheduled_date: data.scheduled_date,
@@ -138,9 +177,7 @@ export async function getScheduledWorkout(
     program,
     template: {
       ...template,
-      exercises: (template.exercises ?? []).sort(
-        (a, b) => a.position - b.position
-      ),
+      exercises: exercisesWithAlts,
     },
   };
 }

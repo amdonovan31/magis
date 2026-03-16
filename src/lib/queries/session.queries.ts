@@ -1,6 +1,25 @@
 import { createClient } from "@/lib/supabase/server";
 import { isScheduledToday } from "@/lib/utils/date";
-import type { TodayWorkout, WorkoutSession } from "@/types/app.types";
+import { getExercisesByIds } from "@/lib/queries/exercise.queries";
+import type { TodayWorkout, WorkoutSession, Exercise } from "@/types/app.types";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function resolveAlternateExercises(exercises: any[]) {
+  const allAltIds = exercises
+    .flatMap((e) => (e.alternate_exercise_ids as string[]) ?? []);
+  const uniqueIds = Array.from(new Set(allAltIds));
+  if (uniqueIds.length === 0) return exercises;
+
+  const altExercises = await getExercisesByIds(uniqueIds);
+  const altMap = new Map(altExercises.map((e: Exercise) => [e.id, e]));
+
+  return exercises.map((e) => ({
+    ...e,
+    alternateExercises: ((e.alternate_exercise_ids as string[]) ?? [])
+      .map((id: string) => altMap.get(id))
+      .filter(Boolean),
+  }));
+}
 
 export async function getTodayWorkout(): Promise<TodayWorkout> {
   const supabase = await createClient();
@@ -79,12 +98,14 @@ export async function getTodayWorkout(): Promise<TodayWorkout> {
 
   if (!todayTemplate) return null;
 
-  // Sort exercises by position
+  // Sort exercises by position and resolve alternates
+  const sortedExercises = (todayTemplate.exercises ?? []).sort(
+    (a: { position: number }, b: { position: number }) => a.position - b.position
+  );
+  const exercisesWithAlternates = await resolveAlternateExercises(sortedExercises);
   const templateWithSortedExercises = {
     ...todayTemplate,
-    exercises: (todayTemplate.exercises ?? []).sort(
-      (a: { position: number }, b: { position: number }) => a.position - b.position
-    ),
+    exercises: exercisesWithAlternates,
   };
 
   // Check for an in-progress session
@@ -133,6 +154,15 @@ export async function getSession(sessionId: string) {
     `)
     .eq("id", sessionId)
     .single();
+
+  if (!data) return data;
+
+  // Resolve alternate exercises
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const wt = data.workout_template as any;
+  if (wt?.exercises) {
+    wt.exercises = await resolveAlternateExercises(wt.exercises);
+  }
 
   return data;
 }

@@ -8,6 +8,7 @@ interface GeneratedExercise {
   reps: string;
   rest_seconds: number;
   notes?: string;
+  alternate_exercise_ids?: string[];
 }
 
 interface GeneratedWorkout {
@@ -109,7 +110,7 @@ export async function POST(req: NextRequest) {
       .single(),
     supabase
       .from("exercises")
-      .select("id, name, muscle_group, equipment")
+      .select("id, name, muscle_group, equipment, movement_pattern")
       .eq("is_archived", false)
       .order("name", { ascending: true }),
   ]);
@@ -147,7 +148,7 @@ export async function POST(req: NextRequest) {
   const exerciseListText = exercises
     .map(
       (e, i) =>
-        `${i + 1}. ${e.name} | id: ${e.id} | muscle_group: ${e.muscle_group ?? "Other"} | equipment: ${e.equipment ?? "None"}`
+        `${i + 1}. ${e.name} | id: ${e.id} | muscle_group: ${e.muscle_group ?? "Other"} | equipment: ${e.equipment ?? "None"} | movement: ${e.movement_pattern ?? "compound"}`
     )
     .join("\n");
 
@@ -266,7 +267,8 @@ Return ONLY a JSON object in exactly this structure — no markdown, no explanat
               "sets": 3,
               "reps": "8-10",
               "rest_seconds": 90,
-              "notes": "optional coaching cue"
+              "notes": "optional coaching cue",
+              "alternate_exercise_ids": ["uuid", "uuid"]
             }
           ]
         }
@@ -282,7 +284,13 @@ Rules:
 - Respect the coach's periodization style and intensity level.
 - If exercises to include are specified, ensure they appear in the program.
 - If exercises to avoid are specified, never use them.
-- day_of_week must be a full weekday name (Monday, Tuesday, etc.).`;
+- day_of_week must be a full weekday name (Monday, Tuesday, etc.).
+- For each exercise, provide 1-2 alternate_exercise_ids from the library that:
+  (a) Share the same muscle_group as the original exercise.
+  (b) Have a similar movement_pattern (push stays push, hinge stays hinge, isolation stays isolation).
+  (c) Prefer different equipment from the original (e.g. if original is Barbell, prefer Dumbbell or Machine).
+  (d) Do not duplicate the original exercise_id or each other.
+  (e) Do not use any exercises from the avoid list.`;
 
   const systemPrompt = `You are an expert personal trainer and strength & conditioning coach. Your job is to generate a complete, periodized training program based on the client's intake form and the coach's guidelines. You must only use exercises from the provided exercise library. Return your response as valid JSON only — no markdown, no explanation, just the JSON object.`;
 

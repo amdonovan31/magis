@@ -44,6 +44,16 @@ export async function getAllExerciseNames(): Promise<
   return data ?? [];
 }
 
+export async function getExercisesByIds(ids: string[]): Promise<Exercise[]> {
+  if (ids.length === 0) return [];
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("exercises")
+    .select("*")
+    .in("id", ids);
+  return data ?? [];
+}
+
 export async function getExercise(id: string): Promise<Exercise | null> {
   const supabase = await createClient();
   const { data } = await supabase

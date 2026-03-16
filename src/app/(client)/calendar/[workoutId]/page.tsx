@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getScheduledWorkout } from "@/lib/queries/calendar.queries";
 import TopBar from "@/components/layout/TopBar";
-import Card from "@/components/ui/Card";
+import CalendarExerciseCard from "@/components/workout/CalendarExerciseCard";
 import Link from "next/link";
 
 export default async function WorkoutDetailPage({
@@ -56,41 +56,23 @@ export default async function WorkoutDetailPage({
         {/* Exercises */}
         <div className="flex flex-col gap-2">
           {workout.template.exercises.map((te, i) => (
-            <Card key={te.id}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex gap-3">
-                  <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-primary/5 text-xs font-bold text-primary/40">
-                    {i + 1}
-                  </span>
-                  <div>
-                    <p className="font-body font-medium text-primary">
-                      {te.exercise?.name ?? "Unknown Exercise"}
-                    </p>
-                    {te.exercise?.muscle_group && (
-                      <span className="mt-0.5 inline-block rounded-full bg-surface border border-primary/5 px-2 py-0.5 text-[10px] text-muted">
-                        {te.exercise.muscle_group}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
-                  <span className="text-sm text-muted">
-                    {te.prescribed_sets ?? "—"}×{te.prescribed_reps ?? "—"}
-                  </span>
-                  {te.prescribed_weight && (
-                    <span className="text-xs text-primary/40">
-                      @ {te.prescribed_weight}
-                    </span>
-                  )}
-                  {te.rest_seconds != null && te.rest_seconds > 0 && (
-                    <span className="text-xs text-primary/40">
-                      {te.rest_seconds}s rest
-                    </span>
-                  )}
-                </div>
-              </div>
-            </Card>
+            <CalendarExerciseCard
+              key={te.id}
+              index={i + 1}
+              name={te.exercise?.name ?? "Unknown Exercise"}
+              muscleGroup={te.exercise?.muscle_group ?? null}
+              prescribedSets={te.prescribed_sets}
+              prescribedReps={te.prescribed_reps}
+              prescribedWeight={te.prescribed_weight}
+              restSeconds={te.rest_seconds}
+              alternates={
+                (te.alternateExercises ?? []).map((alt) => ({
+                  id: alt.id,
+                  name: alt.name,
+                  equipment: alt.equipment ?? null,
+                }))
+              }
+            />
           ))}
         </div>
 
