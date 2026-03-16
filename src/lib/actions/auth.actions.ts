@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
+import type { IntakeData } from "@/lib/actions/intake.actions";
 
 export async function signUp(formData: FormData) {
   const email = (formData.get("email") as string)?.trim();
@@ -100,9 +101,12 @@ export async function signIn(formData: FormData) {
 export async function completeOnboarding(input: {
   fullName: string;
   password?: string;
-  goals: string[];
-  equipment: string[];
-  daysPerWeek: number;
+  birthdate: string;
+  gender: string;
+  heightCm: number;
+  weightKg: number;
+  trainingAgeYears: number;
+  intakeData: IntakeData;
 }): Promise<{
   error?: string;
   programTitle?: string;
@@ -134,12 +138,31 @@ export async function completeOnboarding(input: {
     .from("profiles")
     .update({
       full_name: input.fullName,
+      birthdate: input.birthdate,
+      gender: input.gender,
+      height_cm: input.heightCm,
+      weight_kg: input.weightKg,
+      training_age_years: input.trainingAgeYears,
       onboarding_complete: true,
+      intake_requested: false,
     })
     .eq("id", user.id);
 
   if (profileError) {
     return { error: profileError.message };
+  }
+
+  const coachId = user.app_metadata?.coach_id as string | undefined;
+
+  // Save intake data for all roles
+  const { error: intakeError } = await supabase.from("client_intake").insert({
+    client_id: user.id,
+    coach_id: coachId ?? null,
+    ...input.intakeData,
+  });
+
+  if (intakeError) {
+    console.error("Intake insert error:", intakeError);
   }
 
   const role = user.app_metadata?.role;
@@ -148,9 +171,15 @@ export async function completeOnboarding(input: {
   if (role === "solo") {
     const { generateSoloProgram } = await import("@/lib/actions/ai.actions");
     return generateSoloProgram({
-      goals: input.goals,
-      equipment: input.equipment,
-      daysPerWeek: input.daysPerWeek,
+      goals: [input.intakeData.primary_goal, input.intakeData.secondary_goal].filter(Boolean) as string[],
+      equipment: input.intakeData.equipment_available,
+      daysPerWeek: input.intakeData.days_per_week,
+      birthdate: input.birthdate,
+      gender: input.gender,
+      heightCm: input.heightCm,
+      weightKg: input.weightKg,
+      trainingAgeYears: input.trainingAgeYears,
+      intakeData: input.intakeData,
     });
   }
 

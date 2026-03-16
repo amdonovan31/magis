@@ -790,36 +790,51 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          birthdate: string | null
           created_at: string
           full_name: string | null
+          gender: string | null
+          height_cm: number | null
           id: string
           intake_requested: boolean
           onboarding_complete: boolean
           role: string
           roles: string[]
+          training_age_years: number | null
           updated_at: string
+          weight_kg: number | null
         }
         Insert: {
           avatar_url?: string | null
+          birthdate?: string | null
           created_at?: string
           full_name?: string | null
+          gender?: string | null
+          height_cm?: number | null
           id: string
           intake_requested?: boolean
           onboarding_complete?: boolean
           role: string
           roles?: string[]
+          training_age_years?: number | null
           updated_at?: string
+          weight_kg?: number | null
         }
         Update: {
           avatar_url?: string | null
+          birthdate?: string | null
           created_at?: string
           full_name?: string | null
+          gender?: string | null
+          height_cm?: number | null
           id?: string
           intake_requested?: boolean
           onboarding_complete?: boolean
           role?: string
           roles?: string[]
+          training_age_years?: number | null
           updated_at?: string
+          weight_kg?: number | null
         }
         Relationships: []
       }
@@ -832,6 +847,7 @@ export type Database = {
           id: string
           is_active: boolean
           starts_on: string | null
+          status: string
           title: string
         }
         Insert: {
@@ -842,6 +858,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           starts_on?: string | null
+          status?: string
           title: string
         }
         Update: {
@@ -852,6 +869,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           starts_on?: string | null
+          status?: string
           title?: string
         }
         Relationships: [

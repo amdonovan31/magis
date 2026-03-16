@@ -45,9 +45,14 @@ export default async function ProgramsPage() {
                       <p className="text-sm text-primary/40 italic">Unassigned</p>
                     )}
                   </div>
-                  <Badge variant={program.is_active ? "success" : "default"}>
-                    {program.is_active ? "Active" : "Inactive"}
-                  </Badge>
+                  <div className="flex flex-col items-end gap-1">
+                    <Badge variant={program.status === "published" ? "success" : "warning"}>
+                      {program.status === "published" ? "Published" : "Draft"}
+                    </Badge>
+                    {program.is_active && (
+                      <Badge variant="success">Active</Badge>
+                    )}
+                  </div>
                 </div>
                 {program.description && (
                   <p className="mt-2 text-sm text-primary/60 line-clamp-2">

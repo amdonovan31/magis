@@ -25,6 +25,7 @@ export async function getTodayWorkout(): Promise<TodayWorkout> {
     `)
     .eq("client_id", user.id)
     .eq("is_active", true)
+    .eq("status", "published")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -45,6 +46,7 @@ export async function getTodayWorkout(): Promise<TodayWorkout> {
         `)
         .eq("client_id", user.id)
         .eq("is_active", true)
+        .eq("status", "published")
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle()

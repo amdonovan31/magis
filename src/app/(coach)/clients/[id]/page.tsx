@@ -140,9 +140,14 @@ export default async function ClientDetailPage({
               <Card className="active:scale-[0.98] transition-transform">
                 <div className="flex items-center justify-between">
                   <p className="font-medium text-primary">{program.title}</p>
-                  <Badge variant={program.is_active ? "success" : "default"}>
-                    {program.is_active ? "Active" : "Inactive"}
-                  </Badge>
+                  <div className="flex items-center gap-1.5">
+                    <Badge variant={program.status === "published" ? "success" : "warning"}>
+                      {program.status === "published" ? "Published" : "Draft"}
+                    </Badge>
+                    {program.is_active && (
+                      <Badge variant="success">Active</Badge>
+                    )}
+                  </div>
                 </div>
               </Card>
             </Link>

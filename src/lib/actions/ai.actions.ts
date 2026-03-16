@@ -3,11 +3,18 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAllExerciseNames } from "@/lib/queries/exercise.queries";
 import { revalidatePath } from "next/cache";
+import type { IntakeData } from "@/lib/actions/intake.actions";
 
 interface GenerateProgramInput {
   goals: string[];
   equipment: string[];
   daysPerWeek: number;
+  birthdate?: string;
+  gender?: string;
+  heightCm?: number;
+  weightKg?: number;
+  trainingAgeYears?: number;
+  intakeData?: IntakeData;
 }
 
 interface GeneratedExercise {
@@ -52,15 +59,80 @@ export async function generateSoloProgram(input: GenerateProgramInput): Promise<
   } = await supabase.auth.getUser();
   if (!user) return { error: "Unauthorized" };
 
-  // Fetch available exercises for the AI prompt
-  const exercises = await getAllExerciseNames();
+  // Fetch available exercises and profile data in parallel
+  const [exercises, { data: profileData }] = await Promise.all([
+    getAllExerciseNames(),
+    supabase
+      .from("profiles")
+      .select("birthdate, gender, height_cm, weight_kg, training_age_years")
+      .eq("id", user.id)
+      .single(),
+  ]);
   const exerciseList = exercises
     .map((e) => `${e.name} (${e.muscle_group ?? "Other"})`)
     .join(", ");
 
+  // Use passed-in values or fall back to profile data from DB
+  const birthdate = input.birthdate ?? profileData?.birthdate;
+  const gender = input.gender ?? profileData?.gender;
+  const heightCm = input.heightCm ?? profileData?.height_cm;
+  const weightKg = input.weightKg ?? profileData?.weight_kg;
+  const trainingAgeYears = input.trainingAgeYears ?? profileData?.training_age_years;
+
+  // Build client profile section for the prompt
+  let clientProfileSection = "";
+  if (birthdate) {
+    const birthDate = new Date(birthdate);
+    const clientAge = Math.floor(
+      (Date.now() - birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000)
+    );
+    clientProfileSection += `- Age: ${clientAge} years old\n`;
+  }
+  if (gender) clientProfileSection += `- Gender: ${gender}\n`;
+  if (heightCm) {
+    const totalIn = Math.round(heightCm / 2.54);
+    clientProfileSection += `- Height: ${heightCm} cm (${Math.floor(totalIn / 12)} ft ${totalIn % 12} in)\n`;
+  }
+  if (weightKg) {
+    clientProfileSection += `- Weight: ${weightKg} kg (${Math.round(weightKg / 0.453592)} lbs)\n`;
+  }
+  if (trainingAgeYears != null) {
+    clientProfileSection += `- Training experience: ${trainingAgeYears === 0 ? "Complete beginner" : `${trainingAgeYears} year${trainingAgeYears === 1 ? "" : "s"}`}\n`;
+  }
+
+  // Build health & intake section from PAR-Q and intake data
+  let healthSection = "";
+  const intake = input.intakeData;
+  if (intake) {
+    const parqFlags: string[] = [];
+    if (intake.parq_heart_condition) parqFlags.push("heart condition");
+    if (intake.parq_chest_pain_activity) parqFlags.push("chest pain during activity");
+    if (intake.parq_chest_pain_rest) parqFlags.push("chest pain at rest");
+    if (intake.parq_dizziness) parqFlags.push("dizziness/balance issues");
+    if (intake.parq_bone_joint) parqFlags.push("bone/joint problems");
+    if (intake.parq_blood_pressure_meds) parqFlags.push("blood pressure medication");
+    if (intake.parq_other_reason) parqFlags.push("other health concern");
+
+    if (parqFlags.length > 0) {
+      healthSection += `- PAR-Q flags: ${parqFlags.join(", ")}\n`;
+    }
+    if (intake.parq_notes) {
+      healthSection += `- Health notes: ${intake.parq_notes}\n`;
+    }
+    if (intake.injuries_limitations) {
+      healthSection += `- Injuries/limitations: ${intake.injuries_limitations}\n`;
+    }
+    if (intake.training_focus.length > 0) {
+      healthSection += `- Training focus: ${intake.training_focus.join(", ")}\n`;
+    }
+    if (intake.session_duration) {
+      healthSection += `- Preferred session duration: ${intake.session_duration} minutes\n`;
+    }
+  }
+
   const prompt = `You are a certified personal trainer creating a ${input.daysPerWeek}-day per week training program.
 
-Client goals: ${input.goals.join(", ")}
+${clientProfileSection ? `CLIENT PROFILE:\n${clientProfileSection}` : ""}${healthSection ? `HEALTH & PREFERENCES:\n${healthSection}\n` : ""}Client goals: ${input.goals.join(", ")}
 Available equipment: ${input.equipment.join(", ")}
 Days per week: ${input.daysPerWeek}
 
@@ -96,6 +168,7 @@ Rules:
 - Use exercise names from the provided list when possible.
 - Valid muscle groups: Chest, Back, Shoulders, Biceps, Triceps, Legs, Quads, Hamstrings, Glutes, Core, Calves, Full Body, Cardio.
 - rest_seconds should be between 60-180 based on exercise intensity.
+- If PAR-Q flags or injuries are present, avoid exercises that could aggravate those conditions and prefer safer alternatives.
 - Return ONLY the JSON object, no markdown fences or extra text.`;
 
   try {
@@ -107,7 +180,7 @@ Rules:
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         max_tokens: 4096,
         messages: [{ role: "user", content: prompt }],
       }),
@@ -229,7 +302,7 @@ Rules:
         equipment: input.equipment,
         daysPerWeek: input.daysPerWeek,
       },
-      ai_model: "claude-sonnet-4-20250514",
+      ai_model: "claude-sonnet-4-6",
     });
 
     revalidatePath("/home");

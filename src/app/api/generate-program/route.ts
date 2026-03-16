@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("full_name")
+      .select("full_name, birthdate, gender, height_cm, weight_kg, training_age_years")
       .eq("id", clientId)
       .single(),
     supabase
@@ -155,6 +155,27 @@ export async function POST(req: NextRequest) {
   // Build client profile section
   // ------------------------------------------------------------------
   let clientSection = `CLIENT PROFILE:\n- Name: ${profile?.full_name ?? "Unknown"}\n`;
+
+  if (profile?.birthdate) {
+    const birthDate = new Date(profile.birthdate);
+    const age = Math.floor(
+      (Date.now() - birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000)
+    );
+    clientSection += `- Age: ${age} years old\n`;
+  }
+  if (profile?.gender) {
+    clientSection += `- Gender: ${profile.gender}\n`;
+  }
+  if (profile?.height_cm) {
+    const totalIn = Math.round(profile.height_cm / 2.54);
+    clientSection += `- Height: ${profile.height_cm} cm (${Math.floor(totalIn / 12)} ft ${totalIn % 12} in)\n`;
+  }
+  if (profile?.weight_kg) {
+    clientSection += `- Weight: ${profile.weight_kg} kg (${Math.round(profile.weight_kg / 0.453592)} lbs)\n`;
+  }
+  if (profile?.training_age_years != null) {
+    clientSection += `- Training experience: ${profile.training_age_years === 0 ? "Complete beginner" : `${profile.training_age_years} year${profile.training_age_years === 1 ? "" : "s"}`}\n`;
+  }
 
   if (intake) {
     clientSection += `- Primary goal: ${intake.primary_goal ?? "Not specified"}\n`;
@@ -277,8 +298,8 @@ Rules:
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6-20250514",
-        max_tokens: 16000,
+        model: "claude-sonnet-4-6",
+        max_tokens: 32000,
         temperature: 0,
         system: systemPrompt,
         messages: [{ role: "user", content: userPrompt }],
@@ -300,6 +321,15 @@ Rules:
     if (!content) {
       return NextResponse.json(
         { error: "Empty response from AI. Please try again." },
+        { status: 500 }
+      );
+    }
+
+    // Check if response was truncated
+    if (data.stop_reason === "max_tokens") {
+      console.error("AI response truncated — hit max_tokens limit");
+      return NextResponse.json(
+        { error: "AI response was too long and got cut off. Please try again." },
         { status: 500 }
       );
     }
@@ -336,14 +366,14 @@ Rules:
       details: {
         coach_id: user.id,
         guidelines_id: guidelinesId,
-        model: "claude-sonnet-4-6-20250514",
+        model: "claude-sonnet-4-6",
         weeks: program.weeks.length,
         total_workouts: program.weeks.reduce(
           (sum, w) => sum + w.workouts.length,
           0
         ),
       },
-      ai_model: "claude-sonnet-4-6-20250514",
+      ai_model: "claude-sonnet-4-6",
     });
 
     return NextResponse.json({ program });
