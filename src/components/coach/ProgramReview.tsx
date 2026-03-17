@@ -2,18 +2,36 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
 import TopBar from "@/components/layout/TopBar";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
+import Modal from "@/components/ui/Modal";
+import EditableWorkoutCard from "./EditableWorkoutCard";
+import ExerciseSearchModal, {
+  type ExerciseOption,
+} from "./ExerciseSearchModal";
 import { saveGeneratedProgram } from "@/lib/actions/program.actions";
 
 interface GeneratedExercise {
   exercise_id: string;
-  exercise_name: string;
   sets: number;
   reps: string;
   rest_seconds: number;
   notes?: string;
+  prescribed_weight?: string;
   alternate_exercise_ids?: string[];
 }
 
@@ -26,7 +44,6 @@ interface GeneratedWorkout {
 
 interface GeneratedWeek {
   week_number: number;
-  focus: string;
   workouts: GeneratedWorkout[];
 }
 
@@ -39,14 +56,46 @@ interface GeneratedProgram {
 interface Props {
   clientId: string;
   clientName: string;
+  exercises: ExerciseOption[];
 }
 
-export default function ProgramReview({ clientId, clientName }: Props) {
+const WEEKDAYS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
+
+export default function ProgramReview({
+  clientId,
+  clientName,
+  exercises,
+}: Props) {
   const router = useRouter();
   const [program, setProgram] = useState<GeneratedProgram | null>(null);
+  const [exerciseNames, setExerciseNames] = useState<Record<string, string>>(
+    {}
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [expandedWeek, setExpandedWeek] = useState<number>(1);
+  const [isEditing, setIsEditing] = useState(false);
+  const [regenModalOpen, setRegenModalOpen] = useState(false);
+  const [regenFeedback, setRegenFeedback] = useState("");
+  const [searchModal, setSearchModal] = useState<{
+    open: boolean;
+    mode: "swap" | "add";
+    weekIndex: number;
+    workoutIndex: number;
+    exerciseIndex?: number;
+  }>({ open: false, mode: "add", weekIndex: 0, workoutIndex: 0 });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  );
 
   useEffect(() => {
     const stored = localStorage.getItem("pending_program");
@@ -59,10 +108,112 @@ export default function ProgramReview({ clientId, clientName }: Props) {
 
     try {
       setProgram(JSON.parse(stored));
+      const namesJson = localStorage.getItem(
+        "pending_program_exercise_names"
+      );
+      if (namesJson) setExerciseNames(JSON.parse(namesJson));
     } catch {
       router.replace(`/clients/${clientId}/generate`);
     }
   }, [clientId, router]);
+
+  // Helper to update a specific workout in a specific week
+  function updateWorkoutInWeek(
+    weekIdx: number,
+    workoutIdx: number,
+    updater: (w: GeneratedWorkout) => GeneratedWorkout
+  ) {
+    setProgram((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        weeks: prev.weeks.map((w, wi) =>
+          wi !== weekIdx
+            ? w
+            : {
+                ...w,
+                workouts: w.workouts.map((wo, woi) =>
+                  woi !== workoutIdx ? wo : updater(wo)
+                ),
+              }
+        ),
+      };
+    });
+  }
+
+  // Day reordering — reassign day_of_week sequentially
+  function handleDayDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !program) return;
+
+    const weekIdx = program.weeks.findIndex(
+      (w) => w.week_number === expandedWeek
+    );
+    if (weekIdx === -1) return;
+
+    const week = program.weeks[weekIdx];
+    const workoutIds = week.workouts.map((_, i) => `day-${weekIdx}-${i}`);
+    const oldIndex = workoutIds.indexOf(active.id as string);
+    const newIndex = workoutIds.indexOf(over.id as string);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(week.workouts, oldIndex, newIndex).map(
+      (wo, i) => ({
+        ...wo,
+        day_of_week: WEEKDAYS[i] ?? wo.day_of_week,
+      })
+    );
+
+    setProgram((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        weeks: prev.weeks.map((w, wi) =>
+          wi !== weekIdx ? w : { ...w, workouts: reordered }
+        ),
+      };
+    });
+  }
+
+  function handleToggleEdit() {
+    if (isEditing && program) {
+      // Persist edits to localStorage when leaving edit mode
+      localStorage.setItem("pending_program", JSON.stringify(program));
+    }
+    setIsEditing(!isEditing);
+  }
+
+  function handleExerciseSelect(exercise: ExerciseOption) {
+    const { weekIndex, workoutIndex, exerciseIndex, mode } = searchModal;
+
+    // Update exercise names map
+    setExerciseNames((prev) => ({ ...prev, [exercise.id]: exercise.name }));
+
+    if (mode === "swap" && exerciseIndex != null) {
+      updateWorkoutInWeek(weekIndex, workoutIndex, (wo) => ({
+        ...wo,
+        exercises: wo.exercises.map((ex, i) =>
+          i !== exerciseIndex
+            ? ex
+            : { ...ex, exercise_id: exercise.id }
+        ),
+      }));
+    } else {
+      // Add
+      updateWorkoutInWeek(weekIndex, workoutIndex, (wo) => ({
+        ...wo,
+        exercises: [
+          ...wo.exercises,
+          {
+            exercise_id: exercise.id,
+            sets: 3,
+            reps: "10",
+            rest_seconds: 90,
+          },
+        ],
+      }));
+    }
+  }
 
   async function handleApprove() {
     if (!program) return;
@@ -79,7 +230,7 @@ export default function ProgramReview({ clientId, clientName }: Props) {
 
       localStorage.removeItem("pending_program");
       localStorage.removeItem("pending_program_client_id");
-      // Redirect to the program editor so the coach can review/edit before publishing
+      localStorage.removeItem("pending_program_exercise_names");
       if (res?.programId) {
         router.push(`/programs/${res.programId}/edit`);
       } else {
@@ -91,9 +242,18 @@ export default function ProgramReview({ clientId, clientName }: Props) {
     }
   }
 
-  function handleRegenerate() {
+  function handleSubmitRegenerate(withFeedback: boolean) {
+    if (withFeedback && regenFeedback.trim() && program) {
+      localStorage.setItem("regeneration_feedback", regenFeedback.trim());
+      localStorage.setItem(
+        "regeneration_previous_program",
+        JSON.stringify(program)
+      );
+    }
     localStorage.removeItem("pending_program");
     localStorage.removeItem("pending_program_client_id");
+    localStorage.removeItem("pending_program_exercise_names");
+    setRegenModalOpen(false);
     router.push(`/clients/${clientId}/generate/loading`);
   }
 
@@ -105,11 +265,35 @@ export default function ProgramReview({ clientId, clientName }: Props) {
     );
   }
 
-  const totalWorkouts = program.weeks.reduce((sum, w) => sum + w.workouts.length, 0);
-  const totalExercises = program.weeks.reduce(
-    (sum, w) => sum + w.workouts.reduce((ws, wo) => ws + wo.exercises.length, 0),
+  const totalWorkouts = program.weeks.reduce(
+    (sum, w) => sum + w.workouts.length,
     0
   );
+  const totalExercises = program.weeks.reduce(
+    (sum, w) =>
+      sum + w.workouts.reduce((ws, wo) => ws + wo.exercises.length, 0),
+    0
+  );
+
+  const currentWeekIdx = program.weeks.findIndex(
+    (w) => w.week_number === expandedWeek
+  );
+  const currentWeek =
+    currentWeekIdx !== -1 ? program.weeks[currentWeekIdx] : null;
+  const dayIds =
+    currentWeek?.workouts.map((_, i) => `day-${currentWeekIdx}-${i}`) ?? [];
+
+  // Build instructions lookup from exercises prop
+  const exerciseInstructions: Record<string, string> = {};
+  for (const e of exercises) {
+    if (e.instructions) exerciseInstructions[e.id] = e.instructions;
+  }
+
+  // Exclude IDs for exercise search (exercises already in the target workout)
+  const searchTargetWorkout =
+    currentWeek?.workouts[searchModal.workoutIndex];
+  const searchExcludeIds =
+    searchTargetWorkout?.exercises.map((e) => e.exercise_id) ?? [];
 
   return (
     <>
@@ -127,18 +311,35 @@ export default function ProgramReview({ clientId, clientName }: Props) {
       <div className="flex flex-col gap-4 px-4 pt-4 pb-8">
         {/* Program header */}
         <Card padding="lg">
-          <h2 className="font-heading text-xl font-semibold text-primary">
-            {program.program_name}
-          </h2>
-          <p className="mt-1 text-sm text-muted">{program.program_description}</p>
-          <div className="mt-3 flex gap-4 text-xs text-primary/50">
-            <span>{program.weeks.length} weeks</span>
-            <span>{totalWorkouts} workouts</span>
-            <span>{totalExercises} exercises</span>
+          <div className="flex items-start justify-between">
+            <div className="flex-1 min-w-0">
+              <h2 className="font-heading text-xl font-semibold text-primary">
+                {program.program_name}
+              </h2>
+              <p className="mt-1 text-sm text-muted">
+                {program.program_description}
+              </p>
+              <div className="mt-3 flex gap-4 text-xs text-primary/50">
+                <span>{program.weeks.length} weeks</span>
+                <span>{totalWorkouts} workouts</span>
+                <span>{totalExercises} exercises</span>
+              </div>
+              <p className="mt-1 text-xs text-primary/50">
+                For {clientName}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleToggleEdit}
+              className={`shrink-0 ml-3 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                isEditing
+                  ? "bg-accent text-white"
+                  : "bg-primary/10 text-primary hover:bg-primary/20"
+              }`}
+            >
+              {isEditing ? "Done Editing" : "Edit Program"}
+            </button>
           </div>
-          <p className="mt-1 text-xs text-primary/50">
-            For {clientName}
-          </p>
         </Card>
 
         {/* Week tabs */}
@@ -159,83 +360,147 @@ export default function ProgramReview({ clientId, clientName }: Props) {
         </div>
 
         {/* Expanded week */}
-        {program.weeks
-          .filter((w) => w.week_number === expandedWeek)
-          .map((week) => (
-            <div key={week.week_number} className="flex flex-col gap-3">
-              <p className="text-sm font-medium text-primary/60">
-                Focus: {week.focus}
-              </p>
-
-              {week.workouts.map((workout, wi) => (
-                <Card key={wi} padding="md">
-                  <div className="mb-2 flex items-baseline justify-between">
-                    <h3 className="font-heading text-base font-semibold text-primary">
-                      {workout.workout_name}
-                    </h3>
-                    <span className="text-xs text-primary/40">{workout.day_of_week}</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1 mb-3">
-                    {workout.muscle_groups.map((mg) => (
-                      <span
-                        key={mg}
-                        className="rounded-full bg-primary/5 px-2 py-0.5 text-[10px] font-medium text-primary/60"
-                      >
-                        {mg}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    {workout.exercises.map((ex, ei) => (
-                      <div
-                        key={ei}
-                        className="flex items-center justify-between rounded-lg bg-bg/50 px-3 py-2"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-primary truncate">
-                            {ex.exercise_name}
-                          </p>
-                          {ex.notes && (
-                            <p className="text-[10px] text-primary/40 truncate">{ex.notes}</p>
-                          )}
-                        </div>
-                        <div className="ml-3 shrink-0 text-right text-xs text-primary/60">
-                          <span>{ex.sets} &times; {ex.reps}</span>
-                          <span className="ml-2 text-primary/30">{ex.rest_seconds}s</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
+        {currentWeek && (
+          isEditing ? (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDayDragEnd}
+            >
+              <SortableContext
+                items={dayIds}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="flex flex-col gap-3">
+                  {currentWeek.workouts.map((workout, wi) => (
+                    <EditableWorkoutCard
+                      key={dayIds[wi]}
+                      id={dayIds[wi]}
+                      workout={workout}
+                      weekIndex={currentWeekIdx}
+                      workoutIndex={wi}
+                      exerciseNames={exerciseNames}
+                      exerciseInstructions={exerciseInstructions}
+                      isEditing
+                      onUpdateWorkout={(updated) =>
+                        updateWorkoutInWeek(
+                          currentWeekIdx,
+                          wi,
+                          () => updated
+                        )
+                      }
+                      onOpenExerciseSearch={(mode, exerciseIndex) =>
+                        setSearchModal({
+                          open: true,
+                          mode,
+                          weekIndex: currentWeekIdx,
+                          workoutIndex: wi,
+                          exerciseIndex,
+                        })
+                      }
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {currentWeek.workouts.map((workout, wi) => (
+                <EditableWorkoutCard
+                  key={wi}
+                  id={`day-${currentWeekIdx}-${wi}`}
+                  workout={workout}
+                  weekIndex={currentWeekIdx}
+                  workoutIndex={wi}
+                  exerciseNames={exerciseNames}
+                      exerciseInstructions={exerciseInstructions}
+                  isEditing={false}
+                  onUpdateWorkout={() => {}}
+                  onOpenExerciseSearch={() => {}}
+                />
               ))}
             </div>
-          ))}
+          )
+        )}
 
         {/* Error */}
         {error && (
-          <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
+          <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </p>
         )}
 
         {/* Actions */}
         <div className="flex gap-3 pt-2">
-          <Button
-            variant="secondary"
-            fullWidth
-            onClick={handleRegenerate}
-            disabled={saving}
-          >
-            Regenerate
-          </Button>
+          {!isEditing && (
+            <Button
+              variant="secondary"
+              fullWidth
+              onClick={() => setRegenModalOpen(true)}
+              disabled={saving}
+            >
+              Regenerate
+            </Button>
+          )}
           <Button
             fullWidth
             size="lg"
             onClick={handleApprove}
-            disabled={saving}
+            disabled={saving || isEditing}
           >
             {saving ? "Saving..." : "Approve & Save"}
           </Button>
         </div>
       </div>
+
+      {/* Regeneration feedback modal */}
+      <Modal
+        isOpen={regenModalOpen}
+        onClose={() => setRegenModalOpen(false)}
+        title="Regenerate Program"
+      >
+        <p className="text-sm text-muted mb-3">
+          What would you like changed? The AI will see the current program and
+          your feedback.
+        </p>
+        <textarea
+          value={regenFeedback}
+          onChange={(e) => setRegenFeedback(e.target.value)}
+          rows={4}
+          className="w-full rounded-xl border border-primary/10 bg-primary/5 px-3 py-2 text-sm text-primary placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+          placeholder="e.g., Make the program more leg-focused, reduce isolation work on day 3..."
+        />
+        <div className="flex gap-3 mt-4">
+          <Button
+            variant="secondary"
+            fullWidth
+            onClick={() => handleSubmitRegenerate(false)}
+          >
+            Start Fresh
+          </Button>
+          <Button
+            fullWidth
+            onClick={() => handleSubmitRegenerate(true)}
+            disabled={!regenFeedback.trim()}
+          >
+            Regenerate
+          </Button>
+        </div>
+      </Modal>
+
+      {/* Exercise search modal */}
+      <ExerciseSearchModal
+        isOpen={searchModal.open}
+        onClose={() =>
+          setSearchModal((prev) => ({ ...prev, open: false }))
+        }
+        onSelect={handleExerciseSelect}
+        exercises={exercises}
+        excludeIds={searchExcludeIds}
+        title={
+          searchModal.mode === "swap" ? "Swap Exercise" : "Add Exercise"
+        }
+      />
     </>
   );
 }

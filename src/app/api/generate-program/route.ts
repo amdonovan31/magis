@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 
 interface GeneratedExercise {
   exercise_id: string;
-  exercise_name: string;
   sets: number;
   reps: string;
   rest_seconds: number;
@@ -20,7 +20,6 @@ interface GeneratedWorkout {
 
 interface GeneratedWeek {
   week_number: number;
-  focus: string;
   workouts: GeneratedWorkout[];
 }
 
@@ -55,10 +54,14 @@ export async function POST(req: NextRequest) {
   // Parse request body
   let clientId: string;
   let guidelinesId: string;
+  let regenerationFeedback: string | undefined;
+  let previousProgram: GeneratedProgram | undefined;
   try {
     const body = await req.json();
     clientId = body.clientId;
     guidelinesId = body.guidelinesId;
+    regenerationFeedback = body.regenerationFeedback;
+    previousProgram = body.previousProgram;
     if (!clientId || !guidelinesId) throw new Error("Missing fields");
   } catch {
     return NextResponse.json(
@@ -110,8 +113,9 @@ export async function POST(req: NextRequest) {
       .single(),
     supabase
       .from("exercises")
-      .select("id, name, muscle_group, equipment, movement_pattern")
+      .select("id, name, muscle_group, equipment, movement_pattern, difficulty, is_custom")
       .eq("is_archived", false)
+      .order("is_custom", { ascending: true })
       .order("name", { ascending: true }),
   ]);
 
@@ -143,12 +147,49 @@ export async function POST(req: NextRequest) {
     .filter(Boolean) ?? [];
 
   // ------------------------------------------------------------------
-  // Build the exercise library text
+  // Pre-filter exercises by client's available equipment
   // ------------------------------------------------------------------
-  const exerciseListText = exercises
+  const clientEquipment = intake?.equipment_available as string[] | null;
+
+  // "Full Gym" means all equipment — skip filtering entirely
+  const hasFullGym = clientEquipment?.some((eq) => eq.toLowerCase().includes("full gym"));
+
+  // Map intake labels to exercise.equipment values
+  const equipmentKeywords = (clientEquipment ?? []).flatMap((eq) => {
+    const lower = eq.toLowerCase();
+    if (lower.includes("full gym")) return []; // handled above
+    if (lower.includes("cables") || lower.includes("machines")) return ["cable", "machine"];
+    if (lower.includes("dumbbells")) return ["dumbbell"];
+    if (lower.includes("kettlebells")) return ["kettlebell"];
+    if (lower.includes("bands")) return ["band", "resistance"];
+    if (lower.includes("bodyweight")) return ["bodyweight"];
+    return [lower]; // barbell, etc.
+  });
+
+  const filteredExercises =
+    hasFullGym || !clientEquipment?.length
+      ? exercises
+      : exercises.filter(
+          (e) =>
+            !e.equipment ||
+            e.equipment === "Bodyweight" ||
+            equipmentKeywords.some((kw) =>
+              e.equipment?.toLowerCase().includes(kw)
+            )
+        );
+
+  // Use filtered list if it has enough variety, otherwise fall back to full list
+  const libraryExercises =
+    filteredExercises.length >= 30 ? filteredExercises : exercises;
+
+  // ------------------------------------------------------------------
+  // Build the exercise library text (compact format)
+  // Foundational exercises listed first, marked with ★
+  // ------------------------------------------------------------------
+  const exerciseListText = libraryExercises
     .map(
-      (e, i) =>
-        `${i + 1}. ${e.name} | id: ${e.id} | muscle_group: ${e.muscle_group ?? "Other"} | equipment: ${e.equipment ?? "None"} | movement: ${e.movement_pattern ?? "compound"}`
+      (e) =>
+        `${e.is_custom ? "" : "★"}${e.id}|${e.name}|${e.muscle_group ?? "Other"}|${e.equipment ?? "None"}|${e.movement_pattern ?? "compound"}|${e.difficulty ?? "intermediate"}`
     )
     .join("\n");
 
@@ -233,7 +274,27 @@ export async function POST(req: NextRequest) {
     guidelinesSection += `- Exercises to AVOID: ${avoidNames.join(", ")}\n`;
   }
   if (guidelines.additional_notes) {
-    guidelinesSection += `- Additional coaching notes: ${guidelines.additional_notes}\n`;
+    guidelinesSection += `\nCOACH'S SPECIFIC INSTRUCTIONS (high priority — follow these closely):\n${guidelines.additional_notes}\n`;
+  }
+
+  // ------------------------------------------------------------------
+  // Build optional regeneration context
+  // ------------------------------------------------------------------
+  let regenerationSection = "";
+  if (regenerationFeedback && previousProgram) {
+    regenerationSection = `\nREGENERATION CONTEXT:
+The coach has already reviewed a previously generated program and wants specific changes.
+
+PREVIOUS PROGRAM (what was generated before):
+${JSON.stringify(previousProgram)}
+
+COACH'S REGENERATION FEEDBACK (highest priority — make these changes):
+${regenerationFeedback}
+
+IMPORTANT: Use the previous program as a starting point. Apply the coach's feedback to improve it. Keep what works, change what the coach asked to change.\n`;
+  } else if (regenerationFeedback) {
+    regenerationSection = `\nREGENERATION FEEDBACK (highest priority):
+${regenerationFeedback}\n`;
   }
 
   // ------------------------------------------------------------------
@@ -241,92 +302,56 @@ export async function POST(req: NextRequest) {
   // ------------------------------------------------------------------
   const userPrompt = `${clientSection}
 ${guidelinesSection}
-EXERCISE LIBRARY (you MUST only use exercise IDs from this list):
+${regenerationSection}EXERCISE LIBRARY (format: [★]id|name|muscle_group|equipment|movement_pattern|difficulty):
+Exercises marked with ★ are foundational — STRONGLY prefer these. Only use unmarked (custom) exercises when no suitable ★ exercise exists for a movement pattern.
 ${exerciseListText}
 
-OUTPUT INSTRUCTIONS:
-Generate a complete ${guidelines.program_length_weeks}-week training program.
-Return ONLY a JSON object in exactly this structure — no markdown, no explanation, just the JSON:
-
-{
-  "program_name": "string",
-  "program_description": "string",
-  "weeks": [
-    {
-      "week_number": 1,
-      "focus": "string describing this week's focus",
-      "workouts": [
-        {
-          "day_of_week": "Monday",
-          "workout_name": "string",
-          "muscle_groups": ["Chest", "Triceps"],
-          "exercises": [
-            {
-              "exercise_id": "uuid from exercise library",
-              "exercise_name": "string",
-              "sets": 3,
-              "reps": "8-10",
-              "rest_seconds": 90,
-              "notes": "optional coaching cue",
-              "alternate_exercise_ids": ["uuid", "uuid"]
-            }
-          ]
-        }
-      ]
-    }
-  ]
-}
+OUTPUT: Return minified JSON (no extra whitespace) with this structure:
+{"program_name":"string","program_description":"string","weeks":[{"week_number":1,"workouts":[{"day_of_week":"Monday","workout_name":"string","muscle_groups":["Chest","Triceps"],"exercises":[{"exercise_id":"uuid","sets":3,"reps":"8-10","rest_seconds":90,"notes":"optional cue","alternate_exercise_ids":["uuid"]}]}]}]}
 
 Rules:
-- Every exercise_id MUST match an id from the exercise library above.
-- Each workout should have 4-8 exercises.
-- rest_seconds should be 60-180 based on exercise intensity.
-- Respect the coach's periodization style and intensity level.
-- If exercises to include are specified, ensure they appear in the program.
-- If exercises to avoid are specified, never use them.
-- day_of_week must be a full weekday name (Monday, Tuesday, etc.).
-- For each exercise, provide 1-2 alternate_exercise_ids from the library that:
-  (a) Share the same muscle_group as the original exercise.
-  (b) Have a similar movement_pattern (push stays push, hinge stays hinge, isolation stays isolation).
-  (c) Prefer different equipment from the original (e.g. if original is Barbell, prefer Dumbbell or Machine).
-  (d) Do not duplicate the original exercise_id or each other.
-  (e) Do not use any exercises from the avoid list.`;
+- exercise_id MUST match an id from the library above.
+- 4-8 exercises per workout. rest_seconds 60-180.
+- Respect periodization style and intensity level.
+- Include specified exercises. Never use avoided exercises.
+- day_of_week: full weekday name (Monday, Tuesday, etc.).
+- NEVER use the same exercise twice in one workout. Each exercise_id in a workout must be unique. Choose diverse movement patterns (e.g. for back: 1 vertical pull, 1 horizontal row, 1 isolation — not 3 pull-up variations).
+- Order exercises compound-first, isolation-last.
+- STRONGLY prefer ★ (foundational) exercises. Build the program around proven, standard lifts (bench press, squat, deadlift, rows, overhead press, etc.). Only use advanced exercises (handstand push-ups, muscle-ups, etc.) if the client's training experience and the coach's notes specifically call for it.
+- Match exercise difficulty to client experience: beginners get beginner/intermediate exercises, advanced clients can get advanced exercises.
+- For each exercise, provide exactly 1 alternate_exercise_id that shares the same muscle_group, has similar movement_pattern, and prefers different equipment. Must not duplicate the original or be on the avoid list.
+- Return ONLY valid JSON — no markdown, no explanation.`;
 
-  const systemPrompt = `You are an expert personal trainer and strength & conditioning coach. Your job is to generate a complete, periodized training program based on the client's intake form and the coach's guidelines. You must only use exercises from the provided exercise library. Return your response as valid JSON only — no markdown, no explanation, just the JSON object.`;
+  const systemPrompt = `You are an expert personal trainer and strength & conditioning coach. Your job is to generate a complete, periodized training program based on the client's intake form and the coach's guidelines. You must only use exercises from the provided exercise library. Return your response as valid JSON only — no markdown, no explanation, just the JSON object.
+
+PROGRAMMING PRINCIPLES (follow these strictly):
+- EXERCISE VARIETY: Never repeat the same exercise twice in one workout. Each exercise in a workout must be a distinct movement. For example, do not program 3 pull-up variations on back day — pick one pull variation and complement it with rows, pulldowns, etc.
+- MOVEMENT PATTERN BALANCE: Each workout should cover different movement patterns. For push day: a press, a fly, a dip variation, etc. For pull day: a vertical pull, a horizontal row, an isolation curl, etc. For legs: a squat pattern, a hinge pattern, a lunge, an isolation.
+- COMPOUND FIRST: Order exercises from compound/multi-joint movements to isolation/single-joint movements within each workout.
+- PROGRESSIVE OVERLOAD: If the program is multi-week, vary rep ranges and intensity across weeks according to the periodization style (e.g., linear: increase weight/decrease reps each week; undulating: alternate heavy/light days).
+- REP RANGES: Strength = 3-6 reps, Hypertrophy = 8-12 reps, Endurance = 12-20 reps. Match the client's goals.
+- MUSCLE GROUP COVERAGE: Over a training week, ensure all major muscle groups are trained. Don't over-concentrate on one area at the expense of others.
+- SMART PAIRING: When programming supersets or same-day muscle groups, pair complementary groups (chest/triceps, back/biceps, quads/hamstrings) not competing ones.`;
 
   // ------------------------------------------------------------------
-  // Call Claude API
+  // Call Claude API via SDK (handles timeouts properly)
   // ------------------------------------------------------------------
   try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 32000,
-        temperature: 0,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
-      }),
+    const anthropic = new Anthropic({
+      apiKey,
+      timeout: 10 * 60 * 1000, // 10 minutes
     });
 
-    if (!response.ok) {
-      const errBody = await response.text();
-      console.error("Anthropic API error:", response.status, errBody);
-      return NextResponse.json(
-        { error: "AI generation failed. Please try again." },
-        { status: 500 }
-      );
-    }
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 16000,
+      temperature: 0,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    });
 
-    const data = await response.json();
-    const content = data.content?.[0]?.text;
-
-    if (!content) {
+    const content = response.content[0];
+    if (content.type !== "text" || !content.text) {
       return NextResponse.json(
         { error: "Empty response from AI. Please try again." },
         { status: 500 }
@@ -334,7 +359,7 @@ Rules:
     }
 
     // Check if response was truncated
-    if (data.stop_reason === "max_tokens") {
+    if (response.stop_reason === "max_tokens") {
       console.error("AI response truncated — hit max_tokens limit");
       return NextResponse.json(
         { error: "AI response was too long and got cut off. Please try again." },
@@ -345,13 +370,13 @@ Rules:
     // Parse the JSON response — strip markdown fences if present
     let program: GeneratedProgram;
     try {
-      const jsonStr = content
+      const jsonStr = content.text
         .replace(/```json?\n?/g, "")
         .replace(/```\n?/g, "")
         .trim();
       program = JSON.parse(jsonStr);
     } catch {
-      console.error("Failed to parse AI response:", content.slice(0, 500));
+      console.error("Failed to parse AI response:", content.text.slice(0, 500));
       return NextResponse.json(
         { error: "Invalid AI response format. Please try again." },
         { status: 500 }
@@ -380,11 +405,19 @@ Rules:
           (sum, w) => sum + w.workouts.length,
           0
         ),
+        is_regeneration: !!regenerationFeedback,
+        ...(regenerationFeedback && { regeneration_feedback: regenerationFeedback }),
       },
       ai_model: "claude-sonnet-4-6",
     });
 
-    return NextResponse.json({ program });
+    // Build exercise name lookup for client-side display
+    const exerciseNames: Record<string, string> = {};
+    for (const e of libraryExercises) {
+      exerciseNames[e.id] = e.name;
+    }
+
+    return NextResponse.json({ program, exerciseNames });
   } catch (err) {
     console.error("AI generation error:", err);
     return NextResponse.json(

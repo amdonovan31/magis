@@ -99,18 +99,17 @@ export async function saveGeneratedProgram(input: {
     program_description: string;
     weeks: {
       week_number: number;
-      focus: string;
       workouts: {
         day_of_week: string;
         workout_name: string;
         muscle_groups: string[];
         exercises: {
           exercise_id: string;
-          exercise_name: string;
           sets: number;
           reps: string;
           rest_seconds: number;
           notes?: string;
+          prescribed_weight?: string;
           alternate_exercise_ids?: string[];
         }[];
       }[];
@@ -166,7 +165,7 @@ export async function saveGeneratedProgram(input: {
           day_number: dayIdx + 1,
           week_number: week.week_number,
           scheduled_days: scheduledDay != null ? [scheduledDay] : null,
-          notes: `Focus: ${week.focus}`,
+          notes: null,
         })
         .select("id")
         .single();
@@ -184,6 +183,7 @@ export async function saveGeneratedProgram(input: {
           position: i + 1,
           prescribed_sets: ex.sets,
           prescribed_reps: ex.reps,
+          prescribed_weight: ex.prescribed_weight || null,
           rest_seconds: ex.rest_seconds,
           notes: ex.notes || null,
           alternate_exercise_ids: ex.alternate_exercise_ids?.length

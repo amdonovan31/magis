@@ -23,11 +23,21 @@ export default function GeneratingScreen({
     setStatus("loading");
     setErrorMessage("");
 
+    // Read optional regeneration feedback from localStorage
+    const regenerationFeedback = localStorage.getItem("regeneration_feedback");
+    const previousProgramJson = localStorage.getItem("regeneration_previous_program");
+
     try {
+      const body: Record<string, unknown> = { clientId, guidelinesId };
+      if (regenerationFeedback) body.regenerationFeedback = regenerationFeedback;
+      if (previousProgramJson) {
+        try { body.previousProgram = JSON.parse(previousProgramJson); } catch { /* ignore */ }
+      }
+
       const res = await fetch("/api/generate-program", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId, guidelinesId }),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();
@@ -38,14 +48,21 @@ export default function GeneratingScreen({
         return;
       }
 
-      // Save program to localStorage for the review page
+      // Save program + exercise name lookup for the review page
       localStorage.setItem("pending_program", JSON.stringify(data.program));
       localStorage.setItem("pending_program_client_id", clientId);
+      if (data.exerciseNames) {
+        localStorage.setItem("pending_program_exercise_names", JSON.stringify(data.exerciseNames));
+      }
 
       router.push(`/clients/${clientId}/generate/review`);
     } catch {
       setErrorMessage("Network error. Please check your connection and try again.");
       setStatus("error");
+    } finally {
+      // Clean up regeneration keys regardless of outcome
+      localStorage.removeItem("regeneration_feedback");
+      localStorage.removeItem("regeneration_previous_program");
     }
   }, [clientId, guidelinesId, router]);
 

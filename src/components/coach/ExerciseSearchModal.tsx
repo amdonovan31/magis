@@ -25,6 +25,7 @@ export interface ExerciseOption {
   name: string;
   muscle_group: string | null;
   equipment?: string | null;
+  instructions?: string | null;
 }
 
 interface Props {

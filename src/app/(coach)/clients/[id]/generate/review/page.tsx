@@ -25,16 +25,30 @@ export default async function ReviewPage({
 
   if (!relationship) redirect("/clients");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name")
-    .eq("id", clientId)
-    .single();
+  const [{ data: profile }, { data: exercises }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", clientId)
+      .single(),
+    supabase
+      .from("exercises")
+      .select("id, name, muscle_group, equipment, instructions")
+      .eq("is_archived", false)
+      .order("name", { ascending: true }),
+  ]);
 
   return (
     <ProgramReview
       clientId={clientId}
       clientName={profile?.full_name ?? "Client"}
+      exercises={(exercises ?? []).map((e) => ({
+        id: e.id,
+        name: e.name,
+        muscle_group: e.muscle_group,
+        equipment: e.equipment,
+        instructions: e.instructions,
+      }))}
     />
   );
 }
