@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { logger } from "@/lib/utils/logger";
 import { switchDevRole } from "@/lib/actions/dev.actions";
 
 const ROLES = [
@@ -20,7 +21,7 @@ export default function DevRoleSwitcher() {
     setSwitching(role);
     const result = await switchDevRole(role);
     if (result.error) {
-      console.error("[DevRoleSwitcher]", result.error);
+      logger.error("DevRoleSwitcher switch failed", { error: result.error });
       setSwitching(null);
       return;
     }

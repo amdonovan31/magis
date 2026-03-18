@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { logger } from "@/lib/utils/logger";
 import { switchActiveRole } from "@/lib/actions/role.actions";
 import Card from "@/components/ui/Card";
 
@@ -21,7 +22,7 @@ export default function RolePickerCard({ role, title, description, redirect }: P
     setSwitching(true);
     const result = await switchActiveRole(role);
     if (result.error) {
-      console.error("[RolePickerCard]", result.error);
+      logger.error("RolePickerCard switch failed", { error: result.error });
       setSwitching(false);
       return;
     }

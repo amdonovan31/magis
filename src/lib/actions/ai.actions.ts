@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAllExerciseNames } from "@/lib/queries/exercise.queries";
 import { revalidatePath } from "next/cache";
+import { logger } from "@/lib/utils/logger";
 import type { IntakeData } from "@/lib/actions/intake.actions";
 
 interface GenerateProgramInput {
@@ -188,7 +189,7 @@ Rules:
 
     if (!response.ok) {
       const errBody = await response.text();
-      console.error("Anthropic API error:", errBody);
+      logger.error("Anthropic API error", { body: errBody });
       return { error: "Failed to generate program. Please try again." };
     }
 
@@ -205,7 +206,7 @@ Rules:
       const jsonStr = content.replace(/```json?\n?/g, "").replace(/```\n?/g, "").trim();
       program = JSON.parse(jsonStr);
     } catch {
-      console.error("Failed to parse AI response:", content);
+      logger.error("Failed to parse AI response", { content });
       return { error: "Invalid AI response. Please try again." };
     }
 
@@ -228,7 +229,7 @@ Rules:
       .single();
 
     if (programError || !programRow) {
-      console.error("Program insert error:", programError);
+      logger.error("Program insert error", { error: programError });
       return { error: "Failed to save program." };
     }
 
@@ -246,7 +247,7 @@ Rules:
         .single();
 
       if (templateError || !templateRow) {
-        console.error("Template insert error:", templateError);
+        logger.error("Template insert error", { error: templateError });
         continue;
       }
 
@@ -313,7 +314,7 @@ Rules:
       dayCount: program.days.length,
     };
   } catch (err) {
-    console.error("AI generation error:", err);
+    logger.error("AI generation error", { error: String(err) });
     return { error: "Failed to generate program. Please try again." };
   }
 }

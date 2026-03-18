@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { logger } from "@/lib/utils/logger";
 import { switchActiveRole } from "@/lib/actions/role.actions";
 
 interface Props {
@@ -28,7 +29,7 @@ export default function RoleSwitcher({ currentRole, availableRoles }: Props) {
     setSwitching(true);
     const result = await switchActiveRole(otherRole);
     if (result.error) {
-      console.error("[RoleSwitcher]", result.error);
+      logger.error("RoleSwitcher switch failed", { error: result.error });
       setSwitching(false);
       return;
     }

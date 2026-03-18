@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import type { IntakeData } from "@/lib/actions/intake.actions";
+import { logger } from "@/lib/utils/logger";
 
 export async function signUp(formData: FormData) {
   const email = (formData.get("email") as string)?.trim();
@@ -162,7 +163,7 @@ export async function completeOnboarding(input: {
   });
 
   if (intakeError) {
-    console.error("Intake insert error:", intakeError);
+    logger.error("Intake insert error", { error: intakeError });
   }
 
   const role = user.app_metadata?.role;

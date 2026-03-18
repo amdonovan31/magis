@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { logger } from "@/lib/utils/logger";
 import type { ProgramBuilderState } from "@/types/app.types";
 
 /**
@@ -171,7 +172,7 @@ export async function saveGeneratedProgram(input: {
         .single();
 
       if (templateError || !template) {
-        console.error("Template insert error:", templateError);
+        logger.error("Template insert error", { error: templateError });
         continue;
       }
 
@@ -196,7 +197,7 @@ export async function saveGeneratedProgram(input: {
           .insert(exerciseRows);
 
         if (exError) {
-          console.error("Exercise insert error:", exError);
+          logger.error("Exercise insert error", { error: exError });
         }
       }
     }

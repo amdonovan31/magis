@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
+import { logger } from "@/lib/utils/logger";
 
 interface GeneratedExercise {
   exercise_id: string;
@@ -360,7 +361,7 @@ PROGRAMMING PRINCIPLES (follow these strictly):
 
     // Check if response was truncated
     if (response.stop_reason === "max_tokens") {
-      console.error("AI response truncated — hit max_tokens limit");
+      logger.error("AI response truncated — hit max_tokens limit");
       return NextResponse.json(
         { error: "AI response was too long and got cut off. Please try again." },
         { status: 500 }
@@ -376,7 +377,7 @@ PROGRAMMING PRINCIPLES (follow these strictly):
         .trim();
       program = JSON.parse(jsonStr);
     } catch {
-      console.error("Failed to parse AI response:", content.text.slice(0, 500));
+      logger.error("Failed to parse AI response", { response: content.text.slice(0, 500) });
       return NextResponse.json(
         { error: "Invalid AI response format. Please try again." },
         { status: 500 }
@@ -419,7 +420,7 @@ PROGRAMMING PRINCIPLES (follow these strictly):
 
     return NextResponse.json({ program, exerciseNames });
   } catch (err) {
-    console.error("AI generation error:", err);
+    logger.error("AI generation error", { error: String(err) });
     return NextResponse.json(
       { error: "An unexpected error occurred. Please try again." },
       { status: 500 }
