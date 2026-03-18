@@ -98,6 +98,67 @@ export function computeStreak(dates: string[]): number {
 }
 
 /**
+ * Returns the Monday of the ISO week for a given date, using UTC.
+ * Result is "YYYY-MM-DD" string.
+ */
+export function getWeekStartUTC(date: Date): string {
+  const d = new Date(date);
+  const day = d.getUTCDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+  const diff = (day === 0 ? -6 : 1) - day;
+  d.setUTCDate(d.getUTCDate() + diff);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
+}
+
+/**
+ * Computes a streak of consecutive calendar weeks (Mon–Sun, UTC) with
+ * at least one workout. Takes an array of date strings (ISO timestamps
+ * or YYYY-MM-DD). Returns the current consecutive week count.
+ *
+ * If the client logged this week, the current week counts.
+ * If not, the streak is still alive if last week was logged
+ * (not broken until the current week ends without a log).
+ */
+export function computeWeekStreak(dates: string[]): number {
+  if (dates.length === 0) return 0;
+
+  const weekSet = new Set<string>();
+  for (const d of dates) {
+    weekSet.add(getWeekStartUTC(new Date(d)));
+  }
+
+  const now = new Date();
+  const currentWeekStart = getWeekStartUTC(now);
+
+  // Determine starting week: current if logged, else previous
+  let startWeek: string;
+  if (weekSet.has(currentWeekStart)) {
+    startWeek = currentWeekStart;
+  } else {
+    const prev = new Date(now);
+    prev.setUTCDate(prev.getUTCDate() - 7);
+    const prevWeekStart = getWeekStartUTC(prev);
+    if (weekSet.has(prevWeekStart)) {
+      startWeek = prevWeekStart;
+    } else {
+      return 0;
+    }
+  }
+
+  // Walk backward counting consecutive weeks
+  let streak = 0;
+  let cursor = new Date(startWeek + "T00:00:00Z");
+  while (weekSet.has(getWeekStartUTC(cursor))) {
+    streak++;
+    cursor.setUTCDate(cursor.getUTCDate() - 7);
+  }
+
+  return streak;
+}
+
+/**
  * Given a workout template's scheduled_days and scheduled_dates,
  * and an optional client override, determine if it's scheduled today.
  */

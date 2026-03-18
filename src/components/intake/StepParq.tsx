@@ -51,6 +51,10 @@ export default function StepParq({ data, update }: Props) {
         Please answer these standard health screening questions honestly before
         we get started.
       </p>
+      <p className="mt-3 text-xs text-primary/50 italic">
+        Your health information is stored securely and used only to personalise
+        your fitness programming. It is never shared with third parties.
+      </p>
 
       <div className="mt-6 flex flex-col gap-4">
         {PARQ_QUESTIONS.map((q) => (

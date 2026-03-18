@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import { generateSoloProgram } from "@/lib/actions/ai.actions";
+import { requiresHealthDisclaimer } from "@/lib/disclaimer/keywords";
+import AiDisclaimer from "@/components/disclaimer/AiDisclaimer";
 
 const GOALS = [
   "Build Muscle",
@@ -84,6 +86,7 @@ export default function SoloOnboardingForm() {
         <Card padding="md">
           <p className="text-sm text-primary/80 whitespace-pre-line">{result.explanation}</p>
         </Card>
+        {requiresHealthDisclaimer(result.explanation) && <AiDisclaimer />}
         <Button
           fullWidth
           size="lg"

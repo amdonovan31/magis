@@ -56,7 +56,7 @@ export default function ClientCard({ client }: ClientCardProps) {
               <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 23c-3.6 0-8-3.1-8-8.5C4 9 8 3 12 1c4 2 8 8 8 13.5 0 5.4-4.4 8.5-8 8.5zm0-19.5C9.3 6.2 6 11.1 6 14.5 6 18.5 9 21 12 21s6-2.5 6-6.5c0-3.4-3.3-8.3-6-11z"/>
               </svg>
-              {streak}
+              {streak}w
             </span>
           )}
         </div>

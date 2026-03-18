@@ -2,6 +2,7 @@ import Link from "next/link";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
+import ProgramDisclaimerFooter from "@/components/disclaimer/ProgramDisclaimerFooter";
 import type { TodayWorkout } from "@/types/app.types";
 
 interface TodayWorkoutCardProps {
@@ -85,6 +86,7 @@ export default function TodayWorkoutCard({ todayWorkout }: TodayWorkoutCardProps
           Start Workout →
         </Button>
       </form>
+      <ProgramDisclaimerFooter variant="coached" />
     </Card>
   );
 }

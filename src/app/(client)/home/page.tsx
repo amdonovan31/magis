@@ -1,8 +1,10 @@
 import { getTodayWorkout } from "@/lib/queries/session.queries";
+import { getStreakData } from "@/lib/queries/streaks.queries";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import TodayWorkoutCard from "@/components/workout/TodayWorkoutCard";
+import StreakCard from "@/components/streaks/StreakCard";
 import Card from "@/components/ui/Card";
 import { formatDate } from "@/lib/utils/date";
 import type { Profile } from "@/types/app.types";
@@ -15,7 +17,7 @@ export default async function ClientHomePage() {
 
   if (!user) redirect("/login");
 
-  const [{ data: rawProfile }, { count: intakeCount }, todayWorkout] = await Promise.all([
+  const [{ data: rawProfile }, { count: intakeCount }, todayWorkout, streakData] = await Promise.all([
     supabase
       .from("profiles")
       .select("full_name, intake_requested")
@@ -26,6 +28,7 @@ export default async function ClientHomePage() {
       .select("id", { count: "exact", head: true })
       .eq("client_id", user.id),
     getTodayWorkout(),
+    getStreakData(),
   ]);
 
   const profile = rawProfile as Pick<Profile, "full_name" | "intake_requested"> | null;
@@ -58,6 +61,9 @@ export default async function ClientHomePage() {
 
       {/* Today's workout card */}
       <TodayWorkoutCard todayWorkout={todayWorkout} />
+
+      {/* Streak card */}
+      <StreakCard streakData={streakData} />
 
       {/* Quick links */}
       {todayWorkout && (

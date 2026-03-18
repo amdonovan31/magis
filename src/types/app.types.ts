@@ -93,6 +93,7 @@ export type SessionSummary = {
   totalSets: number;
   totalVolume: number;
   prs: {
+    exerciseId: string;
     exerciseName: string;
     prType: string;
     value: number;
@@ -140,6 +141,26 @@ export type ProgramBuilderState = {
   weeks: ProgramBuilderWeek[];
 };
 
+// PR summary for the list view (one entry per exercise)
+export type PRSummary = {
+  exerciseId: string;
+  exerciseName: string;
+  muscleGroup: string | null;
+  currentBest: number;
+  currentBestReps: number | null;
+  estimated1RM: number;
+  achievedAt: string;
+  recentPRs: { value: number; achievedAt: string }[];
+};
+
+// Single data point in a PR history chart
+export type PRHistoryPoint = {
+  date: string;
+  weight: number;
+  reps: number | null;
+  estimated1RM: number;
+};
+
 // Muscle groups for exercise filter
 export const MUSCLE_GROUPS = [
   "Chest",
@@ -158,6 +179,71 @@ export const MUSCLE_GROUPS = [
 ] as const;
 
 export type MuscleGroup = (typeof MUSCLE_GROUPS)[number];
+
+// Volume data point for weekly/monthly charts
+export type VolumeDataPoint = {
+  periodStart: string; // ISO date for week or month start
+  muscleGroup: string;
+  totalVolume: number;
+  setCount: number;
+};
+
+// Consistent color mapping for muscle groups in charts
+export const MUSCLE_GROUP_COLORS: Record<string, string> = {
+  Chest: "#E07A5F",
+  Back: "#3D405B",
+  Shoulders: "#81B29A",
+  Biceps: "#F2CC8F",
+  Triceps: "#6B7B5E",
+  Quads: "#2C4A2E",
+  Hamstrings: "#577590",
+  Glutes: "#C1666B",
+  Calves: "#9B8EA4",
+  Core: "#F4A261",
+  "Full Body": "#264653",
+  Cardio: "#E9C46A",
+  Forearms: "#7B8D6A",
+  Other: "#A0A0A0",
+};
+
+// Streak milestone thresholds
+export const STREAK_MILESTONES = [1, 2, 4, 6, 8, 12, 16, 24, 52] as const;
+export type StreakMilestone = (typeof STREAK_MILESTONES)[number];
+
+export const STREAK_MILESTONE_LABELS: Record<StreakMilestone, string> = {
+  1: "First week",
+  2: "Building momentum",
+  4: "One month strong",
+  6: "Six week streak",
+  8: "Two months",
+  12: "Three months",
+  16: "Four months",
+  24: "Six months",
+  52: "One full year",
+};
+
+export type WeekEntry = {
+  weekStart: string; // ISO Monday date "YYYY-MM-DD"
+  hasWorkout: boolean;
+  isCurrentWeek: boolean;
+};
+
+export type StreakData = {
+  currentStreak: number;
+  longestStreak: number;
+  currentWeekLogged: boolean;
+  lastLoggedWeek: string | null;
+  streakHistory: WeekEntry[]; // last 52 weeks, oldest first
+  milestoneReached: StreakMilestone | null;
+  isNewLongest: boolean; // true if current === longest && > 1
+  weeksLoggedThisYear: number;
+};
+
+export type StreakSummary = {
+  currentStreak: number;
+  longestStreak: number;
+  currentWeekLogged: boolean;
+};
 
 // Days of week for scheduling
 export const DAYS_OF_WEEK = [

@@ -1,12 +1,14 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionSummary } from "@/lib/queries/summary.queries";
+import { getStreakData } from "@/lib/queries/streaks.queries";
 import { formatDate, formatDuration } from "@/lib/utils/date";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Link from "next/link";
 import PostSessionNote from "@/components/notes/PostSessionNote";
+import StreakMilestoneBanner from "@/components/streaks/StreakMilestoneBanner";
 
 interface SummaryPageProps {
   params: Promise<{ sessionId: string }>;
@@ -21,7 +23,10 @@ export default async function SummaryPage({ params }: SummaryPageProps) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const summary = await getSessionSummary(sessionId);
+  const [summary, streakData] = await Promise.all([
+    getSessionSummary(sessionId),
+    getStreakData(),
+  ]);
   if (!summary) redirect("/home");
 
   // Get the client's coach for the note
@@ -81,7 +86,11 @@ export default async function SummaryPage({ params }: SummaryPageProps) {
             </h2>
             <div className="flex flex-col gap-2">
               {summary.prs.map((pr, i) => (
-                <div key={i} className="flex items-center justify-between">
+                <Link
+                  key={i}
+                  href={`/history?tab=records&exercise=${pr.exerciseId}`}
+                  className="flex items-center justify-between active:opacity-70 transition-opacity"
+                >
                   <div>
                     <p className="text-sm font-medium text-primary">
                       {pr.exerciseName}
@@ -90,21 +99,35 @@ export default async function SummaryPage({ params }: SummaryPageProps) {
                       {pr.prType === "weight" ? "Weight" : "Volume"} PR
                     </p>
                   </div>
-                  <div className="text-right">
-                    <Badge variant="accent">
-                      {pr.value}{pr.prType === "weight" ? " kg" : ""}
-                    </Badge>
-                    {pr.previousValue !== null && (
-                      <p className="text-xs text-primary/40 mt-0.5">
-                        prev: {pr.previousValue}
-                      </p>
-                    )}
+                  <div className="flex items-center gap-2">
+                    <div className="text-right">
+                      <Badge variant="accent">
+                        {pr.value}{pr.prType === "weight" ? " kg" : ""}
+                      </Badge>
+                      {pr.previousValue !== null && (
+                        <p className="text-xs text-primary/40 mt-0.5">
+                          prev: {pr.previousValue}
+                        </p>
+                      )}
+                    </div>
+                    <svg className="h-4 w-4 text-primary/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
+            <Link
+              href="/history?tab=records"
+              className="block text-center text-sm font-medium text-accent mt-3 active:opacity-70"
+            >
+              View All PRs &rarr;
+            </Link>
           </Card>
         )}
+
+        {/* Streak */}
+        <StreakMilestoneBanner streakData={streakData} />
 
         {/* Post-session note for coach */}
         {relationship?.coach_id && (

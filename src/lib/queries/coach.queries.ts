@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { computeStreak } from "@/lib/utils/date";
+import { computeWeekStreak } from "@/lib/utils/date";
 import type { CoachDashboardData, ClientWithProgram, Profile } from "@/types/app.types";
 
 export async function getCoachDashboard(): Promise<CoachDashboardData | null> {
@@ -75,10 +75,8 @@ export async function getCoachDashboard(): Promise<CoachDashboardData | null> {
             .eq("client_id", profile.id),
         ]);
 
-      const sessionDates = (recentSessions ?? []).map((s) =>
-        s.started_at.slice(0, 10)
-      );
-      const streak = computeStreak(sessionDates);
+      const sessionDates = (recentSessions ?? []).map((s) => s.started_at);
+      const streak = computeWeekStreak(sessionDates);
       const lastSessionDate =
         sessionDates.length > 0
           ? recentSessions![recentSessions!.length - 1].started_at

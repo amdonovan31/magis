@@ -69,6 +69,7 @@ export async function getSessionSummary(
   const { data: prs } = await supabase
     .from("personal_records")
     .select(`
+      exercise_id,
       pr_type,
       value,
       previous_value,
@@ -77,6 +78,7 @@ export async function getSessionSummary(
     .eq("session_id", sessionId);
 
   const prList = (prs ?? []).map((pr) => ({
+    exerciseId: pr.exercise_id,
     exerciseName: (pr.exercise as { name: string } | null)?.name ?? "Unknown",
     prType: pr.pr_type,
     value: pr.value,

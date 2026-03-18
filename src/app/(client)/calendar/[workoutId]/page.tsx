@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getScheduledWorkout } from "@/lib/queries/calendar.queries";
 import TopBar from "@/components/layout/TopBar";
 import CalendarExerciseCard from "@/components/workout/CalendarExerciseCard";
+import ProgramDisclaimerFooter from "@/components/disclaimer/ProgramDisclaimerFooter";
 import Link from "next/link";
 
 export default async function WorkoutDetailPage({
@@ -81,6 +82,8 @@ export default async function WorkoutDetailPage({
             No exercises added to this workout yet.
           </p>
         )}
+
+        <ProgramDisclaimerFooter variant="coached" />
       </div>
     </>
   );

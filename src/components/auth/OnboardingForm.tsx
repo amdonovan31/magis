@@ -10,6 +10,11 @@ import StepParq from "@/components/intake/StepParq";
 import StepGoals from "@/components/intake/StepGoals";
 import StepPreferences from "@/components/intake/StepPreferences";
 import StepReview from "@/components/intake/StepReview";
+import DisclaimerScreen from "@/components/disclaimer/DisclaimerScreen";
+import { acceptDisclaimer } from "@/lib/disclaimer/actions";
+import { LOCALSTORAGE_KEY } from "@/lib/disclaimer/constants";
+import { requiresHealthDisclaimer } from "@/lib/disclaimer/keywords";
+import AiDisclaimer from "@/components/disclaimer/AiDisclaimer";
 import type { IntakeData } from "@/lib/actions/intake.actions";
 
 /* ── Gender chips ────────────────────────────────────────── */
@@ -23,10 +28,11 @@ const GENDERS = [
 const TRAINING_AGE_STOPS = [0, 1, 2, 3, 5, 7, 10, 15, 20] as const;
 
 /* ── Step definitions (same for both roles) ─────────────── */
-// profile → body → PAR-Q → goals → preferences → review
-type Step = "profile" | "body" | "parq" | "goals" | "preferences" | "review";
+// profile → body → disclaimer → PAR-Q → goals → preferences → review
+type Step = "profile" | "body" | "disclaimer" | "parq" | "goals" | "preferences" | "review";
 
-const STEPS: Step[] = ["profile", "body", "parq", "goals", "preferences", "review"];
+const STEPS: Step[] = ["profile", "body", "disclaimer", "parq", "goals", "preferences", "review"];
+const PROGRESS_STEPS = STEPS.filter((s) => s !== "disclaimer");
 
 interface Props {
   role: "client" | "solo";
@@ -38,6 +44,7 @@ export default function OnboardingForm({ role, needsPassword }: Props) {
   const [step, setStep] = useState<Step>(STEPS[0]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
 
   /* ── Profile fields ─────────────────────────────────────── */
   const [fullName, setFullName] = useState("");
@@ -194,6 +201,7 @@ export default function OnboardingForm({ role, needsPassword }: Props) {
         <Card padding="md">
           <p className="text-sm text-primary/80 whitespace-pre-line">{result.explanation}</p>
         </Card>
+        {requiresHealthDisclaimer(result.explanation) && <AiDisclaimer />}
         <Button fullWidth size="lg" onClick={() => router.push("/home")}>
           Start Training &#x2192;
         </Button>
@@ -225,17 +233,19 @@ export default function OnboardingForm({ role, needsPassword }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Progress dots */}
-      <div className="flex justify-center gap-2 mb-2">
-        {STEPS.map((s, i) => (
-          <div
-            key={s}
-            className={`h-2 w-2 rounded-full transition-colors ${
-              i <= stepIndex ? "bg-primary" : "bg-primary/20"
-            }`}
-          />
-        ))}
-      </div>
+      {/* Progress dots — hidden on disclaimer step */}
+      {step !== "disclaimer" && (
+        <div className="flex justify-center gap-2 mb-2">
+          {PROGRESS_STEPS.map((s, i) => (
+            <div
+              key={s}
+              className={`h-2 w-2 rounded-full transition-colors ${
+                i <= PROGRESS_STEPS.indexOf(step) ? "bg-primary" : "bg-primary/20"
+              }`}
+            />
+          ))}
+        </div>
+      )}
 
       {/* ── Step: Profile ───────────────────────────────────── */}
       {step === "profile" && (
@@ -400,6 +410,23 @@ export default function OnboardingForm({ role, needsPassword }: Props) {
             <Button fullWidth size="lg" onClick={nextStep}>Next</Button>
           </div>
         </>
+      )}
+
+      {/* ── Step: Disclaimer ──────────────────────────────────── */}
+      {step === "disclaimer" && (
+        <DisclaimerScreen
+          alreadyAccepted={disclaimerAccepted}
+          onAccept={async () => {
+            await acceptDisclaimer();
+            if (typeof window !== "undefined") {
+              try {
+                localStorage.setItem(LOCALSTORAGE_KEY, new Date().toISOString());
+              } catch {}
+            }
+            setDisclaimerAccepted(true);
+            nextStep();
+          }}
+        />
       )}
 
       {/* ── Step: PAR-Q ──────────────────────────────────────── */}

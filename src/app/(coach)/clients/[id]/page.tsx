@@ -10,6 +10,15 @@ import SendIntakeRequestButton from "@/components/intake/SendIntakeRequestButton
 import ClientNotes from "@/components/notes/ClientNotes";
 import { getClientNotes } from "@/lib/queries/notes.queries";
 import { recordClientView } from "@/lib/actions/notes.actions";
+import { getAllPRs } from "@/lib/queries/pr.queries";
+import { getMeasurements } from "@/lib/queries/measurements.queries";
+import { getWeeklyVolume } from "@/lib/queries/volume.queries";
+import { getStreakData } from "@/lib/queries/streaks.queries";
+import CoachPRSummary from "@/components/pr/CoachPRSummary";
+import CoachMeasurementsSummary from "@/components/measurements/CoachMeasurementsSummary";
+import CoachVolumeSummary from "@/components/volume/CoachVolumeSummary";
+import StreakCard from "@/components/streaks/StreakCard";
+import StreakBadges from "@/components/streaks/StreakBadges";
 
 export default async function ClientDetailPage({
   params,
@@ -60,8 +69,8 @@ export default async function ClientDetailPage({
     .limit(1)
     .maybeSingle();
 
-  // Get recent sessions and notes in parallel
-  const [{ data: sessions }, notes] = await Promise.all([
+  // Get recent sessions, notes, PRs, measurements, volume, and streaks in parallel
+  const [{ data: sessions }, notes, prs, measurements, volumeData, streakData] = await Promise.all([
     supabase
       .from("workout_sessions")
       .select("*, workout_template:workout_templates(title)")
@@ -69,6 +78,10 @@ export default async function ClientDetailPage({
       .order("started_at", { ascending: false })
       .limit(10),
     getClientNotes(id),
+    getAllPRs(id),
+    getMeasurements(id),
+    getWeeklyVolume(id, undefined, 8),
+    getStreakData(id),
   ]);
 
   // Record that the coach viewed this client (for unread indicator)
@@ -99,6 +112,13 @@ export default async function ClientDetailPage({
             </div>
           </div>
         </Card>
+
+        {/* Consistency */}
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-primary/50">
+          Consistency
+        </h3>
+        <StreakCard streakData={streakData} />
+        <StreakBadges longestStreak={streakData.longestStreak} />
 
         {/* Design Program CTA */}
         <Link
@@ -153,6 +173,24 @@ export default async function ClientDetailPage({
             </Link>
           ))
         )}
+
+        {/* Personal Records */}
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-primary/50">
+          Personal Records
+        </h3>
+        <CoachPRSummary prs={prs} />
+
+        {/* Body Measurements */}
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-primary/50">
+          Body Measurements
+        </h3>
+        <CoachMeasurementsSummary measurements={measurements} />
+
+        {/* Training Volume */}
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-primary/50">
+          Training Volume
+        </h3>
+        <CoachVolumeSummary volumeData={volumeData} />
 
         {/* Recent Sessions */}
         <h3 className="text-sm font-semibold uppercase tracking-wide text-primary/50">
