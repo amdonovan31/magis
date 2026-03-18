@@ -476,6 +476,50 @@ export type Database = {
           },
         ]
       }
+      error_logs: {
+        Row: {
+          id: string
+          user_id: string | null
+          role: string | null
+          error_message: string
+          error_stack: string | null
+          component: string | null
+          url: string | null
+          metadata: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          role?: string | null
+          error_message: string
+          error_stack?: string | null
+          component?: string | null
+          url?: string | null
+          metadata?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          role?: string | null
+          error_message?: string
+          error_stack?: string | null
+          component?: string | null
+          url?: string | null
+          metadata?: Json | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "error_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       feed_comments: {
         Row: {
           author_id: string
@@ -514,6 +558,47 @@ export type Database = {
             columns: ["post_id"]
             isOneToOne: false
             referencedRelation: "feed_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feedback: {
+        Row: {
+          id: string
+          user_id: string | null
+          role: string | null
+          category: string
+          message: string
+          current_page: string | null
+          app_version: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          role?: string | null
+          category: string
+          message: string
+          current_page?: string | null
+          app_version?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          role?: string | null
+          category?: string
+          message?: string
+          current_page?: string | null
+          app_version?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

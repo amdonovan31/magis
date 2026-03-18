@@ -1,5 +1,6 @@
 "use server";
 
+import type { Json } from "@/types/database.types";
 import { createClient } from "@/lib/supabase/server";
 
 interface LogErrorInput {
@@ -38,7 +39,7 @@ export async function logError(input: LogErrorInput): Promise<void> {
       error_stack: input.errorStack ?? null,
       component: input.component ?? null,
       url: input.url ?? null,
-      metadata: input.metadata ?? null,
+      metadata: (input.metadata ?? null) as Json,
     });
   } catch {
     // Error logging must never cause a secondary error

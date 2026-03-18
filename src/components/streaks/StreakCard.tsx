@@ -2,7 +2,7 @@
 
 import Card from "@/components/ui/Card";
 import { cn } from "@/lib/utils/cn";
-import type { StreakData, StreakMilestone } from "@/types/app.types";
+import type { StreakData } from "@/types/app.types";
 import { STREAK_MILESTONE_LABELS } from "@/types/app.types";
 
 interface StreakCardProps {

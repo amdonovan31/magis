@@ -33,8 +33,6 @@ export default function VolumeBarChart({
   const [activeBar, setActiveBar] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  if (data.length === 0) return null;
-
   // Group data by period
   const periods: string[] = [];
   const periodSet = new Set<string>();
@@ -164,6 +162,8 @@ export default function VolumeBarChart({
     },
     [periods.length, barWidth]
   );
+
+  if (data.length === 0) return null;
 
   const activeData = activeBar !== null ? barData[activeBar] : null;
 

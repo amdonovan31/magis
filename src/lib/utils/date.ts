@@ -149,7 +149,7 @@ export function computeWeekStreak(dates: string[]): number {
 
   // Walk backward counting consecutive weeks
   let streak = 0;
-  let cursor = new Date(startWeek + "T00:00:00Z");
+  const cursor = new Date(startWeek + "T00:00:00Z");
   while (weekSet.has(getWeekStartUTC(cursor))) {
     streak++;
     cursor.setUTCDate(cursor.getUTCDate() - 7);
