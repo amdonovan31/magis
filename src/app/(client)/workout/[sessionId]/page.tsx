@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import WorkoutClient from "@/components/workout/WorkoutClient";
 import WorkoutProgress from "@/components/workout/WorkoutProgress";
 import CompleteWorkoutButton from "@/components/workout/CompleteWorkoutButton";
+import ConnectivityBanner from "@/components/workout/ConnectivityBanner";
 import ProgramDisclaimerFooter from "@/components/disclaimer/ProgramDisclaimerFooter";
 import Link from "next/link";
 import type { WorkoutTemplateWithExercises, SetLog, WorkoutSession } from "@/types/app.types";
@@ -65,6 +66,9 @@ export default async function WorkoutPage({ params }: WorkoutPageProps) {
         <WorkoutProgress completed={completedSets} total={totalSets} />
       </div>
 
+      {/* Connectivity indicator — workout page only */}
+      <ConnectivityBanner />
+
       {/* Exercise loggers with rest timer */}
       {template && (
         <WorkoutClient
@@ -82,6 +86,7 @@ export default async function WorkoutPage({ params }: WorkoutPageProps) {
       {/* Complete workout CTA */}
       <div className="fixed bottom-0 left-1/2 w-full max-w-md -translate-x-1/2 bg-surface p-4 pb-safe border-t border-primary/10">
         <CompleteWorkoutButton
+          sessionId={sessionId}
           completedSets={completedSets}
           onComplete={handleFinish}
         />

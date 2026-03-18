@@ -2,6 +2,7 @@
 
 import { useState, useOptimistic, useTransition } from "react";
 import { logSet } from "@/lib/actions/session.actions";
+import { persistSet } from "@/lib/workout-persistence";
 import { cn } from "@/lib/utils/cn";
 
 interface SetRowProps {
@@ -38,6 +39,17 @@ export default function SetRow({
 
   function handleComplete() {
     const repsNum = reps ? parseInt(reps, 10) : null;
+
+    // Persist to localStorage BEFORE server action — synchronous, instant
+    persistSet(sessionId, {
+      templateExerciseId,
+      exerciseIdOverride: exerciseIdOverride ?? null,
+      setNumber,
+      repsCompleted: repsNum,
+      weightUsed: weight || null,
+      completed: true,
+      completedAt: Date.now(),
+    });
 
     startTransition(async () => {
       setOptimisticDone(true);

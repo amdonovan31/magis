@@ -2,13 +2,16 @@
 
 import { useState } from "react";
 import Button from "@/components/ui/Button";
+import { clearPersistedSession } from "@/lib/workout-persistence";
 
 interface CompleteWorkoutButtonProps {
+  sessionId: string;
   completedSets: number;
   onComplete: () => Promise<void>;
 }
 
 export default function CompleteWorkoutButton({
+  sessionId,
   completedSets,
   onComplete,
 }: CompleteWorkoutButtonProps) {
@@ -21,6 +24,7 @@ export default function CompleteWorkoutButton({
       return;
     }
     setLoading(true);
+    clearPersistedSession(sessionId);
     await onComplete();
   }
 

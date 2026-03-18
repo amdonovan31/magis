@@ -4,6 +4,7 @@ import { useState } from "react";
 import SetRow from "./SetRow";
 import ExerciseDemoModal from "./ExerciseDemoModal";
 import AlternateExercises from "./AlternateExercises";
+import { persistSwap, removeSwap } from "@/lib/workout-persistence";
 import type { WorkoutTemplateExerciseWithExercise, SetLog, Exercise } from "@/types/app.types";
 
 interface ExerciseLoggerProps {
@@ -11,6 +12,7 @@ interface ExerciseLoggerProps {
   templateExercise: WorkoutTemplateExerciseWithExercise;
   existingLogs: SetLog[];
   onSetComplete?: (restSeconds: number) => void;
+  initialSwappedExerciseId?: string | null;
 }
 
 export default function ExerciseLogger({
@@ -18,13 +20,31 @@ export default function ExerciseLogger({
   templateExercise,
   existingLogs,
   onSetComplete,
+  initialSwappedExerciseId,
 }: ExerciseLoggerProps) {
+  const alts = (templateExercise as WorkoutTemplateExerciseWithExercise & { alternateExercises?: Exercise[] }).alternateExercises;
+
   const [showDemo, setShowDemo] = useState(false);
-  const [swappedExercise, setSwappedExercise] = useState<Exercise | null>(null);
+  const [swappedExercise, setSwappedExercise] = useState<Exercise | null>(() => {
+    if (initialSwappedExerciseId && alts) {
+      return alts.find((e) => e.id === initialSwappedExerciseId) ?? null;
+    }
+    return null;
+  });
   const setCount = templateExercise.prescribed_sets ?? 3;
 
   const displayExercise = swappedExercise ?? templateExercise.exercise;
   const exerciseIdOverride = swappedExercise?.id ?? null;
+
+  function handleSwap(exercise: Exercise) {
+    setSwappedExercise(exercise);
+    persistSwap(sessionId, templateExercise.id, exercise.id);
+  }
+
+  function handleRevert() {
+    setSwappedExercise(null);
+    removeSwap(sessionId, templateExercise.id);
+  }
 
   function handleSetComplete() {
     const rest = templateExercise.rest_seconds;
@@ -32,8 +52,6 @@ export default function ExerciseLogger({
       onSetComplete(rest);
     }
   }
-
-  const alts = (templateExercise as WorkoutTemplateExerciseWithExercise & { alternateExercises?: Exercise[] }).alternateExercises;
 
   return (
     <div className="rounded-2xl bg-background overflow-hidden">
@@ -71,7 +89,7 @@ export default function ExerciseLogger({
         {swappedExercise && (
           <button
             type="button"
-            onClick={() => setSwappedExercise(null)}
+            onClick={handleRevert}
             className="mt-1 text-[11px] text-primary/40 hover:text-primary/60 transition-colors"
           >
             ← Revert to {templateExercise.exercise.name}
@@ -128,7 +146,7 @@ export default function ExerciseLogger({
       {alts && alts.length > 0 && (
         <AlternateExercises
           alternates={alts}
-          onSwap={setSwappedExercise}
+          onSwap={handleSwap}
         />
       )}
 
