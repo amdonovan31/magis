@@ -149,6 +149,7 @@ export type PRSummary = {
   currentBest: number;
   currentBestReps: number | null;
   estimated1RM: number;
+  unit: string;
   achievedAt: string;
   recentPRs: { value: number; achievedAt: string }[];
 };
@@ -159,6 +160,7 @@ export type PRHistoryPoint = {
   weight: number;
   reps: number | null;
   estimated1RM: number;
+  unit: string;
 };
 
 // Muscle groups for exercise filter

@@ -1,6 +1,17 @@
 import LoginForm from "@/components/auth/LoginForm";
 
-export default function LoginPage() {
+const ERROR_MESSAGES: Record<string, string> = {
+  auth_callback_error: "Sign-in link is invalid or expired. Please request a new one.",
+  missing_role: "Account setup incomplete. Please contact support.",
+};
+
+export default function LoginPage({
+  searchParams,
+}: {
+  searchParams: { error?: string };
+}) {
+  const urlError = searchParams.error ? ERROR_MESSAGES[searchParams.error] : null;
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-4">
       <div className="w-full max-w-sm">
@@ -13,6 +24,11 @@ export default function LoginPage() {
             Sign in to your account
           </p>
         </div>
+        {urlError && (
+          <p className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+            {urlError}
+          </p>
+        )}
         <LoginForm />
       </div>
     </div>

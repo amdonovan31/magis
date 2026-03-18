@@ -934,6 +934,7 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean
+          pending_json: Json | null
           starts_on: string | null
           status: string
           title: string
@@ -945,6 +946,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          pending_json?: Json | null
           starts_on?: string | null
           status?: string
           title: string
@@ -956,6 +958,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          pending_json?: Json | null
           starts_on?: string | null
           status?: string
           title?: string
@@ -1044,6 +1047,7 @@ export type Database = {
       }
       set_logs: {
         Row: {
+          exercise_id: string | null
           id: string
           is_completed: boolean
           logged_at: string
@@ -1056,6 +1060,7 @@ export type Database = {
           weight_used: string | null
         }
         Insert: {
+          exercise_id?: string | null
           id?: string
           is_completed?: boolean
           logged_at?: string
@@ -1068,6 +1073,7 @@ export type Database = {
           weight_used?: string | null
         }
         Update: {
+          exercise_id?: string | null
           id?: string
           is_completed?: boolean
           logged_at?: string
@@ -1092,6 +1098,13 @@ export type Database = {
             columns: ["template_exercise_id"]
             isOneToOne: false
             referencedRelation: "workout_template_exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "set_logs_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
             referencedColumns: ["id"]
           },
         ]

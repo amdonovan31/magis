@@ -6,9 +6,10 @@ import type { Exercise } from "@/types/app.types";
 
 interface Props {
   alternates: Exercise[];
+  onSwap?: (exercise: Exercise) => void;
 }
 
-export default function AlternateExercises({ alternates }: Props) {
+export default function AlternateExercises({ alternates, onSwap }: Props) {
   const [open, setOpen] = useState(false);
   const [demoExercise, setDemoExercise] = useState<Exercise | null>(null);
 
@@ -57,16 +58,30 @@ export default function AlternateExercises({ alternates }: Props) {
                   )}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setDemoExercise(alt)}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-primary/30 hover:bg-primary/10 hover:text-primary transition-colors"
-                aria-label={`Info for ${alt.name}`}
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </button>
+              <div className="flex items-center gap-1 shrink-0">
+                {onSwap && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSwap(alt);
+                      setOpen(false);
+                    }}
+                    className="rounded-lg bg-accent/10 px-2.5 py-1.5 text-[11px] font-medium text-accent hover:bg-accent/20 transition-colors"
+                  >
+                    Use this
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setDemoExercise(alt)}
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-primary/30 hover:bg-primary/10 hover:text-primary transition-colors"
+                  aria-label={`Info for ${alt.name}`}
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </button>
+              </div>
             </div>
           ))}
         </div>

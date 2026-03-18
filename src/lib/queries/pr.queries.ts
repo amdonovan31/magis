@@ -51,6 +51,7 @@ export async function getAllPRs(clientId?: string): Promise<PRSummary[]> {
       exercise_id,
       value,
       reps,
+      unit,
       achieved_at,
       exercise:exercises(name, muscle_group)
     `)
@@ -66,7 +67,7 @@ export async function getAllPRs(clientId?: string): Promise<PRSummary[]> {
     {
       exerciseName: string;
       muscleGroup: string | null;
-      prs: { value: number; reps: number | null; achievedAt: string }[];
+      prs: { value: number; reps: number | null; unit: string; achievedAt: string }[];
     }
   >();
 
@@ -86,6 +87,7 @@ export async function getAllPRs(clientId?: string): Promise<PRSummary[]> {
     entry.prs.push({
       value: pr.value,
       reps: pr.reps,
+      unit: pr.unit ?? "kg",
       achievedAt: pr.achieved_at,
     });
   }
@@ -93,7 +95,7 @@ export async function getAllPRs(clientId?: string): Promise<PRSummary[]> {
   // Build summary array
   const summaries: PRSummary[] = [];
 
-  type PREntry = { value: number; reps: number | null; achievedAt: string };
+  type PREntry = { value: number; reps: number | null; unit: string; achievedAt: string };
 
   byExercise.forEach((entry, exerciseId) => {
     const latest = entry.prs[entry.prs.length - 1];
@@ -106,6 +108,7 @@ export async function getAllPRs(clientId?: string): Promise<PRSummary[]> {
       currentBest: best.value,
       currentBestReps: best.reps,
       estimated1RM: estimated1RM(best.value, best.reps),
+      unit: best.unit,
       achievedAt: latest.achievedAt,
       recentPRs: entry.prs.slice(-8).map((p) => ({
         value: p.value,
@@ -159,7 +162,7 @@ export async function getPRHistory(
 
   const { data: prs } = await supabase
     .from("personal_records")
-    .select("value, reps, achieved_at")
+    .select("value, reps, unit, achieved_at")
     .eq("user_id", userId)
     .eq("exercise_id", exerciseId)
     .eq("pr_type", "weight")
@@ -172,5 +175,6 @@ export async function getPRHistory(
     weight: pr.value,
     reps: pr.reps,
     estimated1RM: estimated1RM(pr.value, pr.reps),
+    unit: pr.unit ?? "kg",
   }));
 }

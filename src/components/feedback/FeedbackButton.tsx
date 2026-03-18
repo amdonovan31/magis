@@ -13,7 +13,7 @@ export default function FeedbackButton() {
       <button
         type="button"
         onClick={() => setModalOpen(true)}
-        className="fixed bottom-20 right-4 z-40 flex h-10 w-10 items-center justify-center rounded-full bg-muted/80 text-white shadow-md transition-opacity hover:opacity-90 active:opacity-80"
+        className="fixed bottom-24 right-4 z-40 flex h-10 w-10 items-center justify-center rounded-full bg-muted/80 text-white shadow-md transition-opacity hover:opacity-90 active:opacity-80"
         aria-label="Send feedback"
       >
         <svg

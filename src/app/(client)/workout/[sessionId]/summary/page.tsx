@@ -9,6 +9,7 @@ import Button from "@/components/ui/Button";
 import Link from "next/link";
 import PostSessionNote from "@/components/notes/PostSessionNote";
 import StreakMilestoneBanner from "@/components/streaks/StreakMilestoneBanner";
+import ProgramDisclaimerFooter from "@/components/disclaimer/ProgramDisclaimerFooter";
 
 interface SummaryPageProps {
   params: Promise<{ sessionId: string }>;
@@ -142,6 +143,8 @@ export default async function SummaryPage({ params }: SummaryPageProps) {
         <Button variant="secondary" fullWidth disabled>
           Share to Feed (Coming Soon)
         </Button>
+
+        <ProgramDisclaimerFooter variant="coached" />
       </div>
 
       {/* Done button */}

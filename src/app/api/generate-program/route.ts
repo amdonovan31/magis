@@ -418,7 +418,30 @@ PROGRAMMING PRINCIPLES (follow these strictly):
       exerciseNames[e.id] = e.name;
     }
 
-    return NextResponse.json({ program, exerciseNames });
+    // Save pending program to DB so the review page can load it server-side
+    const { data: pendingRow, error: pendingError } = await supabase
+      .from("programs")
+      .insert({
+        coach_id: user.id,
+        client_id: clientId,
+        title: program.program_name,
+        description: program.program_description,
+        is_active: false,
+        status: "pending_review",
+        pending_json: { program, exerciseNames } as unknown as import("@/types/database.types").Json,
+      })
+      .select("id")
+      .single();
+
+    if (pendingError || !pendingRow) {
+      logger.error("Failed to save pending program", { error: pendingError });
+      return NextResponse.json(
+        { error: "Failed to save generated program. Please try again." },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ programId: pendingRow.id });
   } catch (err) {
     logger.error("AI generation error", { error: String(err) });
     return NextResponse.json(

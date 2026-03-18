@@ -20,7 +20,11 @@ export default function ExerciseLogger({
   onSetComplete,
 }: ExerciseLoggerProps) {
   const [showDemo, setShowDemo] = useState(false);
+  const [swappedExercise, setSwappedExercise] = useState<Exercise | null>(null);
   const setCount = templateExercise.prescribed_sets ?? 3;
+
+  const displayExercise = swappedExercise ?? templateExercise.exercise;
+  const exerciseIdOverride = swappedExercise?.id ?? null;
 
   function handleSetComplete() {
     const rest = templateExercise.rest_seconds;
@@ -29,14 +33,21 @@ export default function ExerciseLogger({
     }
   }
 
+  const alts = (templateExercise as WorkoutTemplateExerciseWithExercise & { alternateExercises?: Exercise[] }).alternateExercises;
+
   return (
     <div className="rounded-2xl bg-background overflow-hidden">
       {/* Exercise header */}
       <div className="px-4 py-3">
         <div className="flex items-center gap-2">
           <h3 className="font-semibold text-primary flex-1">
-            {templateExercise.exercise.name}
+            {displayExercise.name}
           </h3>
+          {swappedExercise && (
+            <span className="shrink-0 rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent">
+              swapped
+            </span>
+          )}
           <button
             type="button"
             onClick={() => setShowDemo(true)}
@@ -57,6 +68,15 @@ export default function ExerciseLogger({
             ? ` · ${templateExercise.rest_seconds}s rest`
             : ""}
         </p>
+        {swappedExercise && (
+          <button
+            type="button"
+            onClick={() => setSwappedExercise(null)}
+            className="mt-1 text-[11px] text-primary/40 hover:text-primary/60 transition-colors"
+          >
+            ← Revert to {templateExercise.exercise.name}
+          </button>
+        )}
       </div>
 
       {/* Set rows */}
@@ -85,6 +105,7 @@ export default function ExerciseLogger({
               key={setNum}
               sessionId={sessionId}
               templateExerciseId={templateExercise.id}
+              exerciseIdOverride={exerciseIdOverride}
               setNumber={setNum}
               prescribedReps={templateExercise.prescribed_reps}
               prescribedWeight={templateExercise.prescribed_weight}
@@ -104,14 +125,16 @@ export default function ExerciseLogger({
       )}
 
       {/* Alternate exercises */}
-      {(() => {
-        const alts = (templateExercise as WorkoutTemplateExerciseWithExercise & { alternateExercises?: Exercise[] }).alternateExercises;
-        return alts && alts.length > 0 ? <AlternateExercises alternates={alts} /> : null;
-      })()}
+      {alts && alts.length > 0 && (
+        <AlternateExercises
+          alternates={alts}
+          onSwap={setSwappedExercise}
+        />
+      )}
 
       {/* Demo modal */}
       <ExerciseDemoModal
-        exercise={templateExercise.exercise}
+        exercise={displayExercise}
         isOpen={showDemo}
         onClose={() => setShowDemo(false)}
       />

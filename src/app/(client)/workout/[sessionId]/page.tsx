@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import WorkoutClient from "@/components/workout/WorkoutClient";
 import WorkoutProgress from "@/components/workout/WorkoutProgress";
-import Button from "@/components/ui/Button";
+import CompleteWorkoutButton from "@/components/workout/CompleteWorkoutButton";
+import ProgramDisclaimerFooter from "@/components/disclaimer/ProgramDisclaimerFooter";
 import Link from "next/link";
 import type { WorkoutTemplateWithExercises, SetLog, WorkoutSession } from "@/types/app.types";
 
@@ -73,13 +74,17 @@ export default async function WorkoutPage({ params }: WorkoutPageProps) {
         />
       )}
 
+      {/* Program disclaimer */}
+      <div className="px-4">
+        <ProgramDisclaimerFooter variant="coached" />
+      </div>
+
       {/* Complete workout CTA */}
       <div className="fixed bottom-0 left-1/2 w-full max-w-md -translate-x-1/2 bg-surface p-4 pb-safe border-t border-primary/10">
-        <form action={handleFinish}>
-          <Button type="submit" fullWidth size="lg" variant="accent">
-            Complete Workout ✓
-          </Button>
-        </form>
+        <CompleteWorkoutButton
+          completedSets={completedSets}
+          onComplete={handleFinish}
+        />
       </div>
     </div>
   );

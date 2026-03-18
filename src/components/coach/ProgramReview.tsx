@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   DndContext,
@@ -23,7 +23,7 @@ import EditableWorkoutCard from "./EditableWorkoutCard";
 import ExerciseSearchModal, {
   type ExerciseOption,
 } from "./ExerciseSearchModal";
-import { saveGeneratedProgram } from "@/lib/actions/program.actions";
+import { saveGeneratedProgram, discardPendingProgram } from "@/lib/actions/program.actions";
 
 interface GeneratedExercise {
   exercise_id: string;
@@ -56,6 +56,9 @@ interface GeneratedProgram {
 interface Props {
   clientId: string;
   clientName: string;
+  programId: string;
+  initialProgram: unknown;
+  initialExerciseNames: Record<string, string>;
   exercises: ExerciseOption[];
 }
 
@@ -72,12 +75,17 @@ const WEEKDAYS = [
 export default function ProgramReview({
   clientId,
   clientName,
+  programId,
+  initialProgram,
+  initialExerciseNames,
   exercises,
 }: Props) {
   const router = useRouter();
-  const [program, setProgram] = useState<GeneratedProgram | null>(null);
+  const [program, setProgram] = useState<GeneratedProgram>(
+    initialProgram as GeneratedProgram
+  );
   const [exerciseNames, setExerciseNames] = useState<Record<string, string>>(
-    {}
+    initialExerciseNames
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -97,54 +105,31 @@ export default function ProgramReview({
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
 
-  useEffect(() => {
-    const stored = localStorage.getItem("pending_program");
-    const storedClientId = localStorage.getItem("pending_program_client_id");
-
-    if (!stored || storedClientId !== clientId) {
-      router.replace(`/clients/${clientId}/generate`);
-      return;
-    }
-
-    try {
-      setProgram(JSON.parse(stored));
-      const namesJson = localStorage.getItem(
-        "pending_program_exercise_names"
-      );
-      if (namesJson) setExerciseNames(JSON.parse(namesJson));
-    } catch {
-      router.replace(`/clients/${clientId}/generate`);
-    }
-  }, [clientId, router]);
-
   // Helper to update a specific workout in a specific week
   function updateWorkoutInWeek(
     weekIdx: number,
     workoutIdx: number,
     updater: (w: GeneratedWorkout) => GeneratedWorkout
   ) {
-    setProgram((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        weeks: prev.weeks.map((w, wi) =>
-          wi !== weekIdx
-            ? w
-            : {
-                ...w,
-                workouts: w.workouts.map((wo, woi) =>
-                  woi !== workoutIdx ? wo : updater(wo)
-                ),
-              }
-        ),
-      };
-    });
+    setProgram((prev) => ({
+      ...prev,
+      weeks: prev.weeks.map((w, wi) =>
+        wi !== weekIdx
+          ? w
+          : {
+              ...w,
+              workouts: w.workouts.map((wo, woi) =>
+                woi !== workoutIdx ? wo : updater(wo)
+              ),
+            }
+      ),
+    }));
   }
 
   // Day reordering — reassign day_of_week sequentially
   function handleDayDragEnd(event: DragEndEvent) {
     const { active, over } = event;
-    if (!over || active.id === over.id || !program) return;
+    if (!over || active.id === over.id) return;
 
     const weekIdx = program.weeks.findIndex(
       (w) => w.week_number === expandedWeek
@@ -164,23 +149,12 @@ export default function ProgramReview({
       })
     );
 
-    setProgram((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        weeks: prev.weeks.map((w, wi) =>
-          wi !== weekIdx ? w : { ...w, workouts: reordered }
-        ),
-      };
-    });
-  }
-
-  function handleToggleEdit() {
-    if (isEditing && program) {
-      // Persist edits to localStorage when leaving edit mode
-      localStorage.setItem("pending_program", JSON.stringify(program));
-    }
-    setIsEditing(!isEditing);
+    setProgram((prev) => ({
+      ...prev,
+      weeks: prev.weeks.map((w, wi) =>
+        wi !== weekIdx ? w : { ...w, workouts: reordered }
+      ),
+    }));
   }
 
   function handleExerciseSelect(exercise: ExerciseOption) {
@@ -216,21 +190,17 @@ export default function ProgramReview({
   }
 
   async function handleApprove() {
-    if (!program) return;
     setSaving(true);
     setError("");
 
     try {
-      const res = await saveGeneratedProgram({ clientId, program });
+      const res = await saveGeneratedProgram({ clientId, program, pendingProgramId: programId });
       if (res?.error) {
         setError(res.error);
         setSaving(false);
         return;
       }
 
-      localStorage.removeItem("pending_program");
-      localStorage.removeItem("pending_program_client_id");
-      localStorage.removeItem("pending_program_exercise_names");
       if (res?.programId) {
         router.push(`/programs/${res.programId}/edit`);
       } else {
@@ -243,26 +213,19 @@ export default function ProgramReview({
   }
 
   function handleSubmitRegenerate(withFeedback: boolean) {
-    if (withFeedback && regenFeedback.trim() && program) {
-      localStorage.setItem("regeneration_feedback", regenFeedback.trim());
-      localStorage.setItem(
-        "regeneration_previous_program",
-        JSON.stringify(program)
-      );
-    }
-    localStorage.removeItem("pending_program");
-    localStorage.removeItem("pending_program_client_id");
-    localStorage.removeItem("pending_program_exercise_names");
+    const feedback = withFeedback ? regenFeedback.trim() : undefined;
     setRegenModalOpen(false);
-    router.push(`/clients/${clientId}/generate/loading`);
+
+    const params = new URLSearchParams();
+    if (feedback) params.set("regenFeedback", feedback);
+    params.set("regenProgramId", programId);
+
+    router.push(`/clients/${clientId}/generate/loading?${params.toString()}`);
   }
 
-  if (!program) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
-      </div>
-    );
+  async function handleDiscard() {
+    await discardPendingProgram(programId);
+    router.push(`/clients/${clientId}`);
   }
 
   const totalWorkouts = program.weeks.reduce(
@@ -301,10 +264,10 @@ export default function ProgramReview({
         title="Review Program"
         left={
           <button
-            onClick={() => router.back()}
+            onClick={handleDiscard}
             className="text-sm text-primary/60 hover:text-primary"
           >
-            &larr; Back
+            &larr; Discard
           </button>
         }
       />
@@ -330,7 +293,7 @@ export default function ProgramReview({
             </div>
             <button
               type="button"
-              onClick={handleToggleEdit}
+              onClick={() => setIsEditing(!isEditing)}
               className={`shrink-0 ml-3 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
                 isEditing
                   ? "bg-accent text-white"

@@ -4,8 +4,10 @@ import GeneratingScreen from "@/components/coach/GeneratingScreen";
 
 export default async function GenerateLoadingPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: { regenFeedback?: string; regenProgramId?: string };
 }) {
   const { id: clientId } = await params;
   const supabase = await createClient();
@@ -49,11 +51,37 @@ export default async function GenerateLoadingPage({
     redirect(`/clients/${clientId}/generate`);
   }
 
+  // If regenerating, fetch the previous program's pending_json
+  let previousProgramJson: string | null = null;
+  if (searchParams.regenProgramId) {
+    const { data: prevProgram } = await supabase
+      .from("programs")
+      .select("pending_json")
+      .eq("id", searchParams.regenProgramId)
+      .single();
+
+    if (prevProgram?.pending_json) {
+      const pending = prevProgram.pending_json as { program?: unknown };
+      if (pending.program) {
+        previousProgramJson = JSON.stringify(pending.program);
+      }
+    }
+
+    // Delete the old pending_review program since we're regenerating
+    await supabase
+      .from("programs")
+      .delete()
+      .eq("id", searchParams.regenProgramId)
+      .eq("status", "pending_review");
+  }
+
   return (
     <GeneratingScreen
       clientId={clientId}
       clientName={profile.full_name ?? "Client"}
       guidelinesId={guidelines.id}
+      regenerationFeedback={searchParams.regenFeedback ?? null}
+      previousProgramJson={previousProgramJson}
     />
   );
 }

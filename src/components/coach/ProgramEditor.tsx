@@ -10,6 +10,7 @@ import ExerciseSearchModal from "@/components/coach/ExerciseSearchModal";
 import PublishBar from "@/components/coach/PublishBar";
 import type { ExerciseOption } from "@/components/coach/ExerciseSearchModal";
 import type { ProgramWithTemplates } from "@/types/app.types";
+import DeleteProgramButton from "@/components/coach/DeleteProgramButton";
 import {
   updateWorkoutTemplate,
   updateTemplateExercise,
@@ -32,9 +33,10 @@ const DAYS_OF_WEEK = [
 interface Props {
   program: ProgramWithTemplates;
   exercises: ExerciseOption[];
+  clientName?: string | null;
 }
 
-export default function ProgramEditor({ program: initialProgram, exercises }: Props) {
+export default function ProgramEditor({ program: initialProgram, exercises, clientName }: Props) {
   const router = useRouter();
   const [program, setProgram] = useState(initialProgram);
   const [status, setStatus] = useState(initialProgram.status);
@@ -397,6 +399,16 @@ export default function ProgramEditor({ program: initialProgram, exercises }: Pr
             )}
           </Card>
         ))}
+      </div>
+
+      {/* Delete program */}
+      <div className="px-4 pb-4">
+        <DeleteProgramButton
+          programId={program.id}
+          programName={program.title}
+          clientName={clientName}
+          status={status}
+        />
       </div>
 
       {/* Publish bar */}

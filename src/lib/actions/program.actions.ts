@@ -95,6 +95,7 @@ export async function createProgram(state: ProgramBuilderState) {
  */
 export async function saveGeneratedProgram(input: {
   clientId: string;
+  pendingProgramId?: string;
   program: {
     program_name: string;
     program_description: string;
@@ -126,7 +127,7 @@ export async function saveGeneratedProgram(input: {
     return { error: "Unauthorized" };
   }
 
-  const { clientId, program } = input;
+  const { clientId, program, pendingProgramId } = input;
 
   // Day-of-week to number mapping for scheduled_days
   const dayMap: Record<string, number> = {
@@ -134,22 +135,45 @@ export async function saveGeneratedProgram(input: {
     thursday: 4, friday: 5, saturday: 6,
   };
 
-  // 1. Insert program
-  const { data: programRow, error: programError } = await supabase
-    .from("programs")
-    .insert({
-      coach_id: user.id,
-      client_id: clientId,
-      title: program.program_name,
-      description: program.program_description,
-      is_active: true,
-      status: "draft",
-    })
-    .select("id")
-    .single();
+  let programRowId: string;
 
-  if (programError || !programRow) {
-    return { error: programError?.message ?? "Failed to create program" };
+  if (pendingProgramId) {
+    // Update existing pending_review row → draft
+    const { error: updateError } = await supabase
+      .from("programs")
+      .update({
+        title: program.program_name,
+        description: program.program_description,
+        is_active: true,
+        status: "draft",
+        pending_json: null,
+      })
+      .eq("id", pendingProgramId)
+      .eq("coach_id", user.id);
+
+    if (updateError) {
+      return { error: updateError.message };
+    }
+    programRowId = pendingProgramId;
+  } else {
+    // Legacy path: insert new program row
+    const { data: programRow, error: programError } = await supabase
+      .from("programs")
+      .insert({
+        coach_id: user.id,
+        client_id: clientId,
+        title: program.program_name,
+        description: program.program_description,
+        is_active: true,
+        status: "draft",
+      })
+      .select("id")
+      .single();
+
+    if (programError || !programRow) {
+      return { error: programError?.message ?? "Failed to create program" };
+    }
+    programRowId = programRow.id;
   }
 
   // 2. Insert workout templates and exercises per week
@@ -161,7 +185,7 @@ export async function saveGeneratedProgram(input: {
       const { data: template, error: templateError } = await supabase
         .from("workout_templates")
         .insert({
-          program_id: programRow.id,
+          program_id: programRowId,
           title: workout.workout_name,
           day_number: dayIdx + 1,
           week_number: week.week_number,
@@ -205,7 +229,25 @@ export async function saveGeneratedProgram(input: {
 
   revalidatePath(`/clients/${clientId}`);
   revalidatePath("/programs");
-  return { programId: programRow.id };
+  return { programId: programRowId };
+}
+
+export async function discardPendingProgram(
+  programId: string
+): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
+  const { error } = await supabase
+    .from("programs")
+    .delete()
+    .eq("id", programId)
+    .eq("coach_id", user.id)
+    .eq("status", "pending_review");
+
+  if (error) return { error: error.message };
+  return {};
 }
 
 export async function updateProgramClient(programId: string, clientId: string | null) {
@@ -431,10 +473,41 @@ export async function reorderTemplateExercise(
 
 export async function publishProgram(
   programId: string
-): Promise<{ error?: string }> {
+): Promise<{ error?: string; archivedProgramName?: string }> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Unauthorized" };
+
+  // Get the program to find the client
+  const { data: program } = await supabase
+    .from("programs")
+    .select("client_id")
+    .eq("id", programId)
+    .eq("coach_id", user.id)
+    .single();
+
+  if (!program) return { error: "Program not found" };
+
+  // Archive any other published programs for the same client
+  let archivedProgramName: string | undefined;
+  if (program.client_id) {
+    const { data: previousPublished } = await supabase
+      .from("programs")
+      .select("id, title")
+      .eq("client_id", program.client_id)
+      .eq("status", "published")
+      .neq("id", programId);
+
+    if (previousPublished && previousPublished.length > 0) {
+      archivedProgramName = previousPublished[0].title;
+      await supabase
+        .from("programs")
+        .update({ status: "archived" })
+        .eq("client_id", program.client_id)
+        .eq("status", "published")
+        .neq("id", programId);
+    }
+  }
 
   const { error } = await supabase
     .from("programs")
@@ -445,7 +518,7 @@ export async function publishProgram(
   if (error) return { error: error.message };
 
   revalidatePath("/programs");
-  return {};
+  return { archivedProgramName };
 }
 
 export async function unpublishProgram(

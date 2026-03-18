@@ -7,10 +7,22 @@ import type { TodayWorkout } from "@/types/app.types";
 
 interface TodayWorkoutCardProps {
   todayWorkout: TodayWorkout;
+  hasProgram?: boolean;
 }
 
-export default function TodayWorkoutCard({ todayWorkout }: TodayWorkoutCardProps) {
+export default function TodayWorkoutCard({ todayWorkout, hasProgram = true }: TodayWorkoutCardProps) {
   if (!todayWorkout) {
+    if (!hasProgram) {
+      return (
+        <Card padding="lg" className="text-center">
+          <div className="text-4xl mb-3">📋</div>
+          <h2 className="text-lg font-semibold text-primary">Program Coming Soon</h2>
+          <p className="mt-1 text-sm text-primary/60">
+            Your coach is preparing your program — you&apos;ll get a notification when it&apos;s ready.
+          </p>
+        </Card>
+      );
+    }
     return (
       <Card padding="lg" className="text-center">
         <div className="text-4xl mb-3">🌿</div>

@@ -14,6 +14,7 @@ interface Props {
 export default function PublishBar({ programId, status, onStatusChange }: Props) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
   async function handlePublish() {
     setLoading(true);
@@ -22,6 +23,12 @@ export default function PublishBar({ programId, status, onStatusChange }: Props)
     if (!res.error) {
       onStatusChange("published");
       setShowConfirm(false);
+      if (res.archivedProgramName) {
+        setToast(`Program published. ${res.archivedProgramName} has been archived.`);
+      } else {
+        setToast("Program published.");
+      }
+      setTimeout(() => setToast(null), 5000);
     }
   }
 
@@ -36,6 +43,13 @@ export default function PublishBar({ programId, status, onStatusChange }: Props)
 
   return (
     <>
+      {/* Toast notification */}
+      {toast && (
+        <div className="fixed top-4 left-1/2 z-50 -translate-x-1/2 rounded-xl bg-primary px-4 py-3 text-sm font-medium text-white shadow-lg max-w-sm text-center">
+          {toast}
+        </div>
+      )}
+
       <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-primary/10 bg-background px-4 py-3 pb-safe">
         {status === "draft" ? (
           <Button

@@ -122,7 +122,7 @@ export default function PRDetailModal({
               <div>
                 <p className="text-xs text-primary/50">All-Time Best</p>
                 <p className="text-lg font-bold text-primary">
-                  {best.weight} kg
+                  {best.weight} {best.unit}
                   {best.reps ? (
                     <span className="text-sm font-normal text-primary/60">
                       {" "}
@@ -134,7 +134,7 @@ export default function PRDetailModal({
               <div className="text-right">
                 <p className="text-xs text-primary/50">Est. 1RM</p>
                 <p className="text-sm font-semibold text-muted">
-                  ~{best.estimated1RM} kg
+                  ~{best.estimated1RM} {best.unit}
                 </p>
                 <p className="text-xs text-primary/40">
                   {formatDate(best.date)}

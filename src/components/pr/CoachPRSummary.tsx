@@ -33,7 +33,7 @@ export default function CoachPRSummary({ prs }: CoachPRSummaryProps) {
               </p>
               <div className="flex items-center gap-2 mt-0.5">
                 <p className="text-sm text-primary/70">
-                  <span className="font-semibold">{pr.currentBest} kg</span>
+                  <span className="font-semibold">{pr.currentBest} {pr.unit}</span>
                   {pr.currentBestReps ? (
                     <span className="text-primary/50">
                       {" "}

@@ -38,12 +38,11 @@ export async function signUp(formData: FormData) {
     return { error: error.message };
   }
 
-  if (role === "solo") {
-    redirect("/onboarding");
-  } else if (role === "coach") {
+  if (role === "coach") {
     redirect("/dashboard");
   } else {
-    redirect("/home");
+    // Solo and client users go through onboarding
+    redirect("/onboarding");
   }
 }
 

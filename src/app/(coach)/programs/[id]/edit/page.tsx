@@ -25,5 +25,15 @@ export default async function EditProgramPage({
 
   const exercises = await getAllExerciseNames();
 
-  return <ProgramEditor program={program} exercises={exercises} />;
+  let clientName: string | null = null;
+  if (program.client_id) {
+    const { data: clientProfile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", program.client_id)
+      .single();
+    clientName = clientProfile?.full_name ?? null;
+  }
+
+  return <ProgramEditor program={program} exercises={exercises} clientName={clientName} />;
 }

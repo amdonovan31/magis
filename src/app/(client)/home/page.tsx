@@ -17,7 +17,7 @@ export default async function ClientHomePage() {
 
   if (!user) redirect("/login");
 
-  const [{ data: rawProfile }, { count: intakeCount }, todayWorkout, streakData] = await Promise.all([
+  const [{ data: rawProfile }, { count: intakeCount }, todayWorkout, streakData, { count: programCount }] = await Promise.all([
     supabase
       .from("profiles")
       .select("full_name, intake_requested")
@@ -29,6 +29,12 @@ export default async function ClientHomePage() {
       .eq("client_id", user.id),
     getTodayWorkout(),
     getStreakData(),
+    supabase
+      .from("programs")
+      .select("id", { count: "exact", head: true })
+      .eq("client_id", user.id)
+      .eq("is_active", true)
+      .eq("status", "published"),
   ]);
 
   const profile = rawProfile as Pick<Profile, "full_name" | "intake_requested"> | null;
@@ -60,7 +66,7 @@ export default async function ClientHomePage() {
       )}
 
       {/* Today's workout card */}
-      <TodayWorkoutCard todayWorkout={todayWorkout} />
+      <TodayWorkoutCard todayWorkout={todayWorkout} hasProgram={(programCount ?? 0) > 0} />
 
       {/* Streak card */}
       <StreakCard streakData={streakData} />

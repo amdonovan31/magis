@@ -46,6 +46,7 @@ export async function startWorkoutSession(
 export async function logSet(data: {
   sessionId: string;
   templateExerciseId: string;
+  exerciseIdOverride?: string;
   setNumber: number;
   repsCompleted: number | null;
   weightUsed: string | null;
@@ -64,6 +65,7 @@ export async function logSet(data: {
       {
         session_id: data.sessionId,
         template_exercise_id: data.templateExerciseId,
+        exercise_id: data.exerciseIdOverride ?? null,
         set_number: data.setNumber,
         reps_completed: data.repsCompleted,
         weight_used: data.weightUsed,
@@ -122,6 +124,7 @@ export async function completeSession(sessionId: string) {
     .select(`
       id,
       template_exercise_id,
+      exercise_id,
       reps_completed,
       weight_used,
       is_completed
@@ -133,100 +136,139 @@ export async function completeSession(sessionId: string) {
     // Get the exercise IDs from template_exercise_ids
     const teIds = Array.from(new Set(setLogs.map((l) => l.template_exercise_id).filter(Boolean)));
 
+    let teToExercise = new Map<string, string>();
     if (teIds.length > 0) {
       const { data: templateExercises } = await supabase
         .from("workout_template_exercises")
         .select("id, exercise_id")
         .in("id", teIds as string[]);
 
-      const teToExercise = new Map(
+      teToExercise = new Map(
         (templateExercises ?? []).map((te) => [te.id, te.exercise_id])
       );
+    }
 
-      // Group logs by exercise
-      const exerciseLogs = new Map<string, typeof setLogs>();
-      for (const log of setLogs) {
-        const exerciseId = teToExercise.get(log.template_exercise_id!);
-        if (!exerciseId) continue;
-        if (!exerciseLogs.has(exerciseId)) {
-          exerciseLogs.set(exerciseId, []);
-        }
-        exerciseLogs.get(exerciseId)!.push(log);
+    // Group logs by exercise — prefer exercise_id override (swap) over template lookup
+    const exerciseLogs = new Map<string, typeof setLogs>();
+    for (const log of setLogs) {
+      const exerciseId = log.exercise_id ?? teToExercise.get(log.template_exercise_id!);
+      if (!exerciseId) continue;
+      if (!exerciseLogs.has(exerciseId)) {
+        exerciseLogs.set(exerciseId, []);
+      }
+      exerciseLogs.get(exerciseId)!.push(log);
+    }
+
+    // Infer weight unit from the weight_used string
+    const inferUnit = (weightStr: string | null): string => {
+      if (!weightStr) return "kg";
+      const trimmed = weightStr.trim().toLowerCase();
+      if (trimmed.endsWith("lbs") || trimmed.endsWith("lb")) return "lbs";
+      return "kg";
+    };
+
+    // Determine the weight unit for this user/exercise from recent history
+    const getWeightUnit = async (exerciseId: string, sessionLogs: typeof setLogs): Promise<string> => {
+      // Check current session logs for unit hints
+      for (const log of sessionLogs) {
+        const unit = inferUnit(log.weight_used);
+        if (unit !== "kg") return unit;
       }
 
-      // Check each exercise for PRs
-      for (const [exerciseId, logs] of Array.from(exerciseLogs)) {
-        // Find best weight in this session
-        let bestWeight = 0;
-        let bestWeightLogId = "";
-        let bestVolume = 0;
-        let bestVolumeLogId = "";
+      // Check most recent prior set_log for this exercise
+      const { data: priorLog } = await supabase
+        .from("set_logs")
+        .select("weight_used")
+        .eq("template_exercise_id", sessionLogs[0]?.template_exercise_id ?? "")
+        .neq("session_id", sessionId)
+        .not("weight_used", "is", null)
+        .order("logged_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-        for (const log of logs) {
-          const weight = parseFloat(log.weight_used ?? "0") || 0;
-          const reps = log.reps_completed ?? 0;
-          const volume = weight * reps;
+      if (priorLog) {
+        const unit = inferUnit(priorLog.weight_used);
+        if (unit !== "kg") return unit;
+      }
 
-          if (weight > bestWeight) {
-            bestWeight = weight;
-            bestWeightLogId = log.id;
-          }
-          if (volume > bestVolume) {
-            bestVolume = volume;
-            bestVolumeLogId = log.id;
-          }
+      return "kg";
+    };
+
+    // Check each exercise for PRs
+    for (const [exerciseId, logs] of Array.from(exerciseLogs)) {
+      const weightUnit = await getWeightUnit(exerciseId, logs);
+      const volumeUnit = weightUnit === "lbs" ? "lbs*reps" : "kg*reps";
+
+      // Find best weight in this session
+      let bestWeight = 0;
+      let bestWeightLogId = "";
+      let bestVolume = 0;
+      let bestVolumeLogId = "";
+
+      for (const log of logs) {
+        const weight = parseFloat(log.weight_used ?? "0") || 0;
+        const reps = log.reps_completed ?? 0;
+        const volume = weight * reps;
+
+        if (weight > bestWeight) {
+          bestWeight = weight;
+          bestWeightLogId = log.id;
         }
-
-        // Check weight PR
-        if (bestWeight > 0) {
-          const { data: existingPr } = await supabase
-            .from("personal_records")
-            .select("value")
-            .eq("user_id", user.id)
-            .eq("exercise_id", exerciseId)
-            .eq("pr_type", "weight")
-            .order("value", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (!existingPr || bestWeight > existingPr.value) {
-            await supabase.from("personal_records").insert({
-              user_id: user.id,
-              exercise_id: exerciseId,
-              pr_type: "weight",
-              value: bestWeight,
-              unit: "kg",
-              set_log_id: bestWeightLogId,
-              session_id: sessionId,
-              previous_value: existingPr?.value ?? null,
-            });
-          }
+        if (volume > bestVolume) {
+          bestVolume = volume;
+          bestVolumeLogId = log.id;
         }
+      }
 
-        // Check volume PR (weight x reps for a single set)
-        if (bestVolume > 0) {
-          const { data: existingPr } = await supabase
-            .from("personal_records")
-            .select("value")
-            .eq("user_id", user.id)
-            .eq("exercise_id", exerciseId)
-            .eq("pr_type", "volume")
-            .order("value", { ascending: false })
-            .limit(1)
-            .maybeSingle();
+      // Check weight PR
+      if (bestWeight > 0) {
+        const { data: existingPr } = await supabase
+          .from("personal_records")
+          .select("value")
+          .eq("user_id", user.id)
+          .eq("exercise_id", exerciseId)
+          .eq("pr_type", "weight")
+          .order("value", { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-          if (!existingPr || bestVolume > existingPr.value) {
-            await supabase.from("personal_records").insert({
-              user_id: user.id,
-              exercise_id: exerciseId,
-              pr_type: "volume",
-              value: bestVolume,
-              unit: "kg*reps",
-              set_log_id: bestVolumeLogId,
-              session_id: sessionId,
-              previous_value: existingPr?.value ?? null,
-            });
-          }
+        if (!existingPr || bestWeight > existingPr.value) {
+          await supabase.from("personal_records").insert({
+            user_id: user.id,
+            exercise_id: exerciseId,
+            pr_type: "weight",
+            value: bestWeight,
+            unit: weightUnit,
+            set_log_id: bestWeightLogId,
+            session_id: sessionId,
+            previous_value: existingPr?.value ?? null,
+          });
+        }
+      }
+
+      // Check volume PR (weight x reps for a single set)
+      if (bestVolume > 0) {
+        const { data: existingPr } = await supabase
+          .from("personal_records")
+          .select("value")
+          .eq("user_id", user.id)
+          .eq("exercise_id", exerciseId)
+          .eq("pr_type", "volume")
+          .order("value", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!existingPr || bestVolume > existingPr.value) {
+          await supabase.from("personal_records").insert({
+            user_id: user.id,
+            exercise_id: exerciseId,
+            pr_type: "volume",
+            value: bestVolume,
+            unit: volumeUnit,
+            set_log_id: bestVolumeLogId,
+            session_id: sessionId,
+            previous_value: existingPr?.value ?? null,
+          });
         }
       }
     }

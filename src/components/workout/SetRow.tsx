@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils/cn";
 interface SetRowProps {
   sessionId: string;
   templateExerciseId: string;
+  exerciseIdOverride?: string | null;
   setNumber: number;
   prescribedReps: string | null;
   prescribedWeight: string | null;
@@ -19,6 +20,7 @@ interface SetRowProps {
 export default function SetRow({
   sessionId,
   templateExerciseId,
+  exerciseIdOverride,
   setNumber,
   prescribedReps,
   prescribedWeight,
@@ -42,6 +44,7 @@ export default function SetRow({
       const result = await logSet({
         sessionId,
         templateExerciseId,
+        exerciseIdOverride: exerciseIdOverride ?? undefined,
         setNumber,
         repsCompleted: repsNum,
         weightUsed: weight || null,
@@ -115,7 +118,7 @@ export default function SetRow({
         onClick={handleComplete}
         disabled={optimisticDone}
         className={cn(
-          "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full transition-colors",
+          "flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full transition-colors",
           optimisticDone
             ? "bg-primary text-white"
             : "bg-primary/10 text-primary hover:bg-primary/20"

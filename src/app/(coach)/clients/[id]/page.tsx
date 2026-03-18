@@ -43,34 +43,36 @@ export default async function ClientDetailPage({
 
   if (!relationship) notFound();
 
-  // Get client profile
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", id)
-    .single();
-
-  if (!profile) notFound();
-
-  // Get client's programs
-  const { data: programs } = await supabase
-    .from("programs")
-    .select("*")
-    .eq("client_id", id)
-    .eq("coach_id", user.id)
-    .order("created_at", { ascending: false });
-
-  // Get client intake
-  const { data: intake } = await supabase
-    .from("client_intake")
-    .select("*")
-    .eq("client_id", id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  // Get recent sessions, notes, PRs, measurements, volume, and streaks in parallel
-  const [{ data: sessions }, notes, prs, measurements, volumeData, streakData] = await Promise.all([
+  // Fetch all client data in parallel (auth check above guarantees access)
+  const [
+    { data: profile },
+    { data: programs },
+    { data: intake },
+    { data: sessions },
+    notes,
+    prs,
+    measurements,
+    volumeData,
+    streakData,
+  ] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", id)
+      .single(),
+    supabase
+      .from("programs")
+      .select("*")
+      .eq("client_id", id)
+      .eq("coach_id", user.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("client_intake")
+      .select("*")
+      .eq("client_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
     supabase
       .from("workout_sessions")
       .select("*, workout_template:workout_templates(title)")
@@ -83,6 +85,8 @@ export default async function ClientDetailPage({
     getWeeklyVolume(id, undefined, 8),
     getStreakData(id),
   ]);
+
+  if (!profile) notFound();
 
   // Record that the coach viewed this client (for unread indicator)
   recordClientView(id);

@@ -148,7 +148,7 @@ export default function PRList({ prs, initialExerciseId }: PRListProps) {
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <p className="text-sm text-primary/70">
-                          <span className="font-semibold">{pr.currentBest} kg</span>
+                          <span className="font-semibold">{pr.currentBest} {pr.unit}</span>
                           {pr.currentBestReps ? (
                             <span className="text-primary/50">
                               {" "}
@@ -162,7 +162,7 @@ export default function PRList({ prs, initialExerciseId }: PRListProps) {
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <p className="text-xs text-primary/40">
-                          ~{pr.estimated1RM} kg e1RM
+                          ~{pr.estimated1RM} {pr.unit} e1RM
                         </p>
                         <p className="text-xs text-primary/40">
                           {formatDate(pr.achievedAt)}

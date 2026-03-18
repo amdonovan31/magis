@@ -8,12 +8,16 @@ interface GeneratingScreenProps {
   clientId: string;
   clientName: string;
   guidelinesId: string;
+  regenerationFeedback?: string | null;
+  previousProgramJson?: string | null;
 }
 
 export default function GeneratingScreen({
   clientId,
   clientName,
   guidelinesId,
+  regenerationFeedback,
+  previousProgramJson,
 }: GeneratingScreenProps) {
   const router = useRouter();
   const [status, setStatus] = useState<"loading" | "error">("loading");
@@ -22,10 +26,6 @@ export default function GeneratingScreen({
   const generate = useCallback(async () => {
     setStatus("loading");
     setErrorMessage("");
-
-    // Read optional regeneration feedback from localStorage
-    const regenerationFeedback = localStorage.getItem("regeneration_feedback");
-    const previousProgramJson = localStorage.getItem("regeneration_previous_program");
 
     try {
       const body: Record<string, unknown> = { clientId, guidelinesId };
@@ -48,23 +48,12 @@ export default function GeneratingScreen({
         return;
       }
 
-      // Save program + exercise name lookup for the review page
-      localStorage.setItem("pending_program", JSON.stringify(data.program));
-      localStorage.setItem("pending_program_client_id", clientId);
-      if (data.exerciseNames) {
-        localStorage.setItem("pending_program_exercise_names", JSON.stringify(data.exerciseNames));
-      }
-
-      router.push(`/clients/${clientId}/generate/review`);
+      router.push(`/clients/${clientId}/generate/review?programId=${data.programId}`);
     } catch {
       setErrorMessage("Network error. Please check your connection and try again.");
       setStatus("error");
-    } finally {
-      // Clean up regeneration keys regardless of outcome
-      localStorage.removeItem("regeneration_feedback");
-      localStorage.removeItem("regeneration_previous_program");
     }
-  }, [clientId, guidelinesId, router]);
+  }, [clientId, guidelinesId, regenerationFeedback, previousProgramJson, router]);
 
   useEffect(() => {
     generate();

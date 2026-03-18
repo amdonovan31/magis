@@ -81,11 +81,25 @@ export async function middleware(request: NextRequest) {
 
     // Protect client routes — allow both client and solo roles
     if (pathname.startsWith("/home") || pathname.startsWith("/workout") ||
-        pathname.startsWith("/history") || pathname.startsWith("/calendar")) {
+        pathname.startsWith("/history") || pathname.startsWith("/calendar") ||
+        pathname.startsWith("/profile")) {
       if (role !== "client" && role !== "solo") {
         const redirectUrl = request.nextUrl.clone();
         redirectUrl.pathname = "/dashboard";
         return NextResponse.redirect(redirectUrl);
+      }
+
+      // Enforce onboarding completion for client/solo routes
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("onboarding_complete")
+        .eq("id", user.id)
+        .single();
+
+      if (!profile?.onboarding_complete) {
+        const onboardingUrl = request.nextUrl.clone();
+        onboardingUrl.pathname = "/onboarding";
+        return NextResponse.redirect(onboardingUrl);
       }
     }
   }
