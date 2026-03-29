@@ -1,10 +1,14 @@
 import { getCoachClients } from "@/lib/queries/coach.queries";
 import { getExercises } from "@/lib/queries/exercise.queries";
+import { createClient } from "@/lib/supabase/server";
 import ProgramBuilder from "@/components/coach/ProgramBuilder";
 import TopBar from "@/components/layout/TopBar";
 import Link from "next/link";
 
 export default async function NewProgramPage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
   const [clients, exercises] = await Promise.all([
     getCoachClients(),
     getExercises(),
@@ -26,7 +30,7 @@ export default async function NewProgramPage() {
         }
       />
       <div className="px-4 pt-4 pb-8">
-        <ProgramBuilder clients={clientsList} exercises={exercises} />
+        <ProgramBuilder clients={clientsList} exercises={exercises} currentUserId={user?.id} />
       </div>
     </>
   );

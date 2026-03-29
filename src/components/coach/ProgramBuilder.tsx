@@ -20,6 +20,7 @@ import type {
 interface ProgramBuilderProps {
   clients: Pick<Profile, "id" | "full_name">[];
   exercises: Exercise[];
+  currentUserId?: string;
 }
 
 const defaultDay = (dayNumber: number = 1): ProgramBuilderDay => ({
@@ -35,7 +36,7 @@ const defaultState: ProgramBuilderState = {
   weeks: [{ weekNumber: 1, isDeload: false, days: [defaultDay(1)] }],
 };
 
-export default function ProgramBuilder({ clients, exercises }: ProgramBuilderProps) {
+export default function ProgramBuilder({ clients, exercises, currentUserId }: ProgramBuilderProps) {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [state, setState] = useState<ProgramBuilderState>(defaultState);
   const [activeDayIdx, setActiveDayIdx] = useState(0);
@@ -171,7 +172,7 @@ export default function ProgramBuilder({ clients, exercises }: ProgramBuilderPro
           <option value="">No client yet</option>
           {clients.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.full_name}
+              {c.full_name}{currentUserId && c.id === currentUserId ? " (You)" : ""}
             </option>
           ))}
         </select>

@@ -6,9 +6,10 @@ import type { ClientWithProgram } from "@/types/app.types";
 
 interface ClientCardProps {
   client: ClientWithProgram;
+  currentUserId?: string;
 }
 
-export default function ClientCard({ client }: ClientCardProps) {
+export default function ClientCard({ client, currentUserId }: ClientCardProps) {
   const { profile, activeProgram, lastSessionDate, streak, unreadNotes, intakeComplete, intakeRequested } = client;
 
   return (
@@ -28,6 +29,9 @@ export default function ClientCard({ client }: ClientCardProps) {
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-primary truncate">
             {profile.full_name ?? "Unnamed Client"}
+            {currentUserId && profile.id === currentUserId && (
+              <span className="ml-1 text-sm font-normal text-primary/50">(You)</span>
+            )}
           </p>
           {activeProgram ? (
             <p className="text-sm text-primary/60 truncate">{activeProgram.title}</p>

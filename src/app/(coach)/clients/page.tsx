@@ -31,7 +31,7 @@ export default async function ClientsPage() {
           </div>
         ) : (
           clients.map((client) => (
-            <ClientCard key={client.profile.id} client={client} />
+            <ClientCard key={client.profile.id} client={client} currentUserId={data.coach.id} />
           ))
         )}
       </div>

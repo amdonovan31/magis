@@ -60,12 +60,24 @@ export async function addRoleToProfile(newRole: "coach" | "client" | "solo") {
     return { success: true }; // Already has this role
   }
 
+  const updatedRoles = [...profile.roles, newRole];
+
   const { error } = await supabase
     .from("profiles")
-    .update({ roles: [...profile.roles, newRole] })
+    .update({ roles: updatedRoles })
     .eq("id", user.id);
 
   if (error) return { error: error.message };
+
+  // If user now has both coach + client roles, create self-coaching relationship
+  if (updatedRoles.includes("coach") && updatedRoles.includes("client")) {
+    await supabase
+      .from("coach_client_relationships")
+      .upsert(
+        { coach_id: user.id, client_id: user.id },
+        { onConflict: "client_id", ignoreDuplicates: true }
+      );
+  }
 
   return { success: true };
 }
