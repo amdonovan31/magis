@@ -3,6 +3,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/utils/logger";
 
+// Extend Vercel serverless function timeout (default is 10s on Hobby, 15s on Pro)
+export const maxDuration = 60;
+
 interface GeneratedExercise {
   exercise_id: string;
   sets: number;
@@ -436,16 +439,38 @@ PROGRAMMING PRINCIPLES (follow these strictly):
     if (pendingError || !pendingRow) {
       logger.error("Failed to save pending program", { error: pendingError });
       return NextResponse.json(
-        { error: "Failed to save generated program. Please try again." },
+        { error: `Database save failed: ${pendingError?.message ?? "Unknown error"}. Please try again.` },
         { status: 500 }
       );
     }
 
     return NextResponse.json({ programId: pendingRow.id });
   } catch (err) {
-    logger.error("AI generation error", { error: String(err) });
+    const errMsg = String(err);
+    logger.error("AI generation error", { error: errMsg });
+
+    // Surface specific error types for easier debugging
+    if (errMsg.includes("timeout") || errMsg.includes("ETIMEDOUT") || errMsg.includes("AbortError")) {
+      return NextResponse.json(
+        { error: "AI generation timed out. The program may be too complex — try reducing the number of weeks." },
+        { status: 504 }
+      );
+    }
+    if (errMsg.includes("401") || errMsg.includes("authentication")) {
+      return NextResponse.json(
+        { error: "AI API key is invalid or expired. Please check ANTHROPIC_API_KEY." },
+        { status: 500 }
+      );
+    }
+    if (errMsg.includes("429") || errMsg.includes("rate")) {
+      return NextResponse.json(
+        { error: "AI rate limit reached. Please wait a moment and try again." },
+        { status: 429 }
+      );
+    }
+
     return NextResponse.json(
-      { error: "An unexpected error occurred. Please try again." },
+      { error: "An unexpected error occurred during program generation. Please try again." },
       { status: 500 }
     );
   }
