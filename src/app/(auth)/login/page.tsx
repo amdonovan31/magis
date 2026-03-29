@@ -16,7 +16,7 @@ export default function LoginPage({
     <div className="flex min-h-screen flex-col items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
-          <img src="/magis_logo_clean.svg" alt="Magis" style={{ height: 40 }} />
+          <img src="/magis_logo_clean.svg" alt="Magis" style={{ height: 160 }} />
           <p
             className="font-body text-xs uppercase tracking-widest"
             style={{ color: "var(--color-muted)" }}
