@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Card from "@/components/ui/Card";
 import { cn } from "@/lib/utils/cn";
+import { fetchWeekWorkouts } from "@/lib/actions/calendar.actions";
 import type { ScheduledWorkoutWithDetails } from "@/lib/queries/calendar.queries";
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -20,13 +21,66 @@ function toLocalDateString(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-export default function CalendarClient({ workouts, weekStart }: CalendarClientProps) {
+function addDays(dateStr: string, days: number): string {
+  const d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() + days);
+  return toLocalDateString(d);
+}
+
+function formatWeekRange(weekStart: string): string {
+  const mon = new Date(weekStart + "T00:00:00");
+  const sun = new Date(mon);
+  sun.setDate(mon.getDate() + 6);
+
+  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+  const monStr = mon.toLocaleDateString("en-US", opts);
+  const sunStr = sun.toLocaleDateString("en-US", opts);
+  return `${monStr} – ${sunStr}`;
+}
+
+export default function CalendarClient({ workouts: initialWorkouts, weekStart: initialWeekStart }: CalendarClientProps) {
   const todayStr = toLocalDateString(new Date());
+  const [currentWeekStart, setCurrentWeekStart] = useState(initialWeekStart);
+  const [workouts, setWorkouts] = useState(initialWorkouts);
   const [selectedDate, setSelectedDate] = useState(todayStr);
+  const [loading, setLoading] = useState(false);
+
+  const isInitialWeek = currentWeekStart === initialWeekStart;
+
+  const navigateWeek = useCallback(async (newWeekStart: string, isOriginalWeek: boolean) => {
+    setCurrentWeekStart(newWeekStart);
+    if (isOriginalWeek) {
+      setWorkouts(initialWorkouts);
+      setSelectedDate(todayStr);
+    } else {
+      setSelectedDate(newWeekStart); // Select Monday of new week
+      setLoading(true);
+      const data = await fetchWeekWorkouts(newWeekStart);
+      setWorkouts(data);
+      setLoading(false);
+    }
+  }, [initialWorkouts, todayStr]);
+
+  // Keep initialWorkouts in sync if server re-renders
+  useEffect(() => {
+    if (isInitialWeek) {
+      setWorkouts(initialWorkouts);
+    }
+  }, [initialWorkouts, isInitialWeek]);
+
+  function handlePrev() {
+    const newStart = addDays(currentWeekStart, -7);
+    navigateWeek(newStart, newStart === initialWeekStart);
+  }
+
+  function handleNext() {
+    const newStart = addDays(currentWeekStart, 7);
+    navigateWeek(newStart, newStart === initialWeekStart);
+  }
 
   // Build the 7 days of the week
   const weekDays = DAY_LABELS.map((label, i) => {
-    const d = new Date(weekStart + "T00:00:00");
+    const d = new Date(currentWeekStart + "T00:00:00");
     d.setDate(d.getDate() + i);
     const dateStr = toLocalDateString(d);
     const hasWorkout = workouts.some((w) => w.scheduled_date === dateStr);
@@ -37,6 +91,31 @@ export default function CalendarClient({ workouts, weekStart }: CalendarClientPr
 
   return (
     <div>
+      {/* Week navigation header */}
+      <div className="flex items-center justify-between px-5 pb-3">
+        <button
+          onClick={handlePrev}
+          className="flex h-8 w-8 items-center justify-center rounded-full text-primary/60 hover:text-primary hover:bg-primary/5 transition-colors"
+          aria-label="Previous week"
+        >
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+          </svg>
+        </button>
+        <span className="text-sm font-semibold text-primary">
+          {formatWeekRange(currentWeekStart)}
+        </span>
+        <button
+          onClick={handleNext}
+          className="flex h-8 w-8 items-center justify-center rounded-full text-primary/60 hover:text-primary hover:bg-primary/5 transition-colors"
+          aria-label="Next week"
+        >
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+          </svg>
+        </button>
+      </div>
+
       {/* Week strip */}
       <div className="overflow-x-auto px-3">
         <div className="flex gap-1 min-w-max">
@@ -96,7 +175,11 @@ export default function CalendarClient({ workouts, weekStart }: CalendarClientPr
           {formatDisplayDate(selectedDate)}
         </p>
 
-        {dayWorkouts.length === 0 ? (
+        {loading ? (
+          <Card padding="lg" className="text-center">
+            <p className="text-sm text-muted">Loading...</p>
+          </Card>
+        ) : dayWorkouts.length === 0 ? (
           <NoWorkoutMessage hasAnyWorkouts={workouts.length > 0} />
         ) : (
           <div className="flex flex-col gap-3">

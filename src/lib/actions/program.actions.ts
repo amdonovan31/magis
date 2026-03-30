@@ -472,7 +472,8 @@ export async function reorderTemplateExercise(
 }
 
 export async function publishProgram(
-  programId: string
+  programId: string,
+  startsOn: string
 ): Promise<{ error?: string; archivedProgramName?: string }> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -511,14 +512,92 @@ export async function publishProgram(
 
   const { error } = await supabase
     .from("programs")
-    .update({ status: "published" })
+    .update({ status: "published", starts_on: startsOn })
     .eq("id", programId)
     .eq("coach_id", user.id);
 
   if (error) return { error: error.message };
 
+  // Generate scheduled_workouts rows from templates
+  await generateScheduledWorkouts(programId);
+
   revalidatePath("/programs");
+  revalidatePath("/calendar");
   return { archivedProgramName };
+}
+
+/**
+ * Generate scheduled_workouts rows from a program's workout templates.
+ * Idempotent — deletes existing rows for this program before inserting.
+ */
+export async function generateScheduledWorkouts(
+  programId: string
+): Promise<{ error?: string; count?: number }> {
+  const supabase = await createClient();
+
+  // Fetch the program
+  const { data: program } = await supabase
+    .from("programs")
+    .select("client_id, starts_on")
+    .eq("id", programId)
+    .single();
+
+  if (!program || !program.client_id || !program.starts_on) {
+    return { error: "Program missing client or start date" };
+  }
+
+  // Fetch all workout templates
+  const { data: templates } = await supabase
+    .from("workout_templates")
+    .select("id, week_number, scheduled_days")
+    .eq("program_id", programId)
+    .order("week_number")
+    .order("day_number");
+
+  if (!templates || templates.length === 0) {
+    return { error: "No workout templates found" };
+  }
+
+  const startsOn = new Date(program.starts_on + "T00:00:00");
+
+  const rows = templates.flatMap((t) => {
+    const days = (t.scheduled_days as number[] | null) ?? [];
+    return days.map((scheduledDay) => {
+      // starts_on is Monday (day 1). Compute offset from Monday.
+      // 0=Sun→6, 1=Mon→0, 2=Tue→1, ..., 6=Sat→5
+      const offset = scheduledDay === 0 ? 6 : scheduledDay - 1;
+      const weekOffset = ((t.week_number ?? 1) - 1) * 7;
+      const date = new Date(startsOn);
+      date.setDate(startsOn.getDate() + weekOffset + offset);
+
+      const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
+      return {
+        client_id: program.client_id!,
+        program_id: programId,
+        workout_template_id: t.id,
+        scheduled_date: dateStr,
+        status: "scheduled" as const,
+      };
+    });
+  });
+
+  // Delete existing rows for idempotency
+  await supabase
+    .from("scheduled_workouts")
+    .delete()
+    .eq("program_id", programId);
+
+  const { error } = await supabase
+    .from("scheduled_workouts")
+    .insert(rows);
+
+  if (error) {
+    logger.error("Failed to generate scheduled workouts", { error });
+    return { error: error.message };
+  }
+
+  return { count: rows.length };
 }
 
 export async function unpublishProgram(

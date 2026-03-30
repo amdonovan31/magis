@@ -5,6 +5,7 @@ import TopBar from "@/components/layout/TopBar";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import AssignToMeButton from "@/components/coach/AssignToMeButton";
+import ProgramDetailPublishBar from "@/components/coach/ProgramDetailPublishBar";
 import Link from "next/link";
 
 export default async function ProgramDetailPage({
@@ -32,7 +33,7 @@ export default async function ProgramDetailPage({
           </Link>
         }
       />
-      <div className="flex flex-col gap-4 px-4 pt-4 pb-8">
+      <div className="flex flex-col gap-4 px-4 pt-4 pb-24">
         {program.description && (
           <p className="text-sm text-primary/60">{program.description}</p>
         )}
@@ -42,6 +43,10 @@ export default async function ProgramDetailPage({
             <Badge variant={program.is_active ? "success" : "default"}>
               {program.is_active ? "Active" : "Inactive"}
             </Badge>
+            <ProgramDetailPublishBar
+              programId={program.id}
+              initialStatus={program.status}
+            />
             {program.starts_on && (
               <span className="text-xs text-primary/40">
                 Starts {program.starts_on}

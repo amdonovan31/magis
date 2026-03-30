@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import { publishProgram, unpublishProgram } from "@/lib/actions/program.actions";
 
@@ -15,10 +16,11 @@ export default function PublishBar({ programId, status, onStatusChange }: Props)
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [startsOn, setStartsOn] = useState(() => new Date().toISOString().split("T")[0]);
 
   async function handlePublish() {
     setLoading(true);
-    const res = await publishProgram(programId);
+    const res = await publishProgram(programId, startsOn);
     setLoading(false);
     if (!res.error) {
       onStatusChange("published");
@@ -81,11 +83,18 @@ export default function PublishBar({ programId, status, onStatusChange }: Props)
       </div>
 
       {/* Publish confirmation */}
-      <Modal isOpen={showConfirm} onClose={() => setShowConfirm(false)} title="Publish Program?">
+      <Modal isOpen={showConfirm} onClose={() => setShowConfirm(false)} title="Publish Program">
         <p className="mb-4 text-sm text-primary/60">
           This will make the program visible to the client. They&apos;ll be able to see all workouts and exercises.
         </p>
-        <div className="flex gap-3">
+        <Input
+          label="When should this program start?"
+          type="date"
+          value={startsOn}
+          onChange={(e) => setStartsOn(e.target.value)}
+          required
+        />
+        <div className="mt-4 flex gap-3">
           <Button
             variant="secondary"
             fullWidth
@@ -98,6 +107,7 @@ export default function PublishBar({ programId, status, onStatusChange }: Props)
             size="lg"
             onClick={handlePublish}
             loading={loading}
+            disabled={!startsOn}
           >
             Publish
           </Button>
