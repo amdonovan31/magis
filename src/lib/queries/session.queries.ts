@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { isScheduledToday } from "@/lib/utils/date";
+import { getTodayISO } from "@/lib/utils/date";
 import { getExercisesByIds } from "@/lib/queries/exercise.queries";
 import type { TodayWorkout, WorkoutSession, Exercise } from "@/types/app.types";
 
@@ -28,14 +28,20 @@ export async function getTodayWorkout(): Promise<TodayWorkout> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  // Get the client's active program with templates
-  const { data: program } = await supabase
-    .from("programs")
+  const today = getTodayISO();
+
+  // Find today's scheduled workout via scheduled_workouts table
+  const { data: scheduledRow } = await supabase
+    .from("scheduled_workouts")
     .select(`
-      *,
-      workout_templates(
+      id,
+      program_id,
+      workout_template_id,
+      program:programs!inner(
+        *
+      ),
+      template:workout_templates!inner(
         *,
-        client_schedule:client_workout_schedules!inner(scheduled_days, scheduled_dates),
         exercises:workout_template_exercises(
           *,
           exercise:exercises(*)
@@ -43,68 +49,23 @@ export async function getTodayWorkout(): Promise<TodayWorkout> {
       )
     `)
     .eq("client_id", user.id)
-    .eq("is_active", true)
-    .eq("status", "published")
-    .order("created_at", { ascending: false })
+    .eq("scheduled_date", today)
+    .eq("status", "scheduled")
     .limit(1)
     .maybeSingle();
 
-  // Also try without the inner join (in case no client override exists)
-  const { data: programFallback } = !program
-    ? await supabase
-        .from("programs")
-        .select(`
-          *,
-          workout_templates(
-            *,
-            exercises:workout_template_exercises(
-              *,
-              exercise:exercises(*)
-            )
-          )
-        `)
-        .eq("client_id", user.id)
-        .eq("is_active", true)
-        .eq("status", "published")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle()
-    : { data: null };
+  if (!scheduledRow) return null;
 
-  const activeProgram = program ?? programFallback;
-  if (!activeProgram?.workout_templates?.length) return null;
-
-  // Find a template scheduled for today
-  const todayTemplate = activeProgram.workout_templates.find(
-    (t: {
-      client_schedule?: Array<{ scheduled_days: number[] | null; scheduled_dates: string[] | null }>;
-      scheduled_days: number[] | null;
-      scheduled_dates: string[] | null;
-    }) => {
-      // Client override takes priority
-      const clientSchedule = t.client_schedule?.[0];
-      if (clientSchedule) {
-        return isScheduledToday({
-          scheduledDays: clientSchedule.scheduled_days,
-          scheduledDates: clientSchedule.scheduled_dates,
-        });
-      }
-      return isScheduledToday({
-        scheduledDays: t.scheduled_days,
-        scheduledDates: t.scheduled_dates,
-      });
-    }
-  );
-
-  if (!todayTemplate) return null;
+  const program = scheduledRow.program as unknown as import("@/types/app.types").Program;
+  const template = scheduledRow.template as unknown as import("@/types/app.types").WorkoutTemplateWithExercises;
 
   // Sort exercises by position and resolve alternates
-  const sortedExercises = (todayTemplate.exercises ?? []).sort(
+  const sortedExercises = (template.exercises ?? []).sort(
     (a: { position: number }, b: { position: number }) => a.position - b.position
   );
   const exercisesWithAlternates = await resolveAlternateExercises(sortedExercises);
   const templateWithSortedExercises = {
-    ...todayTemplate,
+    ...template,
     exercises: exercisesWithAlternates,
   };
 
@@ -113,17 +74,17 @@ export async function getTodayWorkout(): Promise<TodayWorkout> {
     .from("workout_sessions")
     .select("*")
     .eq("client_id", user.id)
-    .eq("workout_template_id", todayTemplate.id)
+    .eq("workout_template_id", template.id)
     .eq("status", "in_progress")
     .maybeSingle();
 
   // Fetch coach name if the program has a coach_id different from the user
   let coachName: string | null = null;
-  if (activeProgram.coach_id && activeProgram.coach_id !== user.id) {
+  if (program.coach_id && program.coach_id !== user.id) {
     const { data: coachProfile } = await supabase
       .from("profiles")
       .select("full_name")
-      .eq("id", activeProgram.coach_id)
+      .eq("id", program.coach_id)
       .single();
     coachName = coachProfile?.full_name ?? null;
   }
@@ -131,7 +92,7 @@ export async function getTodayWorkout(): Promise<TodayWorkout> {
   return {
     template: templateWithSortedExercises as unknown as import("@/types/app.types").WorkoutTemplateWithExercises,
     activeSession: activeSession as WorkoutSession | null,
-    program: activeProgram as unknown as import("@/types/app.types").Program,
+    program,
     coachName,
   };
 }

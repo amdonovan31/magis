@@ -889,6 +889,7 @@ export type Database = {
           training_age_years: number | null
           updated_at: string
           weight_kg: number | null
+          weight_unit: string
         }
         Insert: {
           avatar_url?: string | null
@@ -906,6 +907,7 @@ export type Database = {
           training_age_years?: number | null
           updated_at?: string
           weight_kg?: number | null
+          weight_unit?: string
         }
         Update: {
           avatar_url?: string | null
@@ -923,6 +925,7 @@ export type Database = {
           training_age_years?: number | null
           updated_at?: string
           weight_kg?: number | null
+          weight_unit?: string
         }
         Relationships: []
       }
@@ -1045,6 +1048,107 @@ export type Database = {
           },
         ]
       }
+      exercise_substitutions: {
+        Row: {
+          id: string
+          session_id: string
+          template_exercise_id: string
+          original_exercise_id: string
+          substitute_exercise_id: string
+          reason: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          session_id: string
+          template_exercise_id: string
+          original_exercise_id: string
+          substitute_exercise_id: string
+          reason?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          session_id?: string
+          template_exercise_id?: string
+          original_exercise_id?: string
+          substitute_exercise_id?: string
+          reason?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercise_substitutions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "workout_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exercise_substitutions_template_exercise_id_fkey"
+            columns: ["template_exercise_id"]
+            isOneToOne: false
+            referencedRelation: "workout_template_exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exercise_substitutions_original_exercise_id_fkey"
+            columns: ["original_exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exercise_substitutions_substitute_exercise_id_fkey"
+            columns: ["substitute_exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_exercise_notes: {
+        Row: {
+          id: string
+          session_id: string
+          template_exercise_id: string
+          content: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          session_id: string
+          template_exercise_id: string
+          content?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          session_id?: string
+          template_exercise_id?: string
+          content?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_exercise_notes_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "workout_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_exercise_notes_template_exercise_id_fkey"
+            columns: ["template_exercise_id"]
+            isOneToOne: false
+            referencedRelation: "workout_template_exercises"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       set_logs: {
         Row: {
           exercise_id: string | null
@@ -1058,6 +1162,8 @@ export type Database = {
           sync_status: string
           template_exercise_id: string | null
           weight_used: string | null
+          weight_value: number | null
+          weight_unit: string | null
         }
         Insert: {
           exercise_id?: string | null
@@ -1071,6 +1177,8 @@ export type Database = {
           sync_status?: string
           template_exercise_id?: string | null
           weight_used?: string | null
+          weight_value?: number | null
+          weight_unit?: string | null
         }
         Update: {
           exercise_id?: string | null
@@ -1084,6 +1192,8 @@ export type Database = {
           sync_status?: string
           template_exercise_id?: string | null
           weight_used?: string | null
+          weight_value?: number | null
+          weight_unit?: string | null
         }
         Relationships: [
           {

@@ -2,6 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getExercises } from "@/lib/queries/exercise.queries";
+import type { Exercise } from "@/types/app.types";
+
+export async function searchExercises(query: string): Promise<Exercise[]> {
+  if (!query.trim()) return [];
+  return getExercises({ search: query.trim() });
+}
 
 export async function createExercise(formData: FormData) {
   const supabase = await createClient();

@@ -43,6 +43,119 @@ export async function startWorkoutSession(
   redirect(`/workout/${session.id}`);
 }
 
+export async function saveRetroLog(input: {
+  scheduledWorkoutId: string;
+  workoutTemplateId: string;
+  programId: string;
+  weightUnit: "lbs" | "kg";
+  sets: {
+    templateExerciseId: string;
+    setNumber: number;
+    reps: number | null;
+    weight: number | null;
+  }[];
+  notes?: Record<string, string>;
+  substitutions?: Record<string, { exerciseId: string; reason?: string }>;
+}): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
+  // Create a completed session
+  const { data: session, error: sessionError } = await supabase
+    .from("workout_sessions")
+    .insert({
+      client_id: user.id,
+      workout_template_id: input.workoutTemplateId,
+      program_id: input.programId,
+      status: "completed",
+      completed_at: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+
+  if (sessionError || !session) return { error: sessionError?.message ?? "Failed to create session" };
+
+  // Batch insert set logs (with exercise_id override for substitutions)
+  if (input.sets.length > 0) {
+    const setRows = input.sets.map((s) => ({
+      session_id: session.id,
+      template_exercise_id: s.templateExerciseId,
+      exercise_id: input.substitutions?.[s.templateExerciseId]?.exerciseId ?? null,
+      set_number: s.setNumber,
+      reps_completed: s.reps,
+      weight_used: s.weight != null ? `${s.weight}${input.weightUnit}` : null,
+      weight_value: s.weight,
+      weight_unit: s.weight != null ? input.weightUnit : null,
+      is_completed: true,
+      sync_status: "synced",
+    }));
+
+    const { error: setError } = await supabase
+      .from("set_logs")
+      .insert(setRows);
+
+    if (setError) return { error: setError.message };
+  }
+
+  // Insert exercise notes (skip empty)
+  if (input.notes) {
+    const noteRows = Object.entries(input.notes)
+      .filter(([, content]) => content.trim())
+      .map(([templateExerciseId, content]) => ({
+        session_id: session.id,
+        template_exercise_id: templateExerciseId,
+        content: content.trim(),
+      }));
+
+    if (noteRows.length > 0) {
+      await supabase
+        .from("session_exercise_notes")
+        .insert(noteRows);
+    }
+  }
+
+  // Insert exercise substitutions
+  if (input.substitutions && Object.keys(input.substitutions).length > 0) {
+    // Fetch original exercise IDs from template
+    const teIds = Object.keys(input.substitutions);
+    const { data: templateExercises } = await supabase
+      .from("workout_template_exercises")
+      .select("id, exercise_id")
+      .in("id", teIds);
+
+    if (templateExercises) {
+      const subRows = templateExercises
+        .filter((te) => input.substitutions![te.id])
+        .map((te) => ({
+          session_id: session.id,
+          template_exercise_id: te.id,
+          original_exercise_id: te.exercise_id,
+          substitute_exercise_id: input.substitutions![te.id].exerciseId,
+          reason: input.substitutions![te.id].reason ?? null,
+        }));
+
+      if (subRows.length > 0) {
+        await supabase
+          .from("exercise_substitutions")
+          .upsert(subRows, { onConflict: "session_id,template_exercise_id" });
+      }
+    }
+  }
+
+  // Mark scheduled workout as completed
+  await supabase
+    .from("scheduled_workouts")
+    .update({ status: "completed", session_id: session.id })
+    .eq("id", input.scheduledWorkoutId);
+
+  revalidatePath("/calendar");
+  revalidatePath("/home");
+  return {};
+}
+
 export async function logSet(data: {
   sessionId: string;
   templateExerciseId: string;
