@@ -25,8 +25,8 @@ export default async function WorkoutDetailPage({
   if (!workout) notFound();
 
   // Fetch exercise notes and substitutions for completed workouts
-  let notesByExercise: Record<string, string> = {};
-  let subsByExercise: Record<string, { substituteName: string; originalName: string }> = {};
+  const notesByExercise: Record<string, string> = {};
+  const subsByExercise: Record<string, { substituteName: string; originalName: string }> = {};
   if (workout.status === "completed" && workout.session_id) {
     const [{ data: notes }, { data: subs }] = await Promise.all([
       supabase
@@ -61,7 +61,6 @@ export default async function WorkoutDetailPage({
 
   const isScheduled = workout.status === "scheduled";
   const isMissed = workout.status === "missed";
-  const canStart = isScheduled || isMissed;
   const canLog = isScheduled || isMissed;
 
   async function startSession() {
