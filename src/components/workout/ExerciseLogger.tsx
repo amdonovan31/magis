@@ -5,7 +5,6 @@ import SetRow from "./SetRow";
 import ExerciseDemoModal from "./ExerciseDemoModal";
 import { persistSwap, removeSwap } from "@/lib/workout-persistence";
 import { searchExercises } from "@/lib/actions/exercise.actions";
-import { cn } from "@/lib/utils/cn";
 import type { WorkoutTemplateExerciseWithExercise, SetLog, Exercise } from "@/types/app.types";
 
 interface ExerciseLoggerProps {
