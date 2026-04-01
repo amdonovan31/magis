@@ -77,6 +77,7 @@ interface BottomNavProps {
 
 export default function BottomNav({ role }: BottomNavProps) {
   const pathname = usePathname();
+  if (pathname.startsWith('/workout/')) return null;
   const items = role === "coach" ? coachNav : clientNav;
 
   return (

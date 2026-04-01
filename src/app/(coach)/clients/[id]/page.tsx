@@ -218,17 +218,24 @@ export default async function ClientDetailPage({
                       </p>
                     )}
                   </div>
-                  <Badge
-                    variant={
-                      session.status === "completed"
-                        ? "success"
-                        : session.status === "skipped"
-                          ? "default"
-                          : "accent"
-                    }
-                  >
-                    {session.status}
-                  </Badge>
+                  <div className="flex items-center gap-1.5">
+                    {(session as unknown as { skipped_exercises?: string[] }).skipped_exercises?.length ? (
+                      <span className="text-[10px] text-primary/40">
+                        {(session as unknown as { skipped_exercises: string[] }).skipped_exercises.length} skipped
+                      </span>
+                    ) : null}
+                    <Badge
+                      variant={
+                        session.status === "completed"
+                          ? "success"
+                          : session.status === "skipped"
+                            ? "default"
+                            : "accent"
+                      }
+                    >
+                      {session.status}
+                    </Badge>
+                  </div>
                 </div>
               </Card>
             );

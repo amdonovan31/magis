@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import SetRow from "./SetRow";
 import ExerciseDemoModal from "./ExerciseDemoModal";
-import AlternateExercises from "./AlternateExercises";
 import { persistSwap, removeSwap } from "@/lib/workout-persistence";
+import { searchExercises } from "@/lib/actions/exercise.actions";
+import { cn } from "@/lib/utils/cn";
 import type { WorkoutTemplateExerciseWithExercise, SetLog, Exercise } from "@/types/app.types";
 
 interface ExerciseLoggerProps {
@@ -12,7 +13,10 @@ interface ExerciseLoggerProps {
   templateExercise: WorkoutTemplateExerciseWithExercise;
   existingLogs: SetLog[];
   onSetComplete?: (restSeconds: number) => void;
-  initialSwappedExerciseId?: string | null;
+  initialSwappedExercise?: Exercise | null;
+  weightUnit: "kg" | "lbs";
+  isSkipped: boolean;
+  onSkip: () => void;
 }
 
 export default function ExerciseLogger({
@@ -20,29 +24,48 @@ export default function ExerciseLogger({
   templateExercise,
   existingLogs,
   onSetComplete,
-  initialSwappedExerciseId,
+  initialSwappedExercise = null,
+  weightUnit,
+  isSkipped,
+  onSkip,
 }: ExerciseLoggerProps) {
-  const alts = (templateExercise as WorkoutTemplateExerciseWithExercise & { alternateExercises?: Exercise[] }).alternateExercises;
-
   const [showDemo, setShowDemo] = useState(false);
-  const [swappedExercise, setSwappedExercise] = useState<Exercise | null>(() => {
-    if (initialSwappedExerciseId && alts) {
-      return alts.find((e) => e.id === initialSwappedExerciseId) ?? null;
-    }
-    return null;
-  });
-  const setCount = templateExercise.prescribed_sets ?? 3;
+  const [confirmingSkip, setConfirmingSkip] = useState(false);
+  const [swappedExercise, setSwappedExercise] = useState<Exercise | null>(initialSwappedExercise);
+  const [hideLoggedSets, setHideLoggedSets] = useState(false);
 
+  // Swap search state
+  const [swapMode, setSwapMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<Exercise[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [confirmSwapExercise, setConfirmSwapExercise] = useState<Exercise | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const swapContainerRef = useRef<HTMLDivElement>(null);
+
+  const setCount = templateExercise.prescribed_sets ?? 3;
   const displayExercise = swappedExercise ?? templateExercise.exercise;
   const exerciseIdOverride = swappedExercise?.id ?? null;
 
+  const loggedSetCount = existingLogs.filter((l) => l.is_completed).length;
+
+  // Update swapped exercise when initialSwappedExercise arrives async
+  useEffect(() => {
+    if (initialSwappedExercise && !swappedExercise) {
+      setSwappedExercise(initialSwappedExercise);
+    }
+  }, [initialSwappedExercise]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function handleSwap(exercise: Exercise) {
     setSwappedExercise(exercise);
+    setHideLoggedSets(true);
     persistSwap(sessionId, templateExercise.id, exercise.id);
   }
 
   function handleRevert() {
     setSwappedExercise(null);
+    setHideLoggedSets(false);
     removeSwap(sessionId, templateExercise.id);
   }
 
@@ -53,47 +76,216 @@ export default function ExerciseLogger({
     }
   }
 
+  // Debounced search
+  const handleSearch = useCallback((value: string) => {
+    setSearchQuery(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!value.trim()) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
+    setSearchLoading(true);
+    debounceRef.current = setTimeout(async () => {
+      const data = await searchExercises(value);
+      setSearchResults(data);
+      setSearchLoading(false);
+    }, 300);
+  }, []);
+
+  function enterSwapMode() {
+    setSwapMode(true);
+    setSearchQuery("");
+    setSearchResults([]);
+    setConfirmSwapExercise(null);
+    // Focus input on next tick
+    setTimeout(() => searchInputRef.current?.focus(), 0);
+  }
+
+  function exitSwapMode() {
+    setSwapMode(false);
+    setSearchQuery("");
+    setSearchResults([]);
+    setConfirmSwapExercise(null);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+  }
+
+  function handleSelectResult(exercise: Exercise) {
+    // If sets are already logged, show confirmation
+    if (loggedSetCount > 0 && !hideLoggedSets) {
+      setConfirmSwapExercise(exercise);
+      return;
+    }
+    handleSwap(exercise);
+    exitSwapMode();
+  }
+
+  function confirmSwapWithLoggedSets() {
+    if (!confirmSwapExercise) return;
+    handleSwap(confirmSwapExercise);
+    exitSwapMode();
+  }
+
+  // Click-outside handler for swap mode
+  useEffect(() => {
+    if (!swapMode) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (swapContainerRef.current && !swapContainerRef.current.contains(e.target as Node)) {
+        exitSwapMode();
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [swapMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Skipped state — collapsed card
+  if (isSkipped) {
+    return (
+      <div className="rounded-2xl bg-background overflow-hidden opacity-50">
+        <div className="px-4 py-3 flex items-center gap-2">
+          <h3 className="font-semibold text-primary/50 flex-1 line-through">
+            {displayExercise.name}
+          </h3>
+          <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary/50">
+            Skipped
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-2xl bg-background overflow-hidden">
       {/* Exercise header */}
       <div className="px-4 py-3">
-        <div className="flex items-center gap-2">
-          <h3 className="font-semibold text-primary flex-1">
-            {displayExercise.name}
-          </h3>
-          {swappedExercise && (
-            <span className="shrink-0 rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent">
-              swapped
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={() => setShowDemo(true)}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-primary/40 hover:bg-primary/10 hover:text-primary transition-colors"
-            aria-label="Exercise info"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </button>
-        </div>
-        <p className="text-xs text-primary/50 mt-0.5">
-          {setCount} sets × {templateExercise.prescribed_reps ?? "—"}
-          {templateExercise.prescribed_weight
-            ? ` @ ${templateExercise.prescribed_weight}`
-            : ""}
-          {templateExercise.rest_seconds
-            ? ` · ${templateExercise.rest_seconds}s rest`
-            : ""}
-        </p>
-        {swappedExercise && (
-          <button
-            type="button"
-            onClick={handleRevert}
-            className="mt-1 text-[11px] text-primary/40 hover:text-primary/60 transition-colors"
-          >
-            ← Revert to {templateExercise.exercise.name}
-          </button>
+        {swapMode ? (
+          <div ref={swapContainerRef}>
+            {/* Swap search input */}
+            <div className="flex items-center gap-2">
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => handleSearch(e.target.value)}
+                placeholder="Search exercises..."
+                className="flex-1 h-9 rounded-lg border border-primary/20 bg-surface px-3 text-sm text-primary placeholder:text-primary/25 focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+              <button
+                type="button"
+                onClick={exitSwapMode}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-primary/40 hover:bg-primary/10 hover:text-primary transition-colors"
+                aria-label="Cancel swap"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Confirm swap dialog (when sets already logged) */}
+            {confirmSwapExercise && (
+              <div className="mt-2 rounded-xl bg-amber-500/5 border border-amber-500/20 p-3 flex flex-col gap-2">
+                <p className="text-xs text-amber-700">
+                  You&apos;ve logged {loggedSetCount} set{loggedSetCount !== 1 ? "s" : ""} for this exercise. Swapping will clear them from this session. Continue?
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmSwapExercise(null)}
+                    className="flex-1 rounded-lg border border-primary/10 py-1.5 text-xs font-medium text-primary/60 hover:bg-primary/5 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmSwapWithLoggedSets}
+                    className="flex-1 rounded-lg bg-amber-500/10 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-500/20 transition-colors"
+                  >
+                    Swap anyway
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Search results */}
+            {!confirmSwapExercise && (
+              <div className="mt-2 max-h-48 overflow-y-auto flex flex-col gap-0.5">
+                {searchLoading && (
+                  <p className="py-3 text-center text-xs text-primary/40 animate-pulse">Searching...</p>
+                )}
+                {!searchLoading && searchQuery.trim() && searchResults.length === 0 && (
+                  <p className="py-3 text-center text-xs text-primary/40">No exercises found</p>
+                )}
+                {!searchLoading && searchResults.map((ex) => (
+                  <button
+                    key={ex.id}
+                    type="button"
+                    onClick={() => handleSelectResult(ex)}
+                    className="flex items-center justify-between rounded-lg px-2.5 py-2 text-left hover:bg-primary/5 transition-colors"
+                  >
+                    <p className="text-sm font-medium text-primary truncate">{ex.name}</p>
+                    {ex.equipment && (
+                      <span className="shrink-0 ml-2 rounded-full bg-primary/5 px-2 py-0.5 text-[10px] text-primary/40">
+                        {ex.equipment}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            {/* Normal header */}
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-primary flex-1">
+                {displayExercise.name}
+              </h3>
+              {swappedExercise && (
+                <span className="shrink-0 rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent">
+                  swapped
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={enterSwapMode}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-primary/40 hover:bg-primary/10 hover:text-primary transition-colors"
+                aria-label="Swap exercise"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowDemo(true)}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-primary/40 hover:bg-primary/10 hover:text-primary transition-colors"
+                aria-label="Exercise info"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-xs text-primary/50 mt-0.5">
+              {setCount} sets &times; {templateExercise.prescribed_reps ?? "\u2014"}
+              {templateExercise.prescribed_weight
+                ? ` @ ${templateExercise.prescribed_weight}`
+                : ""}
+              {templateExercise.rest_seconds
+                ? ` \u00B7 ${templateExercise.rest_seconds}s rest`
+                : ""}
+            </p>
+            {swappedExercise && (
+              <button
+                type="button"
+                onClick={handleRevert}
+                className="mt-1 text-[11px] text-primary/40 hover:text-primary/60 transition-colors"
+              >
+                &larr; Revert to {templateExercise.exercise.name}
+              </button>
+            )}
+          </>
         )}
       </div>
 
@@ -113,14 +305,16 @@ export default function ExerciseLogger({
 
         {Array.from({ length: setCount }, (_, i) => {
           const setNum = i + 1;
-          const existingLog = existingLogs.find(
-            (l) =>
-              l.template_exercise_id === templateExercise.id &&
-              l.set_number === setNum
-          );
+          const existingLog = hideLoggedSets
+            ? undefined
+            : existingLogs.find(
+                (l) =>
+                  l.template_exercise_id === templateExercise.id &&
+                  l.set_number === setNum
+              );
           return (
             <SetRow
-              key={setNum}
+              key={`${setNum}_${exerciseIdOverride ?? "original"}`}
               sessionId={sessionId}
               templateExerciseId={templateExercise.id}
               exerciseIdOverride={exerciseIdOverride}
@@ -130,7 +324,9 @@ export default function ExerciseLogger({
               initialCompleted={existingLog?.is_completed ?? false}
               initialReps={existingLog?.reps_completed ?? null}
               initialWeight={existingLog?.weight_used ?? null}
+              initialWeightUnit={existingLog?.weight_unit ?? null}
               onSetComplete={handleSetComplete}
+              weightUnit={weightUnit}
             />
           );
         })}
@@ -142,12 +338,42 @@ export default function ExerciseLogger({
         </p>
       )}
 
-      {/* Alternate exercises */}
-      {alts && alts.length > 0 && (
-        <AlternateExercises
-          alternates={alts}
-          onSwap={handleSwap}
-        />
+      {/* Skip exercise */}
+      {confirmingSkip ? (
+        <div className="px-4 pb-3 flex flex-col gap-2">
+          <p className="text-xs text-primary/60 text-center">
+            Skip {displayExercise.name}? Any logged sets will still be saved.
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setConfirmingSkip(false)}
+              className="flex-1 rounded-xl border border-primary/10 py-2 text-xs font-medium text-primary/60 hover:bg-primary/5 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmingSkip(false);
+                onSkip();
+              }}
+              className="flex-1 rounded-xl bg-primary/10 py-2 text-xs font-medium text-primary/60 hover:bg-primary/20 transition-colors"
+            >
+              Skip exercise
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="px-4 pb-3 text-center">
+          <button
+            type="button"
+            onClick={() => setConfirmingSkip(true)}
+            className="text-[11px] text-primary/30 hover:text-primary/50 transition-colors"
+          >
+            Skip exercise
+          </button>
+        </div>
       )}
 
       {/* Demo modal */}

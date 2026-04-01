@@ -4,29 +4,53 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import ExerciseLogger from "./ExerciseLogger";
 import RestTimer from "./RestTimer";
-import { getPersistedSession } from "@/lib/workout-persistence";
-import { logSet } from "@/lib/actions/session.actions";
-import type { WorkoutTemplateWithExercises, SetLog } from "@/types/app.types";
+import UnitToggle from "./UnitToggle";
+import { getPersistedSession, persistSkip } from "@/lib/workout-persistence";
+import { logSet, skipExercise } from "@/lib/actions/session.actions";
+import { fetchExercisesByIds } from "@/lib/actions/exercise.actions";
+import type { WorkoutTemplateWithExercises, SetLog, Exercise } from "@/types/app.types";
 import type { PersistedSet } from "@/lib/workout-persistence";
 
 type SyncBannerState = "restoring" | "syncing" | "failed" | null;
+type WeightUnit = "kg" | "lbs";
 
 interface WorkoutClientProps {
   sessionId: string;
   template: WorkoutTemplateWithExercises;
   setLogs: SetLog[];
+  preferredUnit: WeightUnit;
+  initialSkippedExercises: string[];
 }
 
 export default function WorkoutClient({
   sessionId,
   template,
   setLogs,
+  preferredUnit,
+  initialSkippedExercises,
 }: WorkoutClientProps) {
   const router = useRouter();
+  const [weightUnit, setWeightUnit] = useState<WeightUnit>(preferredUnit);
+  const [skippedExercises, setSkippedExercises] = useState<Set<string>>(
+    () => new Set(initialSkippedExercises)
+  );
   const [restSeconds, setRestSeconds] = useState<number | null>(null);
   const [bannerState, setBannerState] = useState<SyncBannerState>(null);
   const [persistedSwaps, setPersistedSwaps] = useState<Record<string, string>>({});
+  const [swappedExerciseCache, setSwappedExerciseCache] = useState<Record<string, Exercise>>({});
   const syncAttempted = useRef(false);
+
+  const handleSkipExercise = useCallback(
+    async (templateExerciseId: string) => {
+      // Persist locally first
+      persistSkip(sessionId, templateExerciseId);
+      setSkippedExercises((prev) => new Set([...Array.from(prev), templateExerciseId]));
+
+      // Save to DB (fire and forget)
+      skipExercise(sessionId, templateExerciseId);
+    },
+    [sessionId]
+  );
 
   const handleSetComplete = useCallback((seconds: number) => {
     setRestSeconds(seconds);
@@ -65,6 +89,7 @@ export default function WorkoutClient({
             setNumber: set.setNumber,
             repsCompleted: set.repsCompleted,
             weightUsed: set.weightUsed,
+            weightUnit,
             rpe: null,
           })
         )
@@ -81,7 +106,7 @@ export default function WorkoutClient({
         router.refresh();
       }
     },
-    [sessionId, setLogs, router]
+    [sessionId, setLogs, router, weightUnit]
   );
 
   // Restore on mount
@@ -99,6 +124,24 @@ export default function WorkoutClient({
     // Restore swapped exercises
     if (persisted.swappedExercises && Object.keys(persisted.swappedExercises).length > 0) {
       setPersistedSwaps(persisted.swappedExercises);
+
+      // Batch-fetch swapped exercise objects
+      const swapIds = Object.values(persisted.swappedExercises);
+      if (swapIds.length > 0) {
+        fetchExercisesByIds(swapIds).then((exercises) => {
+          const cache: Record<string, Exercise> = {};
+          for (const ex of exercises) cache[ex.id] = ex;
+          setSwappedExerciseCache(cache);
+        });
+      }
+    }
+
+    // Restore skipped exercises
+    if (persisted.skippedExercises && persisted.skippedExercises.length > 0) {
+      setSkippedExercises((prev) => {
+        const merged = new Set([...Array.from(prev), ...persisted.skippedExercises!]);
+        return merged.size > prev.size ? merged : prev;
+      });
     }
 
     // Sync missing sets
@@ -133,7 +176,12 @@ export default function WorkoutClient({
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4 pb-32">
+      {/* Unit toggle */}
+      <div className="flex items-center justify-end px-4 pt-2">
+        <UnitToggle unit={weightUnit} onChange={setWeightUnit} />
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 flex flex-col gap-4 pb-32">
         {template.exercises?.map((te) => (
           <div key={te.id} className="rounded-2xl bg-surface border border-primary/10 overflow-hidden">
             <ExerciseLogger
@@ -143,7 +191,14 @@ export default function WorkoutClient({
                 (l) => l.template_exercise_id === te.id
               )}
               onSetComplete={handleSetComplete}
-              initialSwappedExerciseId={persistedSwaps[te.id] ?? null}
+              initialSwappedExercise={
+                persistedSwaps[te.id]
+                  ? swappedExerciseCache[persistedSwaps[te.id]] ?? null
+                  : null
+              }
+              weightUnit={weightUnit}
+              isSkipped={skippedExercises.has(te.id)}
+              onSkip={() => handleSkipExercise(te.id)}
             />
           </div>
         ))}

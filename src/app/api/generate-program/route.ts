@@ -11,7 +11,6 @@ interface GeneratedExercise {
   sets: number;
   reps: string;
   rest_seconds: number;
-  notes?: string;
   alternate_exercise_ids?: string[];
 }
 
@@ -311,7 +310,7 @@ Exercises marked with ★ are foundational — STRONGLY prefer these. Only use u
 ${exerciseListText}
 
 OUTPUT: Return minified JSON (no extra whitespace) with this structure:
-{"program_name":"string","program_description":"string","weeks":[{"week_number":1,"workouts":[{"day_of_week":"Monday","workout_name":"string","muscle_groups":["Chest","Triceps"],"exercises":[{"exercise_id":"uuid","sets":3,"reps":"8-10","rest_seconds":90,"notes":"optional cue","alternate_exercise_ids":["uuid"]}]}]}]}
+{"program_name":"string","program_description":"string","weeks":[{"week_number":1,"workouts":[{"day_of_week":"Monday","workout_name":"string","muscle_groups":["Chest","Triceps"],"exercises":[{"exercise_id":"uuid","sets":3,"reps":"8-10","rest_seconds":90,"alternate_exercise_ids":["uuid"]}]}]}]}
 
 Rules:
 - exercise_id MUST match an id from the library above.

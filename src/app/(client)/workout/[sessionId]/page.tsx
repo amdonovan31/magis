@@ -42,6 +42,14 @@ export default async function WorkoutPage({ params }: WorkoutPageProps) {
   const template = session.workout_template;
   const setLogs = session.set_logs ?? [];
 
+  // Fetch user's preferred weight unit
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("preferred_unit")
+    .eq("id", user.id)
+    .single();
+  const preferredUnit = (profile?.preferred_unit as "kg" | "lbs") ?? "lbs";
+
   const totalSets = template?.exercises?.reduce(
     (sum, te) => sum + (te.prescribed_sets ?? 0),
     0
@@ -75,6 +83,8 @@ export default async function WorkoutPage({ params }: WorkoutPageProps) {
           sessionId={sessionId}
           template={template}
           setLogs={setLogs}
+          preferredUnit={preferredUnit}
+          initialSkippedExercises={session.skipped_exercises ?? []}
         />
       )}
 
@@ -84,7 +94,7 @@ export default async function WorkoutPage({ params }: WorkoutPageProps) {
       </div>
 
       {/* Complete workout CTA */}
-      <div className="fixed bottom-0 left-1/2 w-full max-w-md -translate-x-1/2 bg-surface p-4 pb-safe border-t border-primary/10">
+      <div className="fixed bottom-0 left-1/2 z-10 w-full max-w-md -translate-x-1/2 bg-surface p-4 pb-safe border-t border-primary/10">
         <CompleteWorkoutButton
           sessionId={sessionId}
           completedSets={completedSets}

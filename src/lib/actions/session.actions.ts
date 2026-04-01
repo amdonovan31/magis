@@ -156,6 +156,34 @@ export async function saveRetroLog(input: {
   return {};
 }
 
+export async function skipExercise(sessionId: string, templateExerciseId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
+  // Read current array, append if not already present
+  const { data: session } = await supabase
+    .from("workout_sessions")
+    .select("skipped_exercises")
+    .eq("id", sessionId)
+    .single();
+
+  if (!session) return { error: "Session not found" };
+
+  const current: string[] = session.skipped_exercises ?? [];
+  if (current.includes(templateExerciseId)) return { success: true };
+
+  const { error } = await supabase
+    .from("workout_sessions")
+    .update({ skipped_exercises: [...current, templateExerciseId] })
+    .eq("id", sessionId);
+
+  if (error) return { error: error.message };
+  return { success: true };
+}
+
 export async function logSet(data: {
   sessionId: string;
   templateExerciseId: string;
@@ -163,6 +191,7 @@ export async function logSet(data: {
   setNumber: number;
   repsCompleted: number | null;
   weightUsed: string | null;
+  weightUnit?: "kg" | "lbs";
   rpe: number | null;
 }) {
   const supabase = await createClient();
@@ -170,6 +199,8 @@ export async function logSet(data: {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Unauthorized" };
+
+  const weightValue = data.weightUsed ? parseFloat(data.weightUsed) : null;
 
   // Upsert — if set already exists for this session+exercise+setNumber, update it
   const { data: result, error } = await supabase
@@ -182,6 +213,8 @@ export async function logSet(data: {
         set_number: data.setNumber,
         reps_completed: data.repsCompleted,
         weight_used: data.weightUsed,
+        weight_value: !isNaN(weightValue as number) ? weightValue : null,
+        weight_unit: data.weightUnit ?? null,
         rpe: data.rpe,
         is_completed: true,
         logged_at: new Date().toISOString(),
@@ -240,6 +273,7 @@ export async function completeSession(sessionId: string) {
       exercise_id,
       reps_completed,
       weight_used,
+      weight_unit,
       is_completed
     `)
     .eq("session_id", sessionId)
@@ -272,44 +306,24 @@ export async function completeSession(sessionId: string) {
       exerciseLogs.get(exerciseId)!.push(log);
     }
 
-    // Infer weight unit from the weight_used string
-    const inferUnit = (weightStr: string | null): string => {
-      if (!weightStr) return "kg";
-      const trimmed = weightStr.trim().toLowerCase();
-      if (trimmed.endsWith("lbs") || trimmed.endsWith("lb")) return "lbs";
-      return "kg";
-    };
-
-    // Determine the weight unit for this user/exercise from recent history
-    const getWeightUnit = async (exerciseId: string, sessionLogs: typeof setLogs): Promise<string> => {
-      // Check current session logs for unit hints
+    // Determine the weight unit for this exercise from stored set_log data
+    const getWeightUnit = (sessionLogs: typeof setLogs): string => {
+      // Prefer the explicit weight_unit stored on the set log
       for (const log of sessionLogs) {
-        const unit = inferUnit(log.weight_used);
-        if (unit !== "kg") return unit;
+        if (log.weight_unit) return log.weight_unit;
       }
-
-      // Check most recent prior set_log for this exercise
-      const { data: priorLog } = await supabase
-        .from("set_logs")
-        .select("weight_used")
-        .eq("template_exercise_id", sessionLogs[0]?.template_exercise_id ?? "")
-        .neq("session_id", sessionId)
-        .not("weight_used", "is", null)
-        .order("logged_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (priorLog) {
-        const unit = inferUnit(priorLog.weight_used);
-        if (unit !== "kg") return unit;
+      // Fallback: infer from weight_used string for legacy data
+      for (const log of sessionLogs) {
+        if (!log.weight_used) continue;
+        const trimmed = log.weight_used.trim().toLowerCase();
+        if (trimmed.endsWith("lbs") || trimmed.endsWith("lb")) return "lbs";
       }
-
-      return "kg";
+      return "lbs";
     };
 
     // Check each exercise for PRs
     for (const [exerciseId, logs] of Array.from(exerciseLogs)) {
-      const weightUnit = await getWeightUnit(exerciseId, logs);
+      const weightUnit = getWeightUnit(logs);
       const volumeUnit = weightUnit === "lbs" ? "lbs*reps" : "kg*reps";
 
       // Find best weight in this session

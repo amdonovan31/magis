@@ -79,6 +79,21 @@ export default async function SummaryPage({ params }: SummaryPageProps) {
           )}
         </div>
 
+        {/* Skipped exercises */}
+        {summary.skippedExercises.length > 0 && (
+          <Card padding="md">
+            <h2 className="font-semibold text-primary/50 mb-2 text-sm">Skipped</h2>
+            <div className="flex flex-col gap-1.5">
+              {summary.skippedExercises.map((ex) => (
+                <div key={ex.id} className="flex items-center gap-2">
+                  <span className="text-sm text-primary/40">{ex.name}</span>
+                  <Badge variant="default">Skipped</Badge>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+
         {/* PRs */}
         {summary.prs.length > 0 && (
           <Card padding="md">
@@ -148,7 +163,7 @@ export default async function SummaryPage({ params }: SummaryPageProps) {
       </div>
 
       {/* Done button */}
-      <div className="fixed bottom-0 left-1/2 w-full max-w-md -translate-x-1/2 bg-surface p-4 pb-safe border-t border-primary/10">
+      <div className="fixed bottom-0 left-1/2 z-10 w-full max-w-md -translate-x-1/2 bg-surface p-4 pb-safe border-t border-primary/10">
         <Link href="/home">
           <Button fullWidth size="lg">
             Done

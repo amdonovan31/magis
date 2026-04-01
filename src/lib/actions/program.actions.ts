@@ -210,7 +210,7 @@ export async function saveGeneratedProgram(input: {
           prescribed_reps: ex.reps,
           prescribed_weight: ex.prescribed_weight || null,
           rest_seconds: ex.rest_seconds,
-          notes: ex.notes || null,
+          notes: null,
           alternate_exercise_ids: ex.alternate_exercise_ids?.length
             ? ex.alternate_exercise_ids
             : null,

@@ -46,11 +46,20 @@ export async function getSessionSummary(
 
   const exercises = template?.exercises ?? [];
   const completedSetLogs = setLogs.filter((l) => l.is_completed);
+  const skippedIds: string[] = (session as { skipped_exercises?: string[] }).skipped_exercises ?? [];
 
   // Count exercises that have at least one completed set
   const exercisesWithSets = new Set(
     completedSetLogs.map((l) => l.template_exercise_id).filter(Boolean)
   );
+
+  // Map skipped template exercise IDs to names
+  const skippedExercises = exercises
+    .filter((e) => skippedIds.includes(e.id))
+    .map((e) => ({
+      id: e.id,
+      name: (e.exercise as { name: string } | null)?.name ?? "Unknown",
+    }));
 
   // Calculate total volume (sum of reps * weight for each completed set)
   let totalVolume = 0;
@@ -96,6 +105,7 @@ export async function getSessionSummary(
     setsCompleted: completedSetLogs.length,
     totalSets,
     totalVolume: Math.round(totalVolume),
+    skippedExercises,
     prs: prList,
   };
 }

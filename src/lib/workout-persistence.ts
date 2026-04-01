@@ -19,6 +19,7 @@ export type PersistedSession = {
   lastUpdated: number;
   sets: Record<string, PersistedSet>;
   swappedExercises: Record<string, string>;
+  skippedExercises?: string[];
 };
 
 function getKey(sessionId: string): string {
@@ -79,6 +80,19 @@ export function removeSwap(
   delete session.swappedExercises[templateExerciseId];
   session.lastUpdated = Date.now();
   writeSession(session);
+}
+
+export function persistSkip(
+  sessionId: string,
+  templateExerciseId: string
+): void {
+  const session = ensureSession(sessionId);
+  const skipped = session.skippedExercises ?? [];
+  if (!skipped.includes(templateExerciseId)) {
+    session.skippedExercises = [...skipped, templateExerciseId];
+    session.lastUpdated = Date.now();
+    writeSession(session);
+  }
 }
 
 export function getPersistedSession(

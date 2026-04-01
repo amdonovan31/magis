@@ -884,6 +884,7 @@ export type Database = {
           id: string
           intake_requested: boolean
           onboarding_complete: boolean
+          preferred_unit: string
           role: string
           roles: string[]
           training_age_years: number | null
@@ -902,6 +903,7 @@ export type Database = {
           id: string
           intake_requested?: boolean
           onboarding_complete?: boolean
+          preferred_unit?: string
           role: string
           roles?: string[]
           training_age_years?: number | null
@@ -920,6 +922,7 @@ export type Database = {
           id?: string
           intake_requested?: boolean
           onboarding_complete?: boolean
+          preferred_unit?: string
           role?: string
           roles?: string[]
           training_age_years?: number | null
@@ -1263,6 +1266,7 @@ export type Database = {
           id: string
           notes: string | null
           program_id: string | null
+          skipped_exercises: string[]
           started_at: string
           status: string
           workout_template_id: string | null
@@ -1274,6 +1278,7 @@ export type Database = {
           id?: string
           notes?: string | null
           program_id?: string | null
+          skipped_exercises?: string[]
           started_at?: string
           status?: string
           workout_template_id?: string | null
@@ -1285,6 +1290,7 @@ export type Database = {
           id?: string
           notes?: string | null
           program_id?: string | null
+          skipped_exercises?: string[]
           started_at?: string
           status?: string
           workout_template_id?: string | null
