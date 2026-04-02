@@ -34,8 +34,26 @@ export default function TodayWorkoutCard({ todayWorkout, hasProgram = true }: To
     );
   }
 
-  const { template, activeSession, program, coachName } = todayWorkout;
+  const { template, activeSession, completedSessionId, program, coachName } = todayWorkout;
   const exerciseCount = template.exercises?.length ?? 0;
+
+  if (completedSessionId) {
+    return (
+      <Card padding="lg">
+        <div className="flex items-center justify-between mb-3">
+          <Badge variant="success">Completed</Badge>
+          <span className="text-xs text-primary/50">{program.title}</span>
+        </div>
+        <h2 className="text-xl font-bold text-primary">{template.title}</h2>
+        <p className="text-sm text-primary/60 mt-1">{exerciseCount} exercises</p>
+        <Link href={`/workout/${completedSessionId}/summary`} className="mt-4 block">
+          <Button fullWidth size="lg">
+            View Summary →
+          </Button>
+        </Link>
+      </Card>
+    );
+  }
 
   if (activeSession) {
     return (
@@ -63,8 +81,8 @@ export default function TodayWorkoutCard({ todayWorkout, hasProgram = true }: To
 
   return (
     <Card padding="lg">
-      <div className="flex items-center justify-between mb-3">
-        <Badge variant="success">Today&apos;s Workout</Badge>
+      <div className="flex items-center justify-between mb-4">
+        <Badge variant="success" className="bg-primary text-white font-bold">Today&apos;s Workout</Badge>
         <span className="text-xs text-primary/50">{program.title}</span>
       </div>
       <h2 className="text-xl font-bold text-primary">{template.title}</h2>

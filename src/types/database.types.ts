@@ -890,7 +890,6 @@ export type Database = {
           training_age_years: number | null
           updated_at: string
           weight_kg: number | null
-          weight_unit: string
         }
         Insert: {
           avatar_url?: string | null
@@ -909,7 +908,6 @@ export type Database = {
           training_age_years?: number | null
           updated_at?: string
           weight_kg?: number | null
-          weight_unit?: string
         }
         Update: {
           avatar_url?: string | null
@@ -928,7 +926,6 @@ export type Database = {
           training_age_years?: number | null
           updated_at?: string
           weight_kg?: number | null
-          weight_unit?: string
         }
         Relationships: []
       }

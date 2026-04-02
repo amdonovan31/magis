@@ -210,9 +210,15 @@ function WorkoutCard({ workout }: { workout: ScheduledWorkoutWithDetails }) {
             <h3 className="font-heading text-base font-semibold text-primary">
               {workout.template.title}
             </h3>
-            <span className="text-xs text-muted">
-              {workout.template.exercises.length} exercises
-            </span>
+            {workout.status === "skipped" ? (
+              <span className="inline-flex items-center rounded-full bg-primary/5 px-2.5 py-0.5 text-xs font-medium text-primary/40">
+                Skipped
+              </span>
+            ) : (
+              <span className="text-xs text-muted">
+                {workout.template.exercises.length} exercises
+              </span>
+            )}
           </div>
           {muscleGroups.length > 0 && (
             <div className="flex flex-wrap gap-1.5">

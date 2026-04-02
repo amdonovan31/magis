@@ -76,6 +76,7 @@ export type CoachDashboardData = {
 export type TodayWorkout = {
   template: WorkoutTemplateWithExercises;
   activeSession: WorkoutSession | null;
+  completedSessionId: string | null;
   program: Program;
   coachName: string | null;
 } | null;
@@ -92,6 +93,7 @@ export type SessionSummary = {
   setsCompleted: number;
   totalSets: number;
   totalVolume: number;
+  weightUnit: string;
   skippedExercises: { id: string; name: string }[];
   prs: {
     exerciseId: string;

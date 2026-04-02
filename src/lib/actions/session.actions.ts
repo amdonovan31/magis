@@ -264,6 +264,19 @@ export async function completeSession(sessionId: string) {
 
   if (error) return { error: error.message };
 
+  // Mark the corresponding scheduled_workout as completed
+  if (session.workout_template_id) {
+    const { getTodayISO } = await import("@/lib/utils/date");
+    const today = getTodayISO();
+    await supabase
+      .from("scheduled_workouts")
+      .update({ status: "completed", session_id: sessionId })
+      .eq("client_id", user.id)
+      .eq("workout_template_id", session.workout_template_id)
+      .eq("scheduled_date", today)
+      .eq("status", "scheduled");
+  }
+
   // Detect PRs — fetch all completed set_logs for this session
   const { data: setLogs } = await supabase
     .from("set_logs")

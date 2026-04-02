@@ -74,6 +74,14 @@ export async function getSessionSummary(
     0
   );
 
+  // Fetch user's preferred unit
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("preferred_unit")
+    .eq("id", session.client_id)
+    .single();
+  const weightUnit = (profile?.preferred_unit as string) ?? "lbs";
+
   // Fetch PRs achieved in this session
   const { data: prs } = await supabase
     .from("personal_records")
@@ -105,6 +113,7 @@ export async function getSessionSummary(
     setsCompleted: completedSetLogs.length,
     totalSets,
     totalVolume: Math.round(totalVolume),
+    weightUnit,
     skippedExercises,
     prs: prList,
   };

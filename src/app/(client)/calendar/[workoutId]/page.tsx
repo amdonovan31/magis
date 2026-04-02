@@ -61,7 +61,8 @@ export default async function WorkoutDetailPage({
 
   const isScheduled = workout.status === "scheduled";
   const isMissed = workout.status === "missed";
-  const canLog = isScheduled || isMissed;
+  const isSkipped = workout.status === "skipped";
+  const canLog = isScheduled || isMissed || isSkipped;
 
   async function startSession() {
     "use server";
@@ -145,7 +146,7 @@ export default async function WorkoutDetailPage({
             <Button
               fullWidth
               size="lg"
-              variant={isMissed ? "primary" : "secondary"}
+              variant={isMissed || isSkipped ? "primary" : "secondary"}
             >
               Log Workout
             </Button>

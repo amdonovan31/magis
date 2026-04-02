@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import { ArrowLeftRight } from "lucide-react";
 import SetRow from "./SetRow";
 import ExerciseDemoModal from "./ExerciseDemoModal";
 import { persistSwap, removeSwap } from "@/lib/workout-persistence";
@@ -248,12 +249,11 @@ export default function ExerciseLogger({
               <button
                 type="button"
                 onClick={enterSwapMode}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-primary/40 hover:bg-primary/10 hover:text-primary transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-full border border-primary px-3 py-1 text-sm font-medium text-primary hover:bg-primary/5 transition-colors"
                 aria-label="Swap exercise"
               >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-                </svg>
+                <ArrowLeftRight className="h-3.5 w-3.5" />
+                Swap
               </button>
               <button
                 type="button"
@@ -302,33 +302,40 @@ export default function ExerciseLogger({
           <span className="w-10" />
         </div>
 
-        {Array.from({ length: setCount }, (_, i) => {
-          const setNum = i + 1;
-          const existingLog = hideLoggedSets
-            ? undefined
-            : existingLogs.find(
-                (l) =>
-                  l.template_exercise_id === templateExercise.id &&
-                  l.set_number === setNum
-              );
-          return (
-            <SetRow
-              key={`${setNum}_${exerciseIdOverride ?? "original"}`}
-              sessionId={sessionId}
-              templateExerciseId={templateExercise.id}
-              exerciseIdOverride={exerciseIdOverride}
-              setNumber={setNum}
-              prescribedReps={templateExercise.prescribed_reps}
-              prescribedWeight={templateExercise.prescribed_weight}
-              initialCompleted={existingLog?.is_completed ?? false}
-              initialReps={existingLog?.reps_completed ?? null}
-              initialWeight={existingLog?.weight_used ?? null}
-              initialWeightUnit={existingLog?.weight_unit ?? null}
-              onSetComplete={handleSetComplete}
-              weightUnit={weightUnit}
-            />
-          );
-        })}
+        {(() => {
+          let firstIncompleteFound = false;
+          return Array.from({ length: setCount }, (_, i) => {
+            const setNum = i + 1;
+            const existingLog = hideLoggedSets
+              ? undefined
+              : existingLogs.find(
+                  (l) =>
+                    l.template_exercise_id === templateExercise.id &&
+                    l.set_number === setNum
+                );
+            const isCompleted = existingLog?.is_completed ?? false;
+            const isActive = !isCompleted && !firstIncompleteFound;
+            if (isActive) firstIncompleteFound = true;
+            return (
+              <SetRow
+                key={`${setNum}_${exerciseIdOverride ?? "original"}`}
+                sessionId={sessionId}
+                templateExerciseId={templateExercise.id}
+                exerciseIdOverride={exerciseIdOverride}
+                setNumber={setNum}
+                prescribedReps={templateExercise.prescribed_reps}
+                prescribedWeight={templateExercise.prescribed_weight}
+                initialCompleted={isCompleted}
+                initialReps={existingLog?.reps_completed ?? null}
+                initialWeight={existingLog?.weight_used ?? null}
+                initialWeightUnit={existingLog?.weight_unit ?? null}
+                onSetComplete={handleSetComplete}
+                weightUnit={weightUnit}
+                isActive={isActive}
+              />
+            );
+          });
+        })()}
       </div>
 
       {templateExercise.notes && (
@@ -368,7 +375,7 @@ export default function ExerciseLogger({
           <button
             type="button"
             onClick={() => setConfirmingSkip(true)}
-            className="text-[11px] text-primary/30 hover:text-primary/50 transition-colors"
+            className="inline-flex items-center rounded-full border border-gray-300 px-3 py-1 text-sm font-medium text-gray-500 hover:bg-gray-50 transition-colors"
           >
             Skip exercise
           </button>

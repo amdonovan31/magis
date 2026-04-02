@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getTodayISO } from "@/lib/utils/date";
 import type { BodyMeasurement } from "@/types/app.types";
 
 /**
@@ -107,4 +108,46 @@ export async function getLatestMeasurements(
   }
 
   return latest;
+}
+
+/**
+ * Get today's weight log and the user's preferred unit.
+ * Returns null if no weight was logged today.
+ */
+export async function getTodayWeight(): Promise<{
+  entry: { id: string; value: number; unit: string } | null;
+  preferredUnit: string;
+}> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { entry: null, preferredUnit: "lbs" };
+
+  const today = getTodayISO();
+
+  const [{ data: measurement }, { data: profile }] = await Promise.all([
+    supabase
+      .from("body_measurements")
+      .select("id, value, unit")
+      .eq("user_id", user.id)
+      .eq("metric_type", "weight")
+      .gte("measured_at", `${today}T00:00:00`)
+      .lt("measured_at", `${today}T23:59:59.999`)
+      .order("measured_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("profiles")
+      .select("preferred_unit")
+      .eq("id", user.id)
+      .single(),
+  ]);
+
+  const preferredUnit = (profile?.preferred_unit as string) ?? "lbs";
+
+  return {
+    entry: measurement ? { id: measurement.id, value: measurement.value, unit: measurement.unit } : null,
+    preferredUnit,
+  };
 }

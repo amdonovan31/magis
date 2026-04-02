@@ -30,6 +30,14 @@ export async function getTodayWorkout(): Promise<TodayWorkout> {
 
   const today = getTodayISO();
 
+  // Mark any past scheduled workouts still in "scheduled" status as "skipped"
+  await supabase
+    .from("scheduled_workouts")
+    .update({ status: "skipped" })
+    .eq("client_id", user.id)
+    .eq("status", "scheduled")
+    .lt("scheduled_date", today);
+
   // Find today's scheduled workout via scheduled_workouts table
   const { data: scheduledRow } = await supabase
     .from("scheduled_workouts")
@@ -78,6 +86,19 @@ export async function getTodayWorkout(): Promise<TodayWorkout> {
     .eq("status", "in_progress")
     .maybeSingle();
 
+  // Check for a completed session today
+  const { data: completedSession } = await supabase
+    .from("workout_sessions")
+    .select("id")
+    .eq("client_id", user.id)
+    .eq("workout_template_id", template.id)
+    .eq("status", "completed")
+    .gte("started_at", `${today}T00:00:00`)
+    .lt("started_at", `${today}T23:59:59.999`)
+    .order("completed_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
   // Fetch coach name if the program has a coach_id different from the user
   let coachName: string | null = null;
   if (program.coach_id && program.coach_id !== user.id) {
@@ -92,6 +113,7 @@ export async function getTodayWorkout(): Promise<TodayWorkout> {
   return {
     template: templateWithSortedExercises as unknown as import("@/types/app.types").WorkoutTemplateWithExercises,
     activeSession: activeSession as WorkoutSession | null,
+    completedSessionId: completedSession?.id ?? null,
     program,
     coachName,
   };

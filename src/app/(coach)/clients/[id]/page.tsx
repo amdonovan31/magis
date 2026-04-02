@@ -16,6 +16,7 @@ import { getWeeklyVolume } from "@/lib/queries/volume.queries";
 import { getStreakData } from "@/lib/queries/streaks.queries";
 import CoachPRSummary from "@/components/pr/CoachPRSummary";
 import CoachMeasurementsSummary from "@/components/measurements/CoachMeasurementsSummary";
+import WeightSection from "@/components/measurements/WeightSection";
 import CoachVolumeSummary from "@/components/volume/CoachVolumeSummary";
 import StreakCard from "@/components/streaks/StreakCard";
 import StreakBadges from "@/components/streaks/StreakBadges";
@@ -52,6 +53,7 @@ export default async function ClientDetailPage({
     notes,
     prs,
     measurements,
+    weightMeasurements,
     volumeData,
     streakData,
   ] = await Promise.all([
@@ -82,6 +84,7 @@ export default async function ClientDetailPage({
     getClientNotes(id),
     getAllPRs(id),
     getMeasurements(id),
+    getMeasurements(id, "weight", 200),
     getWeeklyVolume(id, undefined, 8),
     getStreakData(id),
   ]);
@@ -183,6 +186,22 @@ export default async function ClientDetailPage({
           Personal Records
         </h3>
         <CoachPRSummary prs={prs} />
+
+        {/* Weight Trend */}
+        {weightMeasurements.length > 0 && (
+          <>
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-primary/50">
+              Weight Trend
+            </h3>
+            <Card>
+              <WeightSection
+                measurements={weightMeasurements}
+                unit={(profile as Record<string, unknown>).preferred_unit as string ?? "lbs"}
+                showTrend
+              />
+            </Card>
+          </>
+        )}
 
         {/* Body Measurements */}
         <h3 className="text-sm font-semibold uppercase tracking-wide text-primary/50">

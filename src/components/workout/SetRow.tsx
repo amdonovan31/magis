@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useOptimistic, useTransition, useEffect, useRef } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import { logSet } from "@/lib/actions/session.actions";
 import { persistSet } from "@/lib/workout-persistence";
 import { cn } from "@/lib/utils/cn";
@@ -29,6 +29,7 @@ interface SetRowProps {
   initialWeightUnit?: string | null;
   onSetComplete?: () => void;
   weightUnit: WeightUnit;
+  isActive?: boolean;
 }
 
 export default function SetRow({
@@ -44,6 +45,7 @@ export default function SetRow({
   initialWeightUnit = null,
   onSetComplete,
   weightUnit,
+  isActive = false,
 }: SetRowProps) {
   // Parse prescribed weight as a number (strip any unit suffix)
   const prescribedNum = prescribedWeight ? parseFloat(prescribedWeight) : null;
@@ -76,7 +78,7 @@ export default function SetRow({
 
   const [reps, setReps] = useState(initialReps?.toString() ?? "");
   const [weight, setWeight] = useState(getInitialWeight);
-  const [optimisticDone, setOptimisticDone] = useOptimistic(initialCompleted);
+  const [done, setDone] = useState(initialCompleted);
   const [, startTransition] = useTransition();
   const prevUnitRef = useRef(weightUnit);
 
@@ -86,7 +88,7 @@ export default function SetRow({
     if (prev === weightUnit) return;
     prevUnitRef.current = weightUnit;
 
-    if (optimisticDone && loggedValueRef.current) {
+    if (done && loggedValueRef.current) {
       // Already-logged set: convert the original logged value to new display unit
       const num = parseFloat(loggedValueRef.current);
       if (!isNaN(num)) {
@@ -123,7 +125,7 @@ export default function SetRow({
     loggedUnitRef.current = weightUnit;
 
     startTransition(async () => {
-      setOptimisticDone(true);
+      setDone(true);
       const result = await logSet({
         sessionId,
         templateExerciseId,
@@ -135,7 +137,7 @@ export default function SetRow({
         rpe: null,
       });
       if (result.error) {
-        setOptimisticDone(false);
+        setDone(false);
         loggedValueRef.current = null;
         loggedUnitRef.current = null;
       } else {
@@ -148,7 +150,11 @@ export default function SetRow({
     <div
       className={cn(
         "flex items-center gap-3 rounded-xl px-3 py-2 transition-colors",
-        optimisticDone ? "bg-primary/5" : "bg-surface"
+        done
+          ? "bg-green-50"
+          : isActive
+            ? "border-l-4 border-primary bg-surface"
+            : "bg-surface"
       )}
     >
       {/* Set number */}
@@ -165,12 +171,12 @@ export default function SetRow({
           value={reps}
           onChange={(e) => setReps(e.target.value)}
           placeholder={prescribedReps ?? "\u2014"}
-          disabled={optimisticDone}
+          disabled={done}
           className={cn(
             "h-14 w-full rounded-xl border text-xl text-center font-semibold text-primary",
             "focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors",
             "placeholder:text-primary/25",
-            optimisticDone
+            done
               ? "border-transparent bg-transparent"
               : "border-primary/20 bg-surface"
           )}
@@ -186,12 +192,12 @@ export default function SetRow({
           value={weight}
           onChange={(e) => setWeight(e.target.value)}
           placeholder={prescribedInUnit ?? "\u2014"}
-          disabled={optimisticDone}
+          disabled={done}
           className={cn(
             "h-14 w-full rounded-xl border text-xl text-center font-semibold text-primary",
             "focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors",
             "placeholder:text-primary/25",
-            optimisticDone
+            done
               ? "border-transparent bg-transparent"
               : "border-primary/20 bg-surface"
           )}
@@ -202,16 +208,16 @@ export default function SetRow({
       <button
         type="button"
         onClick={handleComplete}
-        disabled={optimisticDone}
+        disabled={done}
         className={cn(
           "flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full transition-colors",
-          optimisticDone
+          done
             ? "bg-primary text-white"
             : "bg-primary/10 text-primary hover:bg-primary/20"
         )}
-        aria-label={optimisticDone ? "Completed" : "Mark complete"}
+        aria-label={done ? "Completed" : "Mark complete"}
       >
-        {optimisticDone ? (
+        {done ? (
           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
           </svg>

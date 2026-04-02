@@ -75,7 +75,7 @@ export async function getScheduledWorkouts(
     .eq("client_id", user.id)
     .gte("scheduled_date", startDate)
     .lte("scheduled_date", endDate)
-    .in("status", ["scheduled", "completed", "missed"])
+    .in("status", ["scheduled", "completed", "missed", "skipped"])
     .order("scheduled_date", { ascending: true });
 
   if (!data) return [];

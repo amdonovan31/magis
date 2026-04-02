@@ -1,9 +1,11 @@
 import { getTodayWorkout } from "@/lib/queries/session.queries";
 import { getStreakData } from "@/lib/queries/streaks.queries";
+import { getTodayWeight } from "@/lib/queries/measurements.queries";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import TodayWorkoutCard from "@/components/workout/TodayWorkoutCard";
+import WeightCheckInCard from "@/components/measurements/WeightCheckInCard";
 import StreakCard from "@/components/streaks/StreakCard";
 import Card from "@/components/ui/Card";
 import { formatDate } from "@/lib/utils/date";
@@ -17,7 +19,7 @@ export default async function ClientHomePage() {
 
   if (!user) redirect("/login");
 
-  const [{ data: rawProfile }, { count: intakeCount }, todayWorkout, streakData, { count: programCount }] = await Promise.all([
+  const [{ data: rawProfile }, { count: intakeCount }, todayWorkout, streakData, { count: programCount }, todayWeight] = await Promise.all([
     supabase
       .from("profiles")
       .select("full_name, intake_requested")
@@ -35,6 +37,7 @@ export default async function ClientHomePage() {
       .eq("client_id", user.id)
       .eq("is_active", true)
       .eq("status", "published"),
+    getTodayWeight(),
   ]);
 
   const profile = rawProfile as Pick<Profile, "full_name" | "intake_requested"> | null;
@@ -64,6 +67,9 @@ export default async function ClientHomePage() {
           </Card>
         </Link>
       )}
+
+      {/* Weight check-in */}
+      <WeightCheckInCard todayEntry={todayWeight.entry} preferredUnit={todayWeight.preferredUnit} />
 
       {/* Today's workout card */}
       <TodayWorkoutCard todayWorkout={todayWorkout} hasProgram={(programCount ?? 0) > 0} />

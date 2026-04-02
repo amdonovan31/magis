@@ -1,10 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { signOut } from "@/lib/actions/auth.actions";
+import { getMeasurements } from "@/lib/queries/measurements.queries";
 import TopBar from "@/components/layout/TopBar";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import DisclaimerAcceptButton from "@/components/disclaimer/DisclaimerAcceptButton";
+import WeightSection from "@/components/measurements/WeightSection";
 import { DISCLAIMER_BODY } from "@/lib/disclaimer/constants";
 import type { Profile } from "@/types/app.types";
 
@@ -16,13 +18,17 @@ export default async function ProfilePage() {
 
   if (!user) redirect("/login");
 
-  const { data: rawProfile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
+  const [{ data: rawProfile }, weightMeasurements] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single(),
+    getMeasurements(undefined, "weight", 200),
+  ]);
 
   const profile = rawProfile as Profile | null;
+  const preferredUnit = (profile as Record<string, unknown>)?.preferred_unit as string ?? "lbs";
 
   return (
     <>
@@ -64,6 +70,16 @@ export default async function ProfilePage() {
             </div>
           </div>
         </Card>
+
+        {/* Weight tracking */}
+        {weightMeasurements.length > 0 && (
+          <Card>
+            <div className="flex flex-col gap-3">
+              <p className="text-sm font-semibold text-primary">Weight History</p>
+              <WeightSection measurements={weightMeasurements} unit={preferredUnit} />
+            </div>
+          </Card>
+        )}
 
         {/* Terms & Health Disclaimer */}
         <Card>

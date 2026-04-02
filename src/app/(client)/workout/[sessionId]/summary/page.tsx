@@ -10,6 +10,7 @@ import Link from "next/link";
 import PostSessionNote from "@/components/notes/PostSessionNote";
 import StreakMilestoneBanner from "@/components/streaks/StreakMilestoneBanner";
 import ProgramDisclaimerFooter from "@/components/disclaimer/ProgramDisclaimerFooter";
+import ConfettiBurst from "@/components/workout/ConfettiBurst";
 
 interface SummaryPageProps {
   params: Promise<{ sessionId: string }>;
@@ -30,20 +31,31 @@ export default async function SummaryPage({ params }: SummaryPageProps) {
   ]);
   if (!summary) redirect("/home");
 
-  // Get the client's coach for the note
-  const { data: relationship } = await supabase
-    .from("coach_client_relationships")
-    .select("coach_id")
-    .eq("client_id", user.id)
-    .maybeSingle();
+  // Get the client's profile and coach for the note
+  const [{ data: profile }, { data: relationship }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .single(),
+    supabase
+      .from("coach_client_relationships")
+      .select("coach_id")
+      .eq("client_id", user.id)
+      .maybeSingle(),
+  ]);
+
+  const firstName = profile?.full_name?.split(" ")[0] ?? "champ";
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
       {/* Header */}
-      <header className="bg-primary px-4 py-8 text-center text-white">
-        <p className="text-sm text-white/70 mb-1">Workout Complete</p>
-        <h1 className="text-2xl font-bold">{summary.templateTitle}</h1>
-        <p className="text-sm text-white/60 mt-1">{formatDate(summary.date)}</p>
+      <ConfettiBurst />
+      <header className="bg-primary px-4 py-10 text-center text-white">
+        <div className="text-4xl mb-2">&#x1F3C6;</div>
+        <h1 className="text-3xl font-bold">Workout Complete! &#x1F4AA;</h1>
+        <p className="text-lg text-white/80 mt-1">Great work, {firstName}.</p>
+        <p className="text-sm text-white/50 mt-2">{summary.templateTitle} &middot; {formatDate(summary.date)}</p>
       </header>
 
       <div className="flex-1 px-4 py-6 flex flex-col gap-4 pb-32">
@@ -74,7 +86,7 @@ export default async function SummaryPage({ params }: SummaryPageProps) {
               <p className="text-2xl font-bold text-primary">
                 {summary.totalVolume.toLocaleString()}
               </p>
-              <p className="text-xs text-primary/50 mt-1">Volume (kg)</p>
+              <p className="text-xs text-primary/50 mt-1">Volume ({summary.weightUnit})</p>
             </Card>
           )}
         </div>
@@ -118,11 +130,11 @@ export default async function SummaryPage({ params }: SummaryPageProps) {
                   <div className="flex items-center gap-2">
                     <div className="text-right">
                       <Badge variant="accent">
-                        {pr.value}{pr.prType === "weight" ? " kg" : ""}
+                        {pr.value} {summary.weightUnit}
                       </Badge>
                       {pr.previousValue !== null && (
                         <p className="text-xs text-primary/40 mt-0.5">
-                          prev: {pr.previousValue}
+                          prev: {pr.previousValue} {summary.weightUnit}
                         </p>
                       )}
                     </div>

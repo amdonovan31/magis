@@ -24,11 +24,11 @@ export default async function RetroLogPage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("weight_unit")
+    .select("preferred_unit")
     .eq("id", user.id)
     .single();
 
-  const weightUnit = (profile?.weight_unit as "lbs" | "kg") ?? "lbs";
+  const weightUnit = (profile?.preferred_unit as "lbs" | "kg") ?? "lbs";
 
   return (
     <>

@@ -42,6 +42,36 @@ export async function logMeasurement(data: {
 }
 
 /**
+ * Update an existing body measurement's value and unit.
+ */
+export async function updateMeasurement(data: {
+  id: string;
+  value: number;
+  unit: string;
+}): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { error: "Not authenticated" };
+
+  const { error } = await supabase
+    .from("body_measurements")
+    .update({ value: data.value, unit: data.unit })
+    .eq("id", data.id)
+    .eq("user_id", user.id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/home");
+  revalidatePath("/profile");
+  revalidatePath("/history");
+
+  return {};
+}
+
+/**
  * Hard-delete a body measurement owned by the authenticated user.
  */
 export async function deleteMeasurement(
