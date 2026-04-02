@@ -25,14 +25,6 @@ export default function WeightChart({ data, unit }: WeightChartProps) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  if (data.length === 0) {
-    return (
-      <div className="flex items-center justify-center py-12 text-sm text-primary/40">
-        No weight data yet. Log your first weight to see the chart.
-      </div>
-    );
-  }
-
   // Sort ascending by date for chart
   const sorted = [...data].sort(
     (a, b) => new Date(a.measured_at).getTime() - new Date(b.measured_at).getTime()
@@ -65,6 +57,34 @@ export default function WeightChart({ data, unit }: WeightChartProps) {
     return PADDING.top + plotH - ((val - yMin) / yRange) * plotH;
   }
 
+  const handleInteraction = useCallback(
+    (clientX: number) => {
+      if (!svgRef.current || sorted.length === 0) return;
+      const rect = svgRef.current.getBoundingClientRect();
+      const relX = ((clientX - rect.left) / rect.width) * chartWidth;
+      let nearest = 0;
+      let nearestDist = Infinity;
+      for (let i = 0; i < sorted.length; i++) {
+        const dist = Math.abs(xPos(i) - relX);
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          nearest = i;
+        }
+      }
+      setActiveIndex(nearest);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sorted.length, dateMin, dateRange]
+  );
+
+  if (data.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-12 text-sm text-primary/40">
+        No weight data yet. Log your first weight to see the chart.
+      </div>
+    );
+  }
+
   const points = sorted.map((_, i) => `${xPos(i)},${yPos(values[i])}`).join(" ");
 
   // Y-axis ticks
@@ -87,26 +107,6 @@ export default function WeightChart({ data, unit }: WeightChartProps) {
     }
     xLabels.push({ index: sorted.length - 1, label: formatShortDate(sorted[sorted.length - 1].measured_at) });
   }
-
-  const handleInteraction = useCallback(
-    (clientX: number) => {
-      if (!svgRef.current || sorted.length === 0) return;
-      const rect = svgRef.current.getBoundingClientRect();
-      const relX = ((clientX - rect.left) / rect.width) * chartWidth;
-      let nearest = 0;
-      let nearestDist = Infinity;
-      for (let i = 0; i < sorted.length; i++) {
-        const dist = Math.abs(xPos(i) - relX);
-        if (dist < nearestDist) {
-          nearestDist = dist;
-          nearest = i;
-        }
-      }
-      setActiveIndex(nearest);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sorted.length, dateMin, dateRange]
-  );
 
   const active = activeIndex !== null ? sorted[activeIndex] : null;
 
