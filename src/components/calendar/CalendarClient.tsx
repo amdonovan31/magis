@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Card from "@/components/ui/Card";
+import Badge from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
 import { cn } from "@/lib/utils/cn";
 import { fetchWeekWorkouts } from "@/lib/actions/calendar.actions";
 import type { ScheduledWorkoutWithDetails } from "@/lib/queries/calendar.queries";
@@ -83,8 +85,10 @@ export default function CalendarClient({ workouts: initialWorkouts, weekStart: i
     const d = new Date(currentWeekStart + "T00:00:00");
     d.setDate(d.getDate() + i);
     const dateStr = toLocalDateString(d);
-    const hasWorkout = workouts.some((w) => w.scheduled_date === dateStr);
-    return { label, dateStr, dayNum: d.getDate(), hasWorkout };
+    const dayWorkouts = workouts.filter((w) => w.scheduled_date === dateStr);
+    const hasWorkout = dayWorkouts.length > 0;
+    const hasCompleted = dayWorkouts.some((w) => w.status === "completed");
+    return { label, dateStr, dayNum: d.getDate(), hasWorkout, hasCompleted };
   });
 
   const dayWorkouts = workouts.filter((w) => w.scheduled_date === selectedDate);
@@ -159,7 +163,9 @@ export default function CalendarClient({ workouts: initialWorkouts, weekStart: i
                     day.hasWorkout
                       ? isSelected
                         ? "bg-accent-light"
-                        : "bg-accent"
+                        : day.hasCompleted
+                          ? "bg-green-500"
+                          : "bg-accent"
                       : "bg-transparent"
                   )}
                 />
@@ -202,15 +208,19 @@ function WorkoutCard({ workout }: { workout: ScheduledWorkoutWithDetails }) {
     )
   );
 
+  const isCompleted = workout.status === "completed" && workout.session_id;
+
   return (
-    <Link href={`/calendar/${workout.id}`}>
+    <Link href={isCompleted ? `/workout/${workout.session_id}/summary` : `/calendar/${workout.id}`}>
       <Card className="active:scale-[0.98] transition-transform">
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <h3 className="font-heading text-base font-semibold text-primary">
               {workout.template.title}
             </h3>
-            {workout.status === "skipped" ? (
+            {isCompleted ? (
+              <Badge variant="success">Completed</Badge>
+            ) : workout.status === "skipped" ? (
               <span className="inline-flex items-center rounded-full bg-primary/5 px-2.5 py-0.5 text-xs font-medium text-primary/40">
                 Skipped
               </span>
@@ -233,6 +243,11 @@ function WorkoutCard({ workout }: { workout: ScheduledWorkoutWithDetails }) {
             </div>
           )}
           <p className="text-xs text-muted">{workout.program.title}</p>
+          {isCompleted && (
+            <Button size="sm" fullWidth className="mt-1">
+              View Summary →
+            </Button>
+          )}
         </div>
       </Card>
     </Link>
