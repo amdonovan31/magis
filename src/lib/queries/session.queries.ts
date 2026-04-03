@@ -38,7 +38,60 @@ export async function getTodayWorkout(): Promise<TodayWorkout> {
     .eq("status", "scheduled")
     .lt("scheduled_date", today);
 
-  // Find today's scheduled workout via scheduled_workouts table
+  // Check for a completed scheduled workout today first — this takes priority
+  const { data: completedRow } = await supabase
+    .from("scheduled_workouts")
+    .select(`
+      id,
+      session_id,
+      program_id,
+      workout_template_id,
+      program:programs!inner(
+        *
+      ),
+      template:workout_templates!inner(
+        *,
+        exercises:workout_template_exercises(
+          *,
+          exercise:exercises(*)
+        )
+      )
+    `)
+    .eq("client_id", user.id)
+    .eq("scheduled_date", today)
+    .eq("status", "completed")
+    .limit(1)
+    .maybeSingle();
+
+  if (completedRow) {
+    const program = completedRow.program as unknown as import("@/types/app.types").Program;
+    const template = completedRow.template as unknown as import("@/types/app.types").WorkoutTemplateWithExercises;
+
+    const sortedExercises = (template.exercises ?? []).sort(
+      (a: { position: number }, b: { position: number }) => a.position - b.position
+    );
+    const exercisesWithAlternates = await resolveAlternateExercises(sortedExercises);
+
+    let coachName: string | null = null;
+    if (program.coach_id && program.coach_id !== user.id) {
+      const { data: coachProfile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", program.coach_id)
+        .single();
+      coachName = coachProfile?.full_name ?? null;
+    }
+
+    return {
+      template: { ...template, exercises: exercisesWithAlternates } as unknown as import("@/types/app.types").WorkoutTemplateWithExercises,
+      activeSession: null,
+      completedSessionId: completedRow.session_id,
+      program,
+      coachName,
+    };
+  }
+
+  // Find today's scheduled workout (not yet completed)
   const { data: scheduledRow } = await supabase
     .from("scheduled_workouts")
     .select(`
@@ -86,19 +139,6 @@ export async function getTodayWorkout(): Promise<TodayWorkout> {
     .eq("status", "in_progress")
     .maybeSingle();
 
-  // Check for a completed session today
-  const { data: completedSession } = await supabase
-    .from("workout_sessions")
-    .select("id")
-    .eq("client_id", user.id)
-    .eq("workout_template_id", template.id)
-    .eq("status", "completed")
-    .gte("started_at", `${today}T00:00:00`)
-    .lt("started_at", `${today}T23:59:59.999`)
-    .order("completed_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
   // Fetch coach name if the program has a coach_id different from the user
   let coachName: string | null = null;
   if (program.coach_id && program.coach_id !== user.id) {
@@ -113,7 +153,7 @@ export async function getTodayWorkout(): Promise<TodayWorkout> {
   return {
     template: templateWithSortedExercises as unknown as import("@/types/app.types").WorkoutTemplateWithExercises,
     activeSession: activeSession as WorkoutSession | null,
-    completedSessionId: completedSession?.id ?? null,
+    completedSessionId: null,
     program,
     coachName,
   };
@@ -133,7 +173,9 @@ export async function getSession(sessionId: string) {
           exercise:exercises(*)
         )
       ),
-      set_logs(*)
+      set_logs(*),
+      session_exercise_notes(*),
+      session_extra_work(*)
     `)
     .eq("id", sessionId)
     .single();

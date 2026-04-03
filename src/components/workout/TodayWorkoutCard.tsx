@@ -81,15 +81,14 @@ export default function TodayWorkoutCard({ todayWorkout, hasProgram = true }: To
 
   return (
     <Card padding="lg">
-      <div className="flex items-center justify-between mb-4">
-        <Badge variant="success" className="bg-primary text-white font-bold">Today&apos;s Workout</Badge>
-        <span className="text-xs text-primary/50">{program.title}</span>
-      </div>
-      <h2 className="text-xl font-bold text-primary">{template.title}</h2>
-      <p className="text-sm text-primary/60 mt-1">{exerciseCount} exercises</p>
-      {coachName && (
-        <p className="text-xs text-primary/40 mt-1">Programmed by {coachName}</p>
-      )}
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-primary/40">
+        Today&apos;s Workout
+      </p>
+      <p className="text-xs text-primary/50 mt-1">{program.title}</p>
+      <h2 className="text-xl font-bold text-primary mt-2">{template.title}</h2>
+      <p className="text-sm text-primary/60 mt-1">
+        {exerciseCount} exercises{coachName ? ` · Programmed by ${coachName}` : ""}
+      </p>
 
       {/* Exercise preview */}
       {template.exercises && template.exercises.length > 0 && (
