@@ -51,11 +51,10 @@ export default async function SummaryPage({ params }: SummaryPageProps) {
     <div className="flex min-h-screen flex-col bg-background">
       {/* Header */}
       <ConfettiBurst />
-      <header className="bg-primary px-4 py-10 text-center text-white">
-        <div className="text-4xl mb-2">&#x1F3C6;</div>
-        <h1 className="text-3xl font-bold">Workout Complete! &#x1F4AA;</h1>
-        <p className="text-lg text-white/80 mt-1">Great work, {firstName}.</p>
-        <p className="text-sm text-white/50 mt-2">{summary.templateTitle} &middot; {formatDate(summary.date)}</p>
+      <header className="bg-primary px-4 pt-6 pb-5 text-center text-white">
+        <div className="text-2xl mb-1">&#x1F3C6;</div>
+        <p className="text-lg text-white/90">Great work, {firstName}. &#x1F4AA;</p>
+        <p className="text-sm text-white/50 mt-1">{summary.templateTitle} &middot; {formatDate(summary.date)}</p>
       </header>
 
       <div className="flex-1 px-4 py-6 flex flex-col gap-4 pb-32">
