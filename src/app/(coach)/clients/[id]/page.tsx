@@ -225,38 +225,40 @@ export default async function ClientDetailPage({
           sessions.map((session) => {
             const template = session.workout_template as { title: string } | null;
             return (
-              <Card key={session.id}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-primary">
-                      {template?.title ?? "Workout"}
-                    </p>
-                    {session.started_at && (
-                      <p className="text-xs text-primary/40">
-                        {formatRelativeTime(session.started_at)}
+              <Link key={session.id} href={`/clients/${id}/sessions/${session.id}`}>
+                <Card className="active:scale-[0.98] transition-transform">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-primary">
+                        {template?.title ?? "Workout"}
                       </p>
-                    )}
+                      {session.started_at && (
+                        <p className="text-xs text-primary/40">
+                          {formatRelativeTime(session.started_at)}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {(session as unknown as { skipped_exercises?: string[] }).skipped_exercises?.length ? (
+                        <span className="text-[10px] text-primary/40">
+                          {(session as unknown as { skipped_exercises: string[] }).skipped_exercises.length} skipped
+                        </span>
+                      ) : null}
+                      <Badge
+                        variant={
+                          session.status === "completed"
+                            ? "success"
+                            : session.status === "skipped"
+                              ? "default"
+                              : "accent"
+                        }
+                      >
+                        {session.status}
+                      </Badge>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    {(session as unknown as { skipped_exercises?: string[] }).skipped_exercises?.length ? (
-                      <span className="text-[10px] text-primary/40">
-                        {(session as unknown as { skipped_exercises: string[] }).skipped_exercises.length} skipped
-                      </span>
-                    ) : null}
-                    <Badge
-                      variant={
-                        session.status === "completed"
-                          ? "success"
-                          : session.status === "skipped"
-                            ? "default"
-                            : "accent"
-                      }
-                    >
-                      {session.status}
-                    </Badge>
-                  </div>
-                </div>
-              </Card>
+                </Card>
+              </Link>
             );
           })
         )}

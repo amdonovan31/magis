@@ -113,6 +113,54 @@ export type Database = {
           },
         ]
       }
+      client_exercise_feedback: {
+        Row: {
+          client_id: string
+          created_at: string
+          exercise_name: string
+          id: string
+          note: string
+          program_title: string | null
+          session_date: string
+          session_id: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          exercise_name: string
+          id?: string
+          note: string
+          program_title?: string | null
+          session_date: string
+          session_id?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          exercise_name?: string
+          id?: string
+          note?: string
+          program_title?: string | null
+          session_date?: string
+          session_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_exercise_feedback_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_exercise_feedback_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "workout_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_intake: {
         Row: {
           additional_notes: string | null
@@ -420,6 +468,109 @@ export type Database = {
           },
         ]
       }
+      error_logs: {
+        Row: {
+          component: string | null
+          created_at: string | null
+          error_message: string
+          error_stack: string | null
+          id: string
+          metadata: Json | null
+          role: string | null
+          url: string | null
+          user_id: string | null
+        }
+        Insert: {
+          component?: string | null
+          created_at?: string | null
+          error_message: string
+          error_stack?: string | null
+          id?: string
+          metadata?: Json | null
+          role?: string | null
+          url?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          component?: string | null
+          created_at?: string | null
+          error_message?: string
+          error_stack?: string | null
+          id?: string
+          metadata?: Json | null
+          role?: string | null
+          url?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "error_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exercise_substitutions: {
+        Row: {
+          created_at: string
+          id: string
+          original_exercise_id: string
+          reason: string | null
+          session_id: string
+          substitute_exercise_id: string
+          template_exercise_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          original_exercise_id: string
+          reason?: string | null
+          session_id: string
+          substitute_exercise_id: string
+          template_exercise_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          original_exercise_id?: string
+          reason?: string | null
+          session_id?: string
+          substitute_exercise_id?: string
+          template_exercise_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercise_substitutions_original_exercise_id_fkey"
+            columns: ["original_exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exercise_substitutions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "workout_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exercise_substitutions_substitute_exercise_id_fkey"
+            columns: ["substitute_exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exercise_substitutions_template_exercise_id_fkey"
+            columns: ["template_exercise_id"]
+            isOneToOne: false
+            referencedRelation: "workout_template_exercises"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exercises: {
         Row: {
           created_at: string
@@ -476,50 +627,6 @@ export type Database = {
           },
         ]
       }
-      error_logs: {
-        Row: {
-          id: string
-          user_id: string | null
-          role: string | null
-          error_message: string
-          error_stack: string | null
-          component: string | null
-          url: string | null
-          metadata: Json | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          user_id?: string | null
-          role?: string | null
-          error_message: string
-          error_stack?: string | null
-          component?: string | null
-          url?: string | null
-          metadata?: Json | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string | null
-          role?: string | null
-          error_message?: string
-          error_stack?: string | null
-          component?: string | null
-          url?: string | null
-          metadata?: Json | null
-          created_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "error_logs_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       feed_comments: {
         Row: {
           author_id: string
@@ -558,47 +665,6 @@ export type Database = {
             columns: ["post_id"]
             isOneToOne: false
             referencedRelation: "feed_posts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      feedback: {
-        Row: {
-          id: string
-          user_id: string | null
-          role: string | null
-          category: string
-          message: string
-          current_page: string | null
-          app_version: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          user_id?: string | null
-          role?: string | null
-          category: string
-          message: string
-          current_page?: string | null
-          app_version?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string | null
-          role?: string | null
-          category?: string
-          message?: string
-          current_page?: string | null
-          app_version?: string | null
-          created_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "feedback_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -791,6 +857,47 @@ export type Database = {
           },
           {
             foreignKeyName: "feed_reactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feedback: {
+        Row: {
+          app_version: string | null
+          category: string
+          created_at: string | null
+          current_page: string | null
+          id: string
+          message: string
+          role: string | null
+          user_id: string | null
+        }
+        Insert: {
+          app_version?: string | null
+          category: string
+          created_at?: string | null
+          current_page?: string | null
+          id?: string
+          message: string
+          role?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          app_version?: string | null
+          category?: string
+          created_at?: string | null
+          current_page?: string | null
+          id?: string
+          message?: string
+          role?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -1048,88 +1155,29 @@ export type Database = {
           },
         ]
       }
-      exercise_substitutions: {
-        Row: {
-          id: string
-          session_id: string
-          template_exercise_id: string
-          original_exercise_id: string
-          substitute_exercise_id: string
-          reason: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          session_id: string
-          template_exercise_id: string
-          original_exercise_id: string
-          substitute_exercise_id: string
-          reason?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          session_id?: string
-          template_exercise_id?: string
-          original_exercise_id?: string
-          substitute_exercise_id?: string
-          reason?: string | null
-          created_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "exercise_substitutions_session_id_fkey"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "workout_sessions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "exercise_substitutions_template_exercise_id_fkey"
-            columns: ["template_exercise_id"]
-            isOneToOne: false
-            referencedRelation: "workout_template_exercises"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "exercise_substitutions_original_exercise_id_fkey"
-            columns: ["original_exercise_id"]
-            isOneToOne: false
-            referencedRelation: "exercises"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "exercise_substitutions_substitute_exercise_id_fkey"
-            columns: ["substitute_exercise_id"]
-            isOneToOne: false
-            referencedRelation: "exercises"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       session_exercise_notes: {
         Row: {
+          content: string | null
+          created_at: string
           id: string
           session_id: string
           template_exercise_id: string
-          content: string | null
-          created_at: string
           updated_at: string
         }
         Insert: {
+          content?: string | null
+          created_at?: string
           id?: string
           session_id: string
           template_exercise_id: string
-          content?: string | null
-          created_at?: string
           updated_at?: string
         }
         Update: {
+          content?: string | null
+          created_at?: string
           id?: string
           session_id?: string
           template_exercise_id?: string
-          content?: string | null
-          created_at?: string
           updated_at?: string
         }
         Relationships: [
@@ -1149,6 +1197,60 @@ export type Database = {
           },
         ]
       }
+      session_extra_work: {
+        Row: {
+          client_id: string
+          exercise_name: string
+          group_id: string
+          id: string
+          logged_at: string
+          reps_completed: number | null
+          session_id: string
+          set_number: number
+          weight_unit: string | null
+          weight_value: number | null
+        }
+        Insert: {
+          client_id: string
+          exercise_name: string
+          group_id: string
+          id?: string
+          logged_at?: string
+          reps_completed?: number | null
+          session_id: string
+          set_number: number
+          weight_unit?: string | null
+          weight_value?: number | null
+        }
+        Update: {
+          client_id?: string
+          exercise_name?: string
+          group_id?: string
+          id?: string
+          logged_at?: string
+          reps_completed?: number | null
+          session_id?: string
+          set_number?: number
+          weight_unit?: string | null
+          weight_value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_extra_work_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_extra_work_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "workout_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       set_logs: {
         Row: {
           exercise_id: string | null
@@ -1161,9 +1263,9 @@ export type Database = {
           set_number: number
           sync_status: string
           template_exercise_id: string | null
+          weight_unit: string | null
           weight_used: string | null
           weight_value: number | null
-          weight_unit: string | null
         }
         Insert: {
           exercise_id?: string | null
@@ -1176,9 +1278,9 @@ export type Database = {
           set_number: number
           sync_status?: string
           template_exercise_id?: string | null
+          weight_unit?: string | null
           weight_used?: string | null
           weight_value?: number | null
-          weight_unit?: string | null
         }
         Update: {
           exercise_id?: string | null
@@ -1191,11 +1293,18 @@ export type Database = {
           set_number?: number
           sync_status?: string
           template_exercise_id?: string | null
+          weight_unit?: string | null
           weight_used?: string | null
           weight_value?: number | null
-          weight_unit?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "set_logs_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "set_logs_session_id_fkey"
             columns: ["session_id"]
@@ -1208,13 +1317,6 @@ export type Database = {
             columns: ["template_exercise_id"]
             isOneToOne: false
             referencedRelation: "workout_template_exercises"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "set_logs_exercise_id_fkey"
-            columns: ["exercise_id"]
-            isOneToOne: false
-            referencedRelation: "exercises"
             referencedColumns: ["id"]
           },
         ]

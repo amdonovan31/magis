@@ -13,9 +13,20 @@ interface WorkoutPageProps {
   params: Promise<{ sessionId: string }>;
 }
 
+type ExtraWorkRow = {
+  group_id: string;
+  exercise_name: string;
+  set_number: number;
+  reps_completed: number | null;
+  weight_value: number | null;
+  weight_unit: string | null;
+};
+
 type RawSession = WorkoutSession & {
   workout_template: WorkoutTemplateWithExercises | null;
   set_logs: SetLog[];
+  session_exercise_notes: { template_exercise_id: string; content: string | null }[];
+  session_extra_work: ExtraWorkRow[];
 };
 
 async function finishSession(sessionId: string) {
@@ -41,6 +52,8 @@ export default async function WorkoutPage({ params }: WorkoutPageProps) {
 
   const template = session.workout_template;
   const setLogs = session.set_logs ?? [];
+  const exerciseNotes = session.session_exercise_notes ?? [];
+  const extraWork = session.session_extra_work ?? [];
 
   // Fetch user's preferred weight unit
   const { data: profile } = await supabase
@@ -85,6 +98,8 @@ export default async function WorkoutPage({ params }: WorkoutPageProps) {
           setLogs={setLogs}
           preferredUnit={preferredUnit}
           initialSkippedExercises={session.skipped_exercises ?? []}
+          exerciseNotes={exerciseNotes}
+          initialExtraWork={extraWork}
         />
       )}
 

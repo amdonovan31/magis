@@ -184,6 +184,44 @@ export async function skipExercise(sessionId: string, templateExerciseId: string
   return { success: true };
 }
 
+export async function saveExerciseNote(
+  sessionId: string,
+  templateExerciseId: string,
+  content: string
+) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
+  const trimmed = content.trim();
+
+  if (!trimmed) {
+    // Delete the note if content is empty
+    await supabase
+      .from("session_exercise_notes")
+      .delete()
+      .eq("session_id", sessionId)
+      .eq("template_exercise_id", templateExerciseId);
+    return { success: true };
+  }
+
+  const { error } = await supabase
+    .from("session_exercise_notes")
+    .upsert(
+      {
+        session_id: sessionId,
+        template_exercise_id: templateExerciseId,
+        content: trimmed,
+      },
+      { onConflict: "session_id,template_exercise_id" }
+    );
+
+  if (error) return { error: error.message };
+  return { success: true };
+}
+
 export async function logSet(data: {
   sessionId: string;
   templateExerciseId: string;
@@ -414,9 +452,118 @@ export async function completeSession(sessionId: string) {
     }
   }
 
+  // Populate client_exercise_feedback (AI context store) from exercise notes
+  try {
+    const { data: exerciseNotes } = await supabase
+      .from("session_exercise_notes")
+      .select(`
+        content,
+        template_exercise_id,
+        template_exercise:workout_template_exercises!inner(
+          exercise:exercises(name)
+        )
+      `)
+      .eq("session_id", sessionId)
+      .not("content", "is", null);
+
+    if (exerciseNotes && exerciseNotes.length > 0) {
+      // Get program title for context
+      const { data: programData } = session.workout_template_id
+        ? await supabase
+            .from("workout_templates")
+            .select("program:programs(title)")
+            .eq("id", session.workout_template_id)
+            .single()
+        : { data: null };
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const programTitle = (programData as any)?.program?.title ?? null;
+
+      const feedbackRows = exerciseNotes
+        .filter((n) => n.content?.trim())
+        .map((n) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const te = n.template_exercise as any;
+          const exerciseName = te?.exercise?.name ?? "Unknown exercise";
+          return {
+            client_id: user.id,
+            exercise_name: exerciseName,
+            note: n.content!.trim(),
+            session_id: sessionId,
+            session_date: now.toISOString(),
+            program_title: programTitle,
+          };
+        });
+
+      if (feedbackRows.length > 0) {
+        await supabase.from("client_exercise_feedback").insert(feedbackRows);
+      }
+    }
+  } catch (err) {
+    const { logger } = await import("@/lib/utils/logger");
+    logger.error("Failed to populate client_exercise_feedback", {
+      sessionId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
   revalidatePath("/home");
   revalidatePath("/history");
   redirect(`/workout/${sessionId}/summary`);
+}
+
+export async function logExtraWork(data: {
+  sessionId: string;
+  groupId: string;
+  exerciseName: string;
+  setNumber: number;
+  repsCompleted: number | null;
+  weightValue: number | null;
+  weightUnit: string | null;
+}) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
+  const { error } = await supabase
+    .from("session_extra_work")
+    .upsert(
+      {
+        session_id: data.sessionId,
+        client_id: user.id,
+        group_id: data.groupId,
+        exercise_name: data.exerciseName,
+        set_number: data.setNumber,
+        reps_completed: data.repsCompleted,
+        weight_value: data.weightValue,
+        weight_unit: data.weightUnit,
+        logged_at: new Date().toISOString(),
+      },
+      { onConflict: "session_id,group_id,set_number" }
+    );
+
+  if (error) return { error: error.message };
+  return { success: true };
+}
+
+export async function deleteExtraWorkGroup(sessionId: string, groupId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
+  const { error } = await supabase
+    .from("session_extra_work")
+    .delete()
+    .eq("session_id", sessionId)
+    .eq("group_id", groupId)
+    .eq("client_id", user.id);
+
+  if (error) return { error: error.message };
+  return { success: true };
 }
 
 export async function skipSession(workoutTemplateId: string, programId: string) {

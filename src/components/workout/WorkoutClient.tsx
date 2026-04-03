@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import ExerciseLogger from "./ExerciseLogger";
+import ExtraWorkEntry from "./ExtraWorkEntry";
 import RestTimer from "./RestTimer";
 import UnitToggle from "./UnitToggle";
 import { getPersistedSession, persistSkip } from "@/lib/workout-persistence";
@@ -20,6 +21,15 @@ interface WorkoutClientProps {
   setLogs: SetLog[];
   preferredUnit: WeightUnit;
   initialSkippedExercises: string[];
+  exerciseNotes: { template_exercise_id: string; content: string | null }[];
+  initialExtraWork: {
+    group_id: string;
+    exercise_name: string;
+    set_number: number;
+    reps_completed: number | null;
+    weight_value: number | null;
+    weight_unit: string | null;
+  }[];
 }
 
 export default function WorkoutClient({
@@ -28,6 +38,8 @@ export default function WorkoutClient({
   setLogs,
   preferredUnit,
   initialSkippedExercises,
+  exerciseNotes,
+  initialExtraWork,
 }: WorkoutClientProps) {
   const router = useRouter();
   const [weightUnit, setWeightUnit] = useState<WeightUnit>(preferredUnit);
@@ -39,6 +51,29 @@ export default function WorkoutClient({
   const [persistedSwaps, setPersistedSwaps] = useState<Record<string, string>>({});
   const [swappedExerciseCache, setSwappedExerciseCache] = useState<Record<string, Exercise>>({});
   const syncAttempted = useRef(false);
+
+  // Extra work state — group initial data by group_id
+  const [extraExercises, setExtraExercises] = useState<
+    { groupId: string; name: string; sets: { setNumber: number; reps: string; weight: string; done: boolean }[] }[]
+  >(() => {
+    const grouped = new Map<string, typeof initialExtraWork>();
+    for (const row of initialExtraWork) {
+      if (!grouped.has(row.group_id)) grouped.set(row.group_id, []);
+      grouped.get(row.group_id)!.push(row);
+    }
+    return Array.from(grouped.entries()).map(([groupId, rows]) => ({
+      groupId,
+      name: rows[0].exercise_name,
+      sets: rows
+        .sort((a, b) => a.set_number - b.set_number)
+        .map((r) => ({
+          setNumber: r.set_number,
+          reps: r.reps_completed?.toString() ?? "",
+          weight: r.weight_value?.toString() ?? "",
+          done: true,
+        })),
+    }));
+  });
 
   const handleSkipExercise = useCallback(
     async (templateExerciseId: string) => {
@@ -59,6 +94,13 @@ export default function WorkoutClient({
   const handleDismissTimer = useCallback(() => {
     setRestSeconds(null);
   }, []);
+
+  // Build a lookup map for exercise notes
+  const notesByExercise = Object.fromEntries(
+    exerciseNotes
+      .filter((n) => n.content)
+      .map((n) => [n.template_exercise_id, n.content!])
+  );
 
   // Shared sync helper — used by both mount restore and online event
   const syncMissingSets = useCallback(
@@ -199,9 +241,45 @@ export default function WorkoutClient({
               weightUnit={weightUnit}
               isSkipped={skippedExercises.has(te.id)}
               onSkip={() => handleSkipExercise(te.id)}
+              initialNote={notesByExercise[te.id] ?? ""}
             />
           </div>
         ))}
+
+        {/* Extra work entries */}
+        {extraExercises.map((ex) => (
+          <ExtraWorkEntry
+            key={ex.groupId}
+            sessionId={sessionId}
+            groupId={ex.groupId}
+            initialName={ex.name}
+            initialSets={ex.sets}
+            weightUnit={weightUnit}
+            onRemove={() =>
+              setExtraExercises((prev) =>
+                prev.filter((e) => e.groupId !== ex.groupId)
+              )
+            }
+          />
+        ))}
+
+        {/* Add extra work button */}
+        <button
+          type="button"
+          onClick={() =>
+            setExtraExercises((prev) => [
+              ...prev,
+              {
+                groupId: crypto.randomUUID(),
+                name: "",
+                sets: [{ setNumber: 1, reps: "", weight: "", done: false }],
+              },
+            ])
+          }
+          className="rounded-2xl border border-dashed border-primary/15 py-3 text-center text-sm font-medium text-primary/40 hover:text-primary/60 hover:border-primary/25 transition-colors"
+        >
+          + Add extra work
+        </button>
       </div>
 
       {restSeconds !== null && (

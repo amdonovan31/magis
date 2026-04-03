@@ -6,6 +6,7 @@ import SetRow from "./SetRow";
 import ExerciseDemoModal from "./ExerciseDemoModal";
 import { persistSwap, removeSwap } from "@/lib/workout-persistence";
 import { searchExercises } from "@/lib/actions/exercise.actions";
+import { saveExerciseNote } from "@/lib/actions/session.actions";
 import type { WorkoutTemplateExerciseWithExercise, SetLog, Exercise } from "@/types/app.types";
 
 interface ExerciseLoggerProps {
@@ -17,6 +18,7 @@ interface ExerciseLoggerProps {
   weightUnit: "kg" | "lbs";
   isSkipped: boolean;
   onSkip: () => void;
+  initialNote?: string;
 }
 
 export default function ExerciseLogger({
@@ -28,6 +30,7 @@ export default function ExerciseLogger({
   weightUnit,
   isSkipped,
   onSkip,
+  initialNote = "",
 }: ExerciseLoggerProps) {
   const [showDemo, setShowDemo] = useState(false);
   const [confirmingSkip, setConfirmingSkip] = useState(false);
@@ -41,8 +44,12 @@ export default function ExerciseLogger({
   const [searchLoading, setSearchLoading] = useState(false);
   const [confirmSwapExercise, setConfirmSwapExercise] = useState<Exercise | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const noteDebounceRef = useRef<ReturnType<typeof setTimeout>>();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const swapContainerRef = useRef<HTMLDivElement>(null);
+
+  // Exercise note state
+  const [noteContent, setNoteContent] = useState(initialNote);
 
   const setCount = templateExercise.prescribed_sets ?? 3;
   const displayExercise = swappedExercise ?? templateExercise.exercise;
@@ -75,6 +82,15 @@ export default function ExerciseLogger({
       onSetComplete(rest);
     }
   }
+
+  // Debounced note save
+  const handleNoteChange = useCallback((value: string) => {
+    setNoteContent(value);
+    if (noteDebounceRef.current) clearTimeout(noteDebounceRef.current);
+    noteDebounceRef.current = setTimeout(() => {
+      saveExerciseNote(sessionId, templateExercise.id, value);
+    }, 300);
+  }, [sessionId, templateExercise.id]);
 
   // Debounced search
   const handleSearch = useCallback((value: string) => {
@@ -343,6 +359,17 @@ export default function ExerciseLogger({
           Note: {templateExercise.notes}
         </p>
       )}
+
+      {/* Client exercise note */}
+      <div className="px-4 pb-3">
+        <textarea
+          value={noteContent}
+          onChange={(e) => handleNoteChange(e.target.value)}
+          placeholder="Add a note…"
+          rows={1}
+          className="w-full resize-none rounded-xl border border-primary/10 bg-transparent px-3 py-2 text-xs text-primary placeholder:text-primary/30 focus:border-primary/30 focus:outline-none"
+        />
+      </div>
 
       {/* Skip exercise */}
       {confirmingSkip ? (
