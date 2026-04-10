@@ -1,17 +1,21 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getScheduledWorkouts } from "@/lib/queries/calendar.queries";
+import { getTodayISO, getTodayDayOfWeek } from "@/lib/utils/date";
 import CalendarClient from "@/components/calendar/CalendarClient";
 
 /**
- * Returns the Monday and Sunday bounding the current week.
+ * Returns the Monday and Sunday bounding the current week,
+ * using the timezone-aware date utilities.
  */
 function getCurrentWeekRange(): { start: string; end: string } {
-  const now = new Date();
-  const day = now.getDay(); // 0=Sun
-  const diffToMon = day === 0 ? -6 : 1 - day;
-  const mon = new Date(now);
-  mon.setDate(now.getDate() + diffToMon);
+  const today = getTodayISO();
+  const dow = getTodayDayOfWeek(); // 0=Sun
+  const diffToMon = dow === 0 ? -6 : 1 - dow;
+
+  const todayDate = new Date(today + "T12:00:00"); // noon avoids DST edge
+  const mon = new Date(todayDate);
+  mon.setDate(todayDate.getDate() + diffToMon);
   const sun = new Date(mon);
   sun.setDate(mon.getDate() + 6);
 
