@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import type { IntakeData } from "@/lib/actions/intake.actions";
 import { logger } from "@/lib/utils/logger";
@@ -10,6 +11,7 @@ export async function signUp(formData: FormData) {
   const password = formData.get("password") as string;
   const fullName = (formData.get("full_name") as string)?.trim();
   const role = (formData.get("role") as string) || "coach";
+  const coachId = (formData.get("coach_id") as string)?.trim() || null;
 
   if (!email || !password || !fullName) {
     return { error: "All fields are required" };
@@ -20,17 +22,28 @@ export async function signUp(formData: FormData) {
   if (role !== "coach" && role !== "solo" && role !== "client") {
     return { error: "Invalid role" };
   }
+  // coach_id is only meaningful for client signups (clients are coached)
+  if (coachId && role !== "client") {
+    return { error: "Invalid signup configuration" };
+  }
 
   const supabase = await createClient();
+
+  // Build metadata — include coach_id only if present so the handle_new_user
+  // trigger can create the coach_client_relationships row automatically.
+  const metadata: Record<string, string> = {
+    full_name: fullName,
+    role,
+  };
+  if (coachId) {
+    metadata.coach_id = coachId;
+  }
 
   const { error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      data: {
-        full_name: fullName,
-        role,
-      },
+      data: metadata,
     },
   });
 
@@ -44,6 +57,88 @@ export async function signUp(formData: FormData) {
     // Solo and client users go through onboarding
     redirect("/onboarding");
   }
+}
+
+/**
+ * Connects an already-authenticated client/solo user to a coach via the
+ * shareable invite link. Uses the admin client because clients have no
+ * INSERT policy on coach_client_relationships (only coaches do).
+ */
+export async function connectToCoach(coachId: string) {
+  if (!coachId) return { error: "Coach ID is required" };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const callerRole = user.app_metadata?.role as
+    | "coach"
+    | "client"
+    | "solo"
+    | undefined;
+  if (callerRole === "coach") {
+    return { error: "Coaches cannot connect to other coaches as a client." };
+  }
+  if (callerRole === "solo") {
+    return {
+      error:
+        "Solo users can't connect to a coach yet. This will be supported in a future update.",
+    };
+  }
+  if (callerRole !== "client") {
+    return { error: "Only clients can connect to a coach." };
+  }
+  if (coachId === user.id) {
+    return { error: "You can't connect to yourself." };
+  }
+
+  // Verify target is a real coach
+  const { data: coachProfile } = await supabase
+    .from("profiles")
+    .select("id, role, full_name")
+    .eq("id", coachId)
+    .maybeSingle();
+
+  if (!coachProfile || coachProfile.role !== "coach") {
+    return { error: "Coach not found." };
+  }
+
+  // Check existing relationship — client_id is UNIQUE so only one possible
+  const { data: existing } = await supabase
+    .from("coach_client_relationships")
+    .select("coach_id")
+    .eq("client_id", user.id)
+    .maybeSingle();
+
+  if (existing) {
+    if (existing.coach_id === coachId) {
+      // Already connected to this coach — idempotent success
+      return { success: true, already: true };
+    }
+    return {
+      error:
+        "You're already coached by another coach. Contact them to switch.",
+    };
+  }
+
+  // Create the relationship via admin client (bypasses INSERT RLS)
+  const adminClient = createAdminClient();
+  const { error: insertError } = await adminClient
+    .from("coach_client_relationships")
+    .insert({
+      coach_id: coachId,
+      client_id: user.id,
+    });
+
+  if (insertError) {
+    return { error: insertError.message };
+  }
+
+  revalidatePath("/home");
+  revalidatePath("/profile");
+  return { success: true };
 }
 
 export async function signIn(formData: FormData) {

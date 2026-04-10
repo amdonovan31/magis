@@ -7,9 +7,10 @@ import Input from "@/components/ui/Input";
 
 interface SignupFormProps {
   role: "coach" | "solo" | "client";
+  coachId?: string;
 }
 
-export default function SignupForm({ role }: SignupFormProps) {
+export default function SignupForm({ role, coachId }: SignupFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -26,6 +27,7 @@ export default function SignupForm({ role }: SignupFormProps) {
   return (
     <form action={handleSubmit} className="flex flex-col gap-4">
       <input type="hidden" name="role" value={role} />
+      {coachId && <input type="hidden" name="coach_id" value={coachId} />}
       <Input
         label="Full Name"
         name="full_name"
