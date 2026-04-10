@@ -192,6 +192,155 @@ export async function getSession(sessionId: string) {
   return data;
 }
 
+export type LastPerformance = {
+  reps: number;
+  weight_value: number;
+  weight_unit: "kg" | "lbs";
+  logged_at: string;
+};
+
+/**
+ * Returns the most recent completed, non-skipped set per exercise for the
+ * current user. Used to display a "Last: X reps × Y lbs" hint above the
+ * active set row during workout logging.
+ *
+ * Set logs may reference an exercise either via:
+ *   - exercise_id (when the user swapped to a different exercise)
+ *   - template_exercise_id (the original prescribed slot — joined to
+ *     workout_template_exercises to resolve the underlying exercise)
+ * We query both paths and merge in JS so the hint reflects the actual
+ * exercise being performed regardless of how it was logged.
+ *
+ * @param exerciseIds - The exercise IDs (from workout_template_exercises.exercise_id)
+ *                     visible in the current workout
+ * @param excludeSessionId - Excludes the user's current in-progress session
+ *                           so they don't see their own current sets as "last time"
+ */
+export async function getLastPerformanceForExercises(
+  exerciseIds: string[],
+  excludeSessionId: string
+): Promise<Record<string, LastPerformance>> {
+  if (exerciseIds.length === 0) return {};
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return {};
+
+  // Find all template_exercise_ids that map to the requested exercise_ids.
+  // Needed because non-swapped set_logs reference template_exercise_id, not exercise_id.
+  const { data: templateRows } = await supabase
+    .from("workout_template_exercises")
+    .select("id, exercise_id")
+    .in("exercise_id", exerciseIds);
+
+  const templateIdToExerciseId = new Map<string, string>();
+  for (const row of templateRows ?? []) {
+    if (row.exercise_id) templateIdToExerciseId.set(row.id, row.exercise_id);
+  }
+  const templateIds = Array.from(templateIdToExerciseId.keys());
+
+  // Query 1: set_logs that explicitly reference the exercise (post-swap rows)
+  const byExercisePromise = supabase
+    .from("set_logs")
+    .select("exercise_id, reps_completed, weight_value, weight_unit, logged_at, session_id, workout_sessions!inner(client_id)")
+    .in("exercise_id", exerciseIds)
+    .eq("is_completed", true)
+    .eq("is_skipped", false)
+    .not("weight_value", "is", null)
+    .neq("session_id", excludeSessionId)
+    .eq("workout_sessions.client_id", user.id)
+    .order("logged_at", { ascending: false });
+
+  // Query 2: set_logs that reference the template (no swap), join to resolve exercise
+  const byTemplatePromise = templateIds.length
+    ? supabase
+        .from("set_logs")
+        .select("template_exercise_id, reps_completed, weight_value, weight_unit, logged_at, session_id, workout_sessions!inner(client_id)")
+        .in("template_exercise_id", templateIds)
+        .is("exercise_id", null)
+        .eq("is_completed", true)
+        .eq("is_skipped", false)
+        .not("weight_value", "is", null)
+        .neq("session_id", excludeSessionId)
+        .eq("workout_sessions.client_id", user.id)
+        .order("logged_at", { ascending: false })
+    : Promise.resolve({ data: [] as unknown[] });
+
+  const [byExercise, byTemplate] = await Promise.all([byExercisePromise, byTemplatePromise]);
+
+  type RowShape = {
+    exerciseId: string;
+    reps_completed: number | null;
+    weight_value: number | null;
+    weight_unit: string | null;
+    logged_at: string | null;
+  };
+
+  const merged: RowShape[] = [];
+
+  for (const row of (byExercise.data ?? []) as Array<{
+    exercise_id: string | null;
+    reps_completed: number | null;
+    weight_value: number | null;
+    weight_unit: string | null;
+    logged_at: string | null;
+  }>) {
+    if (!row.exercise_id) continue;
+    merged.push({
+      exerciseId: row.exercise_id,
+      reps_completed: row.reps_completed,
+      weight_value: row.weight_value,
+      weight_unit: row.weight_unit,
+      logged_at: row.logged_at,
+    });
+  }
+
+  for (const row of (byTemplate.data ?? []) as Array<{
+    template_exercise_id: string | null;
+    reps_completed: number | null;
+    weight_value: number | null;
+    weight_unit: string | null;
+    logged_at: string | null;
+  }>) {
+    if (!row.template_exercise_id) continue;
+    const exerciseId = templateIdToExerciseId.get(row.template_exercise_id);
+    if (!exerciseId) continue;
+    merged.push({
+      exerciseId,
+      reps_completed: row.reps_completed,
+      weight_value: row.weight_value,
+      weight_unit: row.weight_unit,
+      logged_at: row.logged_at,
+    });
+  }
+
+  // Explicit global sort: ISO timestamps sort lexicographically correct
+  merged.sort((a, b) => (b.logged_at ?? "").localeCompare(a.logged_at ?? ""));
+
+  // Take the first occurrence per exerciseId — guaranteed most recent due to sort
+  const result: Record<string, LastPerformance> = {};
+  for (const row of merged) {
+    if (result[row.exerciseId]) continue;
+    if (
+      row.reps_completed == null ||
+      row.weight_value == null ||
+      row.logged_at == null
+    )
+      continue;
+    const unit = row.weight_unit === "kg" ? "kg" : "lbs";
+    result[row.exerciseId] = {
+      reps: row.reps_completed,
+      weight_value: row.weight_value,
+      weight_unit: unit,
+      logged_at: row.logged_at,
+    };
+  }
+
+  return result;
+}
+
 export async function getClientHistory(limit = 20) {
   const supabase = await createClient();
   const {

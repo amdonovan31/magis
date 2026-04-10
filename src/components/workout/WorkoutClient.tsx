@@ -12,6 +12,7 @@ import { logSet, skipExercise } from "@/lib/actions/session.actions";
 import { fetchExercisesByIds } from "@/lib/actions/exercise.actions";
 import type { WorkoutTemplateWithExercises, SetLog, Exercise } from "@/types/app.types";
 import type { PersistedSet } from "@/lib/workout-persistence";
+import type { LastPerformance } from "@/lib/queries/session.queries";
 
 type SyncBannerState = "restoring" | "syncing" | "failed" | null;
 type WeightUnit = "kg" | "lbs";
@@ -33,6 +34,7 @@ interface WorkoutClientProps {
   }[];
   initialResolvedSets: number;
   totalSets: number;
+  lastPerformanceByExercise: Record<string, LastPerformance>;
 }
 
 export default function WorkoutClient({
@@ -45,6 +47,7 @@ export default function WorkoutClient({
   initialExtraWork,
   initialResolvedSets,
   totalSets,
+  lastPerformanceByExercise,
 }: WorkoutClientProps) {
   const router = useRouter();
   const [weightUnit, setWeightUnit] = useState<WeightUnit>(preferredUnit);
@@ -255,6 +258,7 @@ export default function WorkoutClient({
               isSkipped={skippedExercises.has(te.id)}
               onSkip={() => handleSkipExercise(te.id)}
               initialNote={notesByExercise[te.id] ?? ""}
+              lastPerformanceByExercise={lastPerformanceByExercise}
               onSetResolved={() => setResolvedCount((c) => c + 1)}
               onSetUnresolved={() => setResolvedCount((c) => c - 1)}
             />

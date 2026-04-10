@@ -4,6 +4,7 @@ import { useState, useTransition, useEffect, useRef, useCallback } from "react";
 import { logSet } from "@/lib/actions/session.actions";
 import { persistSet } from "@/lib/workout-persistence";
 import { cn } from "@/lib/utils/cn";
+import type { LastPerformance } from "@/lib/queries/session.queries";
 
 type WeightUnit = "kg" | "lbs";
 
@@ -34,6 +35,7 @@ interface SetRowProps {
   isSkipped?: boolean;
   onSkip?: () => void;
   onUnskip?: () => void;
+  lastPerformance?: LastPerformance | null;
 }
 
 export default function SetRow({
@@ -53,6 +55,7 @@ export default function SetRow({
   isSkipped = false,
   onSkip,
   onUnskip,
+  lastPerformance = null,
 }: SetRowProps) {
   const prescribedNum = prescribedWeight ? parseFloat(prescribedWeight) : null;
   const prescribedInUnit = prescribedNum != null && !isNaN(prescribedNum)
@@ -257,7 +260,7 @@ export default function SetRow({
       {/* Foreground: set row */}
       <div
         className={cn(
-          "relative flex items-center gap-3 rounded-xl px-3 py-2 transition-colors",
+          "relative rounded-xl px-3 py-2 transition-colors",
           done
             ? "bg-green-50"
             : isActive
@@ -266,6 +269,21 @@ export default function SetRow({
         )}
         style={swipeX !== 0 ? { transform: `translateX(${swipeX}px)`, transition: "none" } : undefined}
       >
+        {/* Last performance hint — only on the active incomplete, non-skipped set */}
+        {isActive && !done && !isSkipped && lastPerformance && (
+          <p className="mb-1 pl-9 text-[10px] text-primary/40">
+            Last:{" "}
+            {lastPerformance.reps} reps ×{" "}
+            {convertWeight(
+              lastPerformance.weight_value,
+              lastPerformance.weight_unit,
+              weightUnit
+            )}{" "}
+            {weightUnit}
+          </p>
+        )}
+
+        <div className="flex items-center gap-3">
         {/* Set number */}
         <span className="w-6 text-center text-sm font-semibold text-primary/60">
           {setNumber}
@@ -336,6 +354,7 @@ export default function SetRow({
             </svg>
           )}
         </button>
+        </div>
       </div>
     </div>
   );

@@ -9,6 +9,8 @@ import { searchExercises } from "@/lib/actions/exercise.actions";
 import { saveExerciseNote, skipSet, unskipSet } from "@/lib/actions/session.actions";
 import type { WorkoutTemplateExerciseWithExercise, SetLog, Exercise } from "@/types/app.types";
 
+import type { LastPerformance } from "@/lib/queries/session.queries";
+
 interface ExerciseLoggerProps {
   sessionId: string;
   templateExercise: WorkoutTemplateExerciseWithExercise;
@@ -19,6 +21,7 @@ interface ExerciseLoggerProps {
   isSkipped: boolean;
   onSkip: () => void;
   initialNote?: string;
+  lastPerformanceByExercise?: Record<string, LastPerformance>;
   onSetResolved?: () => void;
   onSetUnresolved?: () => void;
 }
@@ -33,6 +36,7 @@ export default function ExerciseLogger({
   isSkipped,
   onSkip,
   initialNote = "",
+  lastPerformanceByExercise,
   onSetResolved,
   onSetUnresolved,
 }: ExerciseLoggerProps) {
@@ -69,6 +73,13 @@ export default function ExerciseLogger({
   const setCount = templateExercise.prescribed_sets ?? 3;
   const displayExercise = swappedExercise ?? templateExercise.exercise;
   const exerciseIdOverride = swappedExercise?.id ?? null;
+
+  // Resolve the actual exercise being performed (swapped or original) to look
+  // up its last performance hint. Note: persisted swaps from localStorage are
+  // hydrated async via initialSwappedExercise, so on first render of a swapped
+  // exercise this may briefly show the original's hint until state updates.
+  const resolvedExerciseId = swappedExercise?.id ?? templateExercise.exercise.id;
+  const lastPerformance = lastPerformanceByExercise?.[resolvedExerciseId] ?? null;
 
   const loggedSetCount = existingLogs.filter((l) => l.is_completed).length;
 
@@ -383,6 +394,7 @@ export default function ExerciseLogger({
                 isSkipped={skippedSets.has(setNum)}
                 onSkip={() => handleSetSkip(setNum)}
                 onUnskip={() => handleSetUnskip(setNum)}
+                lastPerformance={lastPerformance}
               />
             );
           });

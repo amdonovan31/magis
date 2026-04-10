@@ -1,4 +1,4 @@
-import { getSession } from "@/lib/queries/session.queries";
+import { getSession, getLastPerformanceForExercises } from "@/lib/queries/session.queries";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import WorkoutClient from "@/components/workout/WorkoutClient";
@@ -62,6 +62,19 @@ export default async function WorkoutPage({ params }: WorkoutPageProps) {
     .single();
   const preferredUnit = (profile?.preferred_unit as "kg" | "lbs") ?? "lbs";
 
+  // Fetch last performance for each exercise in the workout (excluding current session)
+  const exerciseIds = Array.from(
+    new Set(
+      (template?.exercises ?? [])
+        .map((te) => te.exercise?.id)
+        .filter((id): id is string => !!id)
+    )
+  );
+  const lastPerformanceByExercise = await getLastPerformanceForExercises(
+    exerciseIds,
+    sessionId
+  );
+
   const totalSets = template?.exercises?.reduce(
     (sum, te) => sum + (te.prescribed_sets ?? 0),
     0
@@ -98,6 +111,7 @@ export default async function WorkoutPage({ params }: WorkoutPageProps) {
           initialExtraWork={extraWork}
           initialResolvedSets={resolvedSets}
           totalSets={totalSets}
+          lastPerformanceByExercise={lastPerformanceByExercise}
         />
       )}
 
