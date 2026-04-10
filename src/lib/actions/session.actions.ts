@@ -63,6 +63,35 @@ export async function saveRetroLog(input: {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Unauthorized" };
 
+  // Refuse to save an empty workout — at least one set must have reps or weight.
+  // Prevents accidental empty saves (e.g. user opens retro log then backs out).
+  const hasAnyData = input.sets.some(
+    (s) => (s.reps != null && s.reps > 0) || (s.weight != null && s.weight > 0)
+  );
+  if (!hasAnyData) {
+    return { error: "Enter at least one set before saving." };
+  }
+
+  // Refuse to create a duplicate session for the same scheduled workout.
+  // If a session already exists (in_progress or completed) for this template+client,
+  // surface an error instead of silently creating an orphan.
+  const { data: existingSession } = await supabase
+    .from("workout_sessions")
+    .select("id, status")
+    .eq("client_id", user.id)
+    .eq("workout_template_id", input.workoutTemplateId)
+    .in("status", ["in_progress", "completed"])
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingSession) {
+    if (existingSession.status === "completed") {
+      return { error: "This workout has already been logged." };
+    }
+    return { error: "You have an in-progress session for this workout. Resume it from the calendar." };
+  }
+
   // Create a completed session
   const { data: session, error: sessionError } = await supabase
     .from("workout_sessions")
@@ -184,6 +213,52 @@ export async function skipExercise(sessionId: string, templateExerciseId: string
   return { success: true };
 }
 
+export async function deleteSession(sessionId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
+  // Verify caller owns the session before doing anything destructive
+  const { data: session } = await supabase
+    .from("workout_sessions")
+    .select("id, workout_template_id, started_at")
+    .eq("id", sessionId)
+    .eq("client_id", user.id)
+    .maybeSingle();
+
+  if (!session) return { error: "Session not found" };
+
+  // Reset the linked scheduled_workouts row so the day becomes loggable again.
+  // Match by template + client + the session's started date (not session_id —
+  // that's only set on completion, and may be null for in-progress sessions).
+  if (session.workout_template_id && session.started_at) {
+    const startedDate = session.started_at.slice(0, 10); // YYYY-MM-DD
+    await supabase
+      .from("scheduled_workouts")
+      .update({ status: "scheduled", session_id: null })
+      .eq("client_id", user.id)
+      .eq("workout_template_id", session.workout_template_id)
+      .eq("scheduled_date", startedDate);
+  }
+
+  // Delete the session — FK cascades handle set_logs, session_exercise_notes,
+  // session_extra_work, and personal_records.session_id (set null).
+  const { error } = await supabase
+    .from("workout_sessions")
+    .delete()
+    .eq("id", sessionId)
+    .eq("client_id", user.id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/history");
+  revalidatePath("/calendar");
+  revalidatePath("/home");
+  return { success: true };
+}
+
 export async function saveExerciseNote(
   sessionId: string,
   templateExerciseId: string,
@@ -268,6 +343,64 @@ export async function logSet(data: {
   return { success: true, id: result?.id };
 }
 
+export async function skipSet(
+  sessionId: string,
+  templateExerciseId: string,
+  setNumber: number
+) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
+  const { error } = await supabase
+    .from("set_logs")
+    .upsert(
+      {
+        session_id: sessionId,
+        template_exercise_id: templateExerciseId,
+        set_number: setNumber,
+        is_skipped: true,
+        is_completed: false,
+        logged_at: new Date().toISOString(),
+      },
+      { onConflict: "session_id,template_exercise_id,set_number" }
+    );
+
+  if (error) return { error: error.message };
+  return { success: true };
+}
+
+export async function unskipSet(
+  sessionId: string,
+  templateExerciseId: string,
+  setNumber: number
+) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
+  const { error } = await supabase
+    .from("set_logs")
+    .upsert(
+      {
+        session_id: sessionId,
+        template_exercise_id: templateExerciseId,
+        set_number: setNumber,
+        is_skipped: false,
+        is_completed: false,
+        logged_at: new Date().toISOString(),
+      },
+      { onConflict: "session_id,template_exercise_id,set_number" }
+    );
+
+  if (error) return { error: error.message };
+  return { success: true };
+}
+
 export async function completeSession(sessionId: string) {
   const supabase = await createClient();
   const {
@@ -284,6 +417,19 @@ export async function completeSession(sessionId: string) {
     .single();
 
   if (!session) return { error: "Session not found" };
+
+  // Refuse to complete a session with no logged sets.
+  // Prevents accidental empty completions (e.g. user backgrounds the app).
+  const { count: completedSetCount } = await supabase
+    .from("set_logs")
+    .select("id", { count: "exact", head: true })
+    .eq("session_id", sessionId)
+    .eq("is_completed", true)
+    .eq("is_skipped", false);
+
+  if ((completedSetCount ?? 0) === 0) {
+    return { error: "Log at least one set before completing this workout." };
+  }
 
   const now = new Date();
   const startedAt = new Date(session.started_at);
@@ -315,7 +461,7 @@ export async function completeSession(sessionId: string) {
       .eq("status", "scheduled");
   }
 
-  // Detect PRs — fetch all completed set_logs for this session
+  // Detect PRs — fetch completed (non-skipped) set_logs for this session
   const { data: setLogs } = await supabase
     .from("set_logs")
     .select(`
@@ -328,7 +474,8 @@ export async function completeSession(sessionId: string) {
       is_completed
     `)
     .eq("session_id", sessionId)
-    .eq("is_completed", true);
+    .eq("is_completed", true)
+    .eq("is_skipped", false);
 
   if (setLogs && setLogs.length > 0) {
     // Get the exercise IDs from template_exercise_ids

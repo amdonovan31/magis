@@ -3,13 +3,10 @@ import { getClientHistory } from "@/lib/queries/session.queries";
 import { getAllPRs } from "@/lib/queries/pr.queries";
 import { getMeasurements } from "@/lib/queries/measurements.queries";
 import { getWeeklyVolume } from "@/lib/queries/volume.queries";
-import Link from "next/link";
 import TopBar from "@/components/layout/TopBar";
-import Card from "@/components/ui/Card";
-import Badge from "@/components/ui/Badge";
-import { formatDate, formatRelativeTime } from "@/lib/utils/date";
 import type { WorkoutSession } from "@/types/app.types";
 import HistoryTabs from "@/components/pr/HistoryTabs";
+import HistoryCard from "@/components/workout/HistoryCard";
 import MeasurementsHistory from "@/components/measurements/MeasurementsHistory";
 import VolumeCharts from "@/components/volume/VolumeCharts";
 
@@ -31,48 +28,20 @@ function WorkoutsList({ sessions }: { sessions: SessionWithTemplate[] }) {
 
   return (
     <div className="flex flex-col gap-2">
-      {sessions.map((session) => {
-        const card = (
-          <Card className="flex items-start justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="font-medium text-primary">
-                {session.workout_template?.title ?? "Workout"}
-              </p>
-              {session.started_at && (
-                <p className="text-sm text-primary/60">
-                  {formatDate(session.started_at)}
-                </p>
-              )}
-              {session.started_at && (
-                <p className="text-xs text-primary/40 mt-0.5">
-                  {formatRelativeTime(session.started_at)}
-                </p>
-              )}
-            </div>
-            <Badge
-              variant={
-                session.status === "completed"
-                  ? "success"
-                  : session.status === "skipped"
-                    ? "warning"
-                    : "default"
-              }
-            >
-              {session.status}
-            </Badge>
-          </Card>
-        );
-
-        if (session.status === "completed") {
-          return (
-            <Link key={session.id} href={`/workout/${session.id}/summary`} className="active:scale-[0.98] transition-transform">
-              {card}
-            </Link>
-          );
-        }
-
-        return <div key={session.id}>{card}</div>;
-      })}
+      {sessions.map((session) => (
+        <HistoryCard
+          key={session.id}
+          session={{
+            id: session.id,
+            started_at: session.started_at,
+            status: session.status,
+            workout_template: session.workout_template,
+          }}
+        />
+      ))}
+      <p className="text-[10px] text-center text-primary/30 mt-2">
+        Swipe left on a workout to delete
+      </p>
     </div>
   );
 }

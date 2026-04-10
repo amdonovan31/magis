@@ -22,33 +22,38 @@ export async function GET(request: NextRequest) {
   }
 
   const user = data.user;
-  const role = user.app_metadata?.role as
-    | "coach"
-    | "client"
-    | "solo"
-    | undefined;
+  // Role can come from app_metadata (set by trigger) or user_metadata (set by
+  // inviteUserByEmail). For fresh invites the JWT predates the trigger, so
+  // app_metadata.role is often undefined here. Default to "client".
+  const role =
+    (user.app_metadata?.role as "coach" | "client" | "solo" | undefined) ??
+    (user.user_metadata?.role as "coach" | "client" | "solo" | undefined) ??
+    "client";
 
-  // Clients and solo users who haven't completed onboarding
-  if (role === "client" || role === "solo") {
-    const { data: profile } = await supabase
+  // Read profile with retry — handle_new_user trigger may not have completed
+  let profile: { onboarding_complete: boolean | null; roles: string[] } | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { data: p } = await supabase
       .from("profiles")
-      .select("onboarding_complete")
+      .select("onboarding_complete, roles")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
+    if (p) {
+      profile = p as { onboarding_complete: boolean | null; roles: string[] };
+      break;
+    }
+    if (attempt < 2) await new Promise((r) => setTimeout(r, 100));
+  }
 
+  // Clients and solo users go to onboarding unless explicitly complete
+  if (role === "client" || role === "solo") {
     if (!profile?.onboarding_complete) {
       return NextResponse.redirect(`${origin}/onboarding`);
     }
   }
 
   // Multi-role users see the role picker
-  const { data: profileData } = await supabase
-    .from("profiles")
-    .select("roles")
-    .eq("id", user.id)
-    .single();
-
-  if (profileData && profileData.roles.length > 1) {
+  if (profile && profile.roles && profile.roles.length > 1) {
     return NextResponse.redirect(`${origin}/choose-role`);
   }
 

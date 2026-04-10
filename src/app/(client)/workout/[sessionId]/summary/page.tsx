@@ -78,7 +78,9 @@ export default async function SummaryPage({ params }: SummaryPageProps) {
             <p className="text-2xl font-bold text-primary">
               {summary.setsCompleted}/{summary.totalSets}
             </p>
-            <p className="text-xs text-primary/50 mt-1">Sets</p>
+            <p className="text-xs text-primary/50 mt-1">
+              Sets{summary.skippedSetCount > 0 ? ` (${summary.skippedSetCount} skipped)` : ""}
+            </p>
           </Card>
           {summary.totalVolume > 0 && (
             <Card padding="md" className="text-center">

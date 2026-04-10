@@ -35,5 +35,20 @@ export default async function EditProgramPage({
     clientName = clientProfile?.full_name ?? null;
   }
 
-  return <ProgramEditor program={program} exercises={exercises} clientName={clientName} />;
+  // Fetch future scheduled workouts (non-started) for date editing
+  const { data: scheduledWorkouts } = await supabase
+    .from("scheduled_workouts")
+    .select("id, workout_template_id, scheduled_date, status")
+    .eq("program_id", programId)
+    .eq("status", "scheduled")
+    .order("scheduled_date", { ascending: true });
+
+  return (
+    <ProgramEditor
+      program={program}
+      exercises={exercises}
+      clientName={clientName}
+      scheduledWorkouts={scheduledWorkouts ?? []}
+    />
+  );
 }

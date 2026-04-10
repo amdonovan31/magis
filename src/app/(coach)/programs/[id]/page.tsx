@@ -62,6 +62,13 @@ export default async function ProgramDetailPage({
           )}
         </div>
 
+        <Link
+          href={`/programs/${id}/edit`}
+          className="flex items-center justify-center rounded-xl border border-primary/20 py-3 text-sm font-semibold text-primary hover:bg-primary/5 transition-colors"
+        >
+          Edit Program
+        </Link>
+
         <h3 className="text-sm font-semibold uppercase tracking-wide text-primary/50">
           Workout Days
         </h3>

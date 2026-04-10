@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import TopBar from "@/components/layout/TopBar";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import Modal from "@/components/ui/Modal";
 import EditableExerciseRow from "@/components/coach/EditableExerciseRow";
 import ExerciseSearchModal from "@/components/coach/ExerciseSearchModal";
 import PublishBar from "@/components/coach/PublishBar";
@@ -18,7 +21,9 @@ import {
   addTemplateExercise,
   removeTemplateExercise,
   reorderTemplateExercise,
+  applyProgramEdits,
 } from "@/lib/actions/program.actions";
+import type { ProgramEditChanges } from "@/lib/actions/program.actions";
 
 const DAYS_OF_WEEK = [
   { label: "Sun", value: 0 },
@@ -30,13 +35,37 @@ const DAYS_OF_WEEK = [
   { label: "Sat", value: 6 },
 ] as const;
 
+interface ScheduledWorkoutRow {
+  id: string;
+  workout_template_id: string;
+  scheduled_date: string;
+  status: string;
+}
+
 interface Props {
   program: ProgramWithTemplates;
   exercises: ExerciseOption[];
   clientName?: string | null;
+  scheduledWorkouts?: ScheduledWorkoutRow[];
 }
 
-export default function ProgramEditor({ program: initialProgram, exercises, clientName }: Props) {
+function emptyChanges(): ProgramEditChanges {
+  return {
+    exerciseUpdates: [],
+    exerciseSwaps: [],
+    exerciseAdds: [],
+    exerciseRemoves: [],
+    templateUpdates: [],
+    dateChanges: [],
+  };
+}
+
+export default function ProgramEditor({
+  program: initialProgram,
+  exercises,
+  clientName,
+  scheduledWorkouts = [],
+}: Props) {
   const router = useRouter();
   const [program, setProgram] = useState(initialProgram);
   const [status, setStatus] = useState(initialProgram.status);
@@ -44,25 +73,42 @@ export default function ProgramEditor({ program: initialProgram, exercises, clie
   const [saving, setSaving] = useState(false);
   const [, startTransition] = useTransition();
 
+  // Published edit mode state
+  const isPublished = status === "published";
+  const [editMode, setEditMode] = useState(false);
+  const [pendingChanges, setPendingChanges] = useState<ProgramEditChanges>(emptyChanges);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [localDates, setLocalDates] = useState<Record<string, string>>(() => {
+    const map: Record<string, string> = {};
+    for (const sw of scheduledWorkouts) {
+      // Use first upcoming date per template
+      if (!map[sw.workout_template_id]) {
+        map[sw.workout_template_id] = sw.scheduled_date;
+      }
+    }
+    return map;
+  });
+
   // Exercise search modal state
   const [searchModal, setSearchModal] = useState<{
     open: boolean;
     mode: "swap" | "add";
-    targetId?: string; // template_exercise_id for swap, workout_template_id for add
+    targetId?: string;
     excludeIds?: string[];
   }>({ open: false, mode: "add" });
 
   const debounceRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
-  // Get unique week numbers
   const weekNumbers = Array.from(new Set(program.workout_templates.map((t) => t.week_number))).sort((a, b) => a - b);
-
-  // Templates for the active week
   const weekTemplates = program.workout_templates
     .filter((t) => t.week_number === activeWeek)
     .sort((a, b) => (a.day_number ?? 0) - (b.day_number ?? 0));
 
-  // ── Debounced field update helper ──
+  // ═══════════════════════════════════════════
+  // DRAFT MODE: debounced auto-save (unchanged)
+  // ═══════════════════════════════════════════
+
   function debouncedAction(key: string, fn: () => Promise<unknown>, delayMs = 300) {
     const existing = debounceRefs.current.get(key);
     if (existing) clearTimeout(existing);
@@ -78,26 +124,46 @@ export default function ProgramEditor({ program: initialProgram, exercises, clie
     );
   }
 
-  // ── Template updates ──
+  // ═══════════════════════════════════════════
+  // SHARED HANDLERS (route to draft or buffered)
+  // ═══════════════════════════════════════════
+
   const handleUpdateTemplate = useCallback(
     (templateId: string, data: { title?: string; notes?: string | null; scheduled_days?: number[] | null }) => {
-      // Optimistic update
       setProgram((prev) => ({
         ...prev,
         workout_templates: prev.workout_templates.map((t) =>
           t.id === templateId ? { ...t, ...data } : t
         ),
       }));
-      debouncedAction(`template-${templateId}`, () => updateWorkoutTemplate(templateId, data));
+
+      if (isPublished && editMode) {
+        // Buffer the change
+        setPendingChanges((prev) => {
+          const existing = prev.templateUpdates.find((u) => u.id === templateId);
+          if (existing) {
+            return {
+              ...prev,
+              templateUpdates: prev.templateUpdates.map((u) =>
+                u.id === templateId ? { ...u, ...data } : u
+              ),
+            };
+          }
+          return {
+            ...prev,
+            templateUpdates: [...prev.templateUpdates, { id: templateId, ...data } as ProgramEditChanges["templateUpdates"][0]],
+          };
+        });
+      } else {
+        debouncedAction(`template-${templateId}`, () => updateWorkoutTemplate(templateId, data));
+      }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
+    [isPublished, editMode]
   );
 
-  // ── Exercise field updates ──
   const handleUpdateExerciseField = useCallback(
     (exerciseId: string, data: Record<string, unknown>) => {
-      // Optimistic update
       setProgram((prev) => ({
         ...prev,
         workout_templates: prev.workout_templates.map((t) => ({
@@ -107,10 +173,29 @@ export default function ProgramEditor({ program: initialProgram, exercises, clie
           ),
         })),
       }));
-      debouncedAction(`exercise-${exerciseId}`, () => updateTemplateExercise(exerciseId, data));
+
+      if (isPublished && editMode) {
+        setPendingChanges((prev) => {
+          const existing = prev.exerciseUpdates.find((u) => u.id === exerciseId);
+          if (existing) {
+            return {
+              ...prev,
+              exerciseUpdates: prev.exerciseUpdates.map((u) =>
+                u.id === exerciseId ? { ...u, ...data } as ProgramEditChanges["exerciseUpdates"][0] : u
+              ),
+            };
+          }
+          return {
+            ...prev,
+            exerciseUpdates: [...prev.exerciseUpdates, { id: exerciseId, ...data } as ProgramEditChanges["exerciseUpdates"][0]],
+          };
+        });
+      } else {
+        debouncedAction(`exercise-${exerciseId}`, () => updateTemplateExercise(exerciseId, data));
+      }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
+    [isPublished, editMode]
   );
 
   // ── Swap exercise ──
@@ -126,7 +211,6 @@ export default function ProgramEditor({ program: initialProgram, exercises, clie
     if (!searchModal.targetId) return;
     const targetId = searchModal.targetId;
 
-    // Optimistic update
     setProgram((prev) => ({
       ...prev,
       workout_templates: prev.workout_templates.map((t) => ({
@@ -139,9 +223,19 @@ export default function ProgramEditor({ program: initialProgram, exercises, clie
       })),
     }));
 
-    startTransition(async () => {
-      await swapTemplateExercise(targetId, exercise.id);
-    });
+    if (isPublished && editMode) {
+      setPendingChanges((prev) => ({
+        ...prev,
+        exerciseSwaps: [
+          ...prev.exerciseSwaps.filter((s) => s.id !== targetId),
+          { id: targetId, new_exercise_id: exercise.id },
+        ],
+      }));
+    } else {
+      startTransition(async () => {
+        await swapTemplateExercise(targetId, exercise.id);
+      });
+    }
   }
 
   // ── Add exercise ──
@@ -155,18 +249,53 @@ export default function ProgramEditor({ program: initialProgram, exercises, clie
     if (!searchModal.targetId) return;
     const workoutTemplateId = searchModal.targetId;
 
-    startTransition(async () => {
-      const res = await addTemplateExercise(workoutTemplateId, exercise.id);
-      if (!res.error) {
-        // Refresh from server to get the new exercise with all relations
-        router.refresh();
-      }
-    });
+    if (isPublished && editMode) {
+      // Add to local preview
+      const template = program.workout_templates.find((t) => t.id === workoutTemplateId);
+      const maxPos = template?.exercises.reduce((max, e) => Math.max(max, e.position), 0) ?? 0;
+      const tempId = `pending-${Date.now()}`;
+
+      setProgram((prev) => ({
+        ...prev,
+        workout_templates: prev.workout_templates.map((t) =>
+          t.id === workoutTemplateId
+            ? {
+                ...t,
+                exercises: [
+                  ...t.exercises,
+                  {
+                    id: tempId,
+                    workout_template_id: workoutTemplateId,
+                    exercise_id: exercise.id,
+                    exercise: { name: exercise.name, muscle_group: exercise.muscle_group, id: exercise.id },
+                    position: maxPos + 1,
+                    prescribed_sets: 3,
+                    prescribed_reps: "8-12",
+                    prescribed_weight: null,
+                    rest_seconds: 90,
+                    notes: null,
+                    alternate_exercise_ids: null,
+                  } as unknown as ProgramWithTemplates["workout_templates"][0]["exercises"][0],
+                ],
+              }
+            : t
+        ),
+      }));
+
+      setPendingChanges((prev) => ({
+        ...prev,
+        exerciseAdds: [...prev.exerciseAdds, { workout_template_id: workoutTemplateId, exercise_id: exercise.id }],
+      }));
+    } else {
+      startTransition(async () => {
+        const res = await addTemplateExercise(workoutTemplateId, exercise.id);
+        if (!res.error) router.refresh();
+      });
+    }
   }
 
   // ── Remove exercise ──
   function handleRemove(templateExerciseId: string) {
-    // Optimistic update
     setProgram((prev) => ({
       ...prev,
       workout_templates: prev.workout_templates.map((t) => ({
@@ -177,14 +306,20 @@ export default function ProgramEditor({ program: initialProgram, exercises, clie
       })),
     }));
 
-    startTransition(async () => {
-      await removeTemplateExercise(templateExerciseId);
-    });
+    if (isPublished && editMode) {
+      setPendingChanges((prev) => ({
+        ...prev,
+        exerciseRemoves: [...prev.exerciseRemoves, templateExerciseId],
+      }));
+    } else {
+      startTransition(async () => {
+        await removeTemplateExercise(templateExerciseId);
+      });
+    }
   }
 
   // ── Reorder exercise ──
   function handleReorder(templateExerciseId: string, direction: "up" | "down") {
-    // Optimistic update
     setProgram((prev) => ({
       ...prev,
       workout_templates: prev.workout_templates.map((t) => {
@@ -192,22 +327,21 @@ export default function ProgramEditor({ program: initialProgram, exercises, clie
         if (idx === -1) return t;
         const swapIdx = direction === "up" ? idx - 1 : idx + 1;
         if (swapIdx < 0 || swapIdx >= t.exercises.length) return t;
-
         const newExercises = [...t.exercises];
         const temp = newExercises[idx];
         newExercises[idx] = newExercises[swapIdx];
         newExercises[swapIdx] = temp;
-        // Update positions
-        return {
-          ...t,
-          exercises: newExercises.map((e, i) => ({ ...e, position: i + 1 })),
-        };
+        return { ...t, exercises: newExercises.map((e, i) => ({ ...e, position: i + 1 })) };
       }),
     }));
 
-    startTransition(async () => {
-      await reorderTemplateExercise(templateExerciseId, direction);
-    });
+    if (!(isPublished && editMode)) {
+      startTransition(async () => {
+        await reorderTemplateExercise(templateExerciseId, direction);
+      });
+    }
+    // In buffered mode, reorder is reflected in the local preview only.
+    // Full position sync happens on save via exercise updates.
   }
 
   // ── Modal select handler ──
@@ -219,7 +353,66 @@ export default function ProgramEditor({ program: initialProgram, exercises, clie
     }
   }
 
-  const isPublished = status === "published";
+  // ── Date change (published edit mode only) ──
+  function handleDateChange(scheduledWorkoutId: string, templateId: string, newDate: string) {
+    setLocalDates((prev) => ({ ...prev, [templateId]: newDate }));
+    setPendingChanges((prev) => ({
+      ...prev,
+      dateChanges: [
+        ...prev.dateChanges.filter((d) => d.scheduled_workout_id !== scheduledWorkoutId),
+        { scheduled_workout_id: scheduledWorkoutId, new_date: newDate },
+      ],
+    }));
+  }
+
+  // ── Save published edits ──
+  function handlePreSave() {
+    setSaveError(null);
+
+    // Intra-edit date conflict check
+    const dates = pendingChanges.dateChanges.map((d) => d.new_date);
+    const dups = dates.filter((d, i) => dates.indexOf(d) !== i);
+    if (dups.length > 0) {
+      setSaveError(`Date conflict: multiple workouts scheduled for ${dups[0]}`);
+      return;
+    }
+
+    setShowConfirmDialog(true);
+  }
+
+  async function handleConfirmSave() {
+    setShowConfirmDialog(false);
+    setSaving(true);
+    setSaveError(null);
+
+    const result = await applyProgramEdits(program.id, pendingChanges);
+
+    if (result.error) {
+      setSaveError(result.error);
+      setSaving(false);
+      return;
+    }
+
+    setPendingChanges(emptyChanges());
+    setEditMode(false);
+    setSaving(false);
+    router.refresh();
+  }
+
+  function handleCancelEdit() {
+    setProgram(initialProgram);
+    setPendingChanges(emptyChanges());
+    setSaveError(null);
+    setEditMode(false);
+    // Reset local dates
+    const map: Record<string, string> = {};
+    for (const sw of scheduledWorkouts) {
+      if (!map[sw.workout_template_id]) map[sw.workout_template_id] = sw.scheduled_date;
+    }
+    setLocalDates(map);
+  }
+
+  const inEditMode = isPublished && editMode;
 
   return (
     <>
@@ -227,10 +420,16 @@ export default function ProgramEditor({ program: initialProgram, exercises, clie
         title="Edit Program"
         left={
           <button
-            onClick={() => router.back()}
+            onClick={() => {
+              if (inEditMode) {
+                handleCancelEdit();
+              } else {
+                router.back();
+              }
+            }}
             className="text-sm text-primary/60 hover:text-primary"
           >
-            &larr; Back
+            {inEditMode ? "Cancel" : "← Back"}
           </button>
         }
         right={
@@ -246,16 +445,41 @@ export default function ProgramEditor({ program: initialProgram, exercises, clie
       />
 
       <div className="flex flex-col gap-4 px-4 pt-4 pb-32">
+        {/* Published edit mode banner */}
+        {inEditMode && (
+          <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
+            <p className="text-xs font-medium text-amber-800">
+              Editing a published program. Changes will apply to all upcoming sessions when saved.
+            </p>
+          </div>
+        )}
+
+        {/* Save error */}
+        {saveError && (
+          <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3">
+            <p className="text-xs font-medium text-red-800">{saveError}</p>
+          </div>
+        )}
+
+        {/* Enter edit mode button for published programs */}
+        {isPublished && !editMode && (
+          <Button
+            variant="secondary"
+            fullWidth
+            onClick={() => setEditMode(true)}
+          >
+            Edit Program
+          </Button>
+        )}
+
         {/* Program header */}
         <Card padding="lg">
           <input
             type="text"
             defaultValue={program.title}
-            onChange={() => {
-              // Title updates go directly to program table — but we don't have an action for that yet
-            }}
+            onChange={() => {}}
             className="w-full bg-transparent font-heading text-xl font-semibold text-primary focus:outline-none"
-            readOnly={isPublished}
+            readOnly={isPublished && !editMode}
           />
           {program.description && (
             <p className="mt-1 text-sm text-muted">{program.description}</p>
@@ -287,136 +511,189 @@ export default function ProgramEditor({ program: initialProgram, exercises, clie
         </div>
 
         {/* Workouts for active week */}
-        {weekTemplates.map((template) => (
-          <Card key={template.id} padding="md">
-            {/* Workout header */}
-            <div className="mb-3 flex items-start justify-between gap-2">
-              <div className="flex-1 min-w-0">
-                {isPublished ? (
-                  <h3 className="font-heading text-base font-semibold text-primary">
-                    {template.title}
-                  </h3>
-                ) : (
-                  <input
-                    type="text"
-                    defaultValue={template.title}
-                    onBlur={(e) => handleUpdateTemplate(template.id, { title: e.target.value })}
-                    className="w-full bg-transparent font-heading text-base font-semibold text-primary focus:outline-none focus:border-b focus:border-primary/20"
-                  />
-                )}
-                {/* Notes / focus */}
-                {isPublished ? (
-                  template.notes && (
-                    <p className="mt-0.5 text-xs text-primary/40">{template.notes}</p>
-                  )
-                ) : (
-                  <input
-                    type="text"
-                    defaultValue={template.notes ?? ""}
-                    onBlur={(e) => handleUpdateTemplate(template.id, { notes: e.target.value || null })}
-                    placeholder="Add notes..."
-                    className="mt-0.5 w-full bg-transparent text-xs text-primary/40 placeholder:text-primary/20 focus:outline-none focus:text-primary/60"
-                  />
-                )}
-              </div>
-              {/* Day of week selector */}
-              <div className="flex gap-0.5 shrink-0">
-                {DAYS_OF_WEEK.map((day) => {
-                  const isActive = template.scheduled_days?.includes(day.value);
-                  return (
-                    <button
-                      key={day.value}
-                      type="button"
-                      disabled={isPublished}
-                      onClick={() => {
-                        const current = template.scheduled_days ?? [];
-                        const newDays = isActive
-                          ? current.filter((d) => d !== day.value)
-                          : [...current, day.value].sort();
-                        handleUpdateTemplate(template.id, { scheduled_days: newDays.length > 0 ? newDays : null });
-                      }}
-                      className={`h-6 w-6 rounded text-[9px] font-medium transition-colors ${
-                        isActive
-                          ? "bg-primary text-white"
-                          : "bg-primary/5 text-primary/30 hover:bg-primary/10"
-                      } disabled:cursor-default`}
-                    >
-                      {day.label[0]}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+        {weekTemplates.map((template) => {
+          const canEdit = !isPublished || editMode;
+          const swForTemplate = scheduledWorkouts.find((sw) => sw.workout_template_id === template.id);
 
-            {/* Exercises */}
-            <div className="flex flex-col gap-1.5">
-              {template.exercises
-                .sort((a, b) => a.position - b.position)
-                .map((ex, i) =>
-                  isPublished ? (
-                    // Read-only view when published
-                    <div
-                      key={ex.id}
-                      className="flex items-center justify-between rounded-lg bg-bg/50 px-3 py-2"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-primary truncate">
-                          {ex.exercise.name}
-                        </p>
-                      </div>
-                      <div className="ml-3 shrink-0 text-right text-xs text-primary/60">
-                        <span>{ex.prescribed_sets} &times; {ex.prescribed_reps}</span>
-                        <span className="ml-2 text-primary/30">{ex.rest_seconds}s</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <EditableExerciseRow
-                      key={ex.id}
-                      exercise={ex}
-                      isFirst={i === 0}
-                      isLast={i === template.exercises.length - 1}
-                      onUpdateField={handleUpdateExerciseField}
-                      onSwap={handleSwapClick}
-                      onRemove={handleRemove}
-                      onReorder={handleReorder}
+          return (
+            <Card key={template.id} padding="md">
+              {/* Workout header */}
+              <div className="mb-3 flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  {canEdit ? (
+                    <input
+                      type="text"
+                      defaultValue={template.title}
+                      onBlur={(e) => handleUpdateTemplate(template.id, { title: e.target.value })}
+                      className="w-full bg-transparent font-heading text-base font-semibold text-primary focus:outline-none focus:border-b focus:border-primary/20"
                     />
-                  )
-                )}
-            </div>
+                  ) : (
+                    <h3 className="font-heading text-base font-semibold text-primary">
+                      {template.title}
+                    </h3>
+                  )}
+                  {canEdit ? (
+                    <input
+                      type="text"
+                      defaultValue={template.notes ?? ""}
+                      onBlur={(e) => handleUpdateTemplate(template.id, { notes: e.target.value || null })}
+                      placeholder="Add notes..."
+                      className="mt-0.5 w-full bg-transparent text-xs text-primary/40 placeholder:text-primary/20 focus:outline-none focus:text-primary/60"
+                    />
+                  ) : (
+                    template.notes && (
+                      <p className="mt-0.5 text-xs text-primary/40">{template.notes}</p>
+                    )
+                  )}
+                </div>
+                {/* Day of week selector */}
+                <div className="flex gap-0.5 shrink-0">
+                  {DAYS_OF_WEEK.map((day) => {
+                    const isActive = template.scheduled_days?.includes(day.value);
+                    return (
+                      <button
+                        key={day.value}
+                        type="button"
+                        disabled={!canEdit}
+                        onClick={() => {
+                          const current = template.scheduled_days ?? [];
+                          const newDays = isActive
+                            ? current.filter((d) => d !== day.value)
+                            : [...current, day.value].sort();
+                          handleUpdateTemplate(template.id, { scheduled_days: newDays.length > 0 ? newDays : null });
+                        }}
+                        className={`h-6 w-6 rounded text-[9px] font-medium transition-colors ${
+                          isActive
+                            ? "bg-primary text-white"
+                            : "bg-primary/5 text-primary/30 hover:bg-primary/10"
+                        } disabled:cursor-default`}
+                      >
+                        {day.label[0]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
-            {/* Add exercise button */}
-            {!isPublished && (
-              <button
-                type="button"
-                onClick={() => handleAddClick(template.id)}
-                className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-dashed border-primary/15 py-2 text-xs font-medium text-primary/40 transition-colors hover:border-primary/30 hover:text-primary/60"
-              >
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                </svg>
-                Add Exercise
-              </button>
-            )}
-          </Card>
-        ))}
+              {/* Scheduled date (edit mode only, published programs) */}
+              {inEditMode && swForTemplate && (
+                <div className="mb-3">
+                  <Input
+                    type="date"
+                    label="Next scheduled date"
+                    value={localDates[template.id] ?? swForTemplate.scheduled_date}
+                    onChange={(e) => handleDateChange(swForTemplate.id, template.id, e.target.value)}
+                  />
+                </div>
+              )}
+
+              {/* Exercises */}
+              <div className="flex flex-col gap-1.5">
+                {template.exercises
+                  .sort((a, b) => a.position - b.position)
+                  .map((ex, i) =>
+                    canEdit ? (
+                      <EditableExerciseRow
+                        key={ex.id}
+                        exercise={ex}
+                        isFirst={i === 0}
+                        isLast={i === template.exercises.length - 1}
+                        onUpdateField={handleUpdateExerciseField}
+                        onSwap={handleSwapClick}
+                        onRemove={handleRemove}
+                        onReorder={handleReorder}
+                      />
+                    ) : (
+                      <div
+                        key={ex.id}
+                        className="flex items-center justify-between rounded-lg bg-bg/50 px-3 py-2"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-primary truncate">
+                            {ex.exercise.name}
+                          </p>
+                        </div>
+                        <div className="ml-3 shrink-0 text-right text-xs text-primary/60">
+                          <span>{ex.prescribed_sets} &times; {ex.prescribed_reps}</span>
+                          <span className="ml-2 text-primary/30">{ex.rest_seconds}s</span>
+                        </div>
+                      </div>
+                    )
+                  )}
+              </div>
+
+              {/* Add exercise button */}
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={() => handleAddClick(template.id)}
+                  className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-dashed border-primary/15 py-2 text-xs font-medium text-primary/40 transition-colors hover:border-primary/30 hover:text-primary/60"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add Exercise
+                </button>
+              )}
+            </Card>
+          );
+        })}
       </div>
 
-      {/* Delete program */}
-      <div className="px-4 pb-4">
-        <DeleteProgramButton
+      {/* Delete program (not in edit mode) */}
+      {!inEditMode && (
+        <div className="px-4 pb-4">
+          <DeleteProgramButton
+            programId={program.id}
+            programName={program.title}
+            clientName={clientName}
+            status={status}
+          />
+        </div>
+      )}
+
+      {/* Bottom bar: Publish (draft) or Save/Cancel (published edit mode) */}
+      {inEditMode ? (
+        <div className="fixed bottom-0 left-1/2 z-10 w-full max-w-md -translate-x-1/2 bg-surface p-4 pb-safe border-t border-primary/10">
+          <div className="flex gap-3">
+            <Button variant="secondary" fullWidth onClick={handleCancelEdit}>
+              Cancel
+            </Button>
+            <Button fullWidth loading={saving} onClick={handlePreSave}>
+              Save Changes
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <PublishBar
           programId={program.id}
-          programName={program.title}
-          clientName={clientName}
           status={status}
+          onStatusChange={setStatus}
         />
-      </div>
+      )}
 
-      {/* Publish bar */}
-      <PublishBar
-        programId={program.id}
-        status={status}
-        onStatusChange={setStatus}
-      />
+      {/* Confirmation dialog */}
+      <Modal
+        isOpen={showConfirmDialog}
+        onClose={() => setShowConfirmDialog(false)}
+        title="Save Program Changes"
+      >
+        <p className="text-sm text-primary/70 mb-4">
+          Save changes to <strong>{program.title}</strong>?
+          {clientName && (
+            <> This will update all upcoming sessions for <strong>{clientName}</strong>.</>
+          )}
+          {" "}Sessions already started or completed will not be affected.
+        </p>
+        <div className="flex gap-3">
+          <Button variant="secondary" fullWidth onClick={() => setShowConfirmDialog(false)}>
+            Cancel
+          </Button>
+          <Button fullWidth loading={saving} onClick={handleConfirmSave}>
+            Confirm
+          </Button>
+        </div>
+      </Modal>
 
       {/* Exercise search modal */}
       <ExerciseSearchModal

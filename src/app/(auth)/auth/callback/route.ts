@@ -63,35 +63,47 @@ export async function GET(request: NextRequest) {
 
 async function getRedirectPath(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  user: { id: string; app_metadata: Record<string, unknown> }
+  user: {
+    id: string;
+    app_metadata: Record<string, unknown>;
+    user_metadata?: Record<string, unknown>;
+  }
 ): Promise<string> {
-  const role = user.app_metadata?.role as
-    | "coach"
-    | "client"
-    | "solo"
-    | undefined;
+  // Role can come from app_metadata (set by trigger after profile insert) OR
+  // user_metadata (set by inviteUserByEmail before the trigger runs).
+  // For freshly invited users the JWT was issued before the trigger fired,
+  // so app_metadata.role may be undefined on the first callback hit.
+  const role =
+    (user.app_metadata?.role as "coach" | "client" | "solo" | undefined) ??
+    (user.user_metadata?.role as "coach" | "client" | "solo" | undefined) ??
+    "client"; // Default to client — safest for invited users
 
-  // Clients and solo users who haven't completed onboarding
-  if (role === "client" || role === "solo") {
-    const { data: profile } = await supabase
+  // Read profile with retry — the handle_new_user trigger may not have
+  // completed by the time we query, especially for fresh invites.
+  let profile: { onboarding_complete: boolean | null; roles: string[] } | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { data } = await supabase
       .from("profiles")
-      .select("onboarding_complete")
+      .select("onboarding_complete, roles")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
+    if (data) {
+      profile = data as { onboarding_complete: boolean | null; roles: string[] };
+      break;
+    }
+    if (attempt < 2) await new Promise((r) => setTimeout(r, 100));
+  }
 
+  // Clients and solo users go to onboarding unless explicitly complete.
+  // Treat missing profile or null onboarding_complete as "not complete."
+  if (role === "client" || role === "solo") {
     if (!profile?.onboarding_complete) {
       return "/onboarding";
     }
   }
 
   // Multi-role users see the role picker
-  const { data: profileData } = await supabase
-    .from("profiles")
-    .select("roles")
-    .eq("id", user.id)
-    .single();
-
-  if (profileData && profileData.roles.length > 1) {
+  if (profile && profile.roles && profile.roles.length > 1) {
     return "/choose-role";
   }
 

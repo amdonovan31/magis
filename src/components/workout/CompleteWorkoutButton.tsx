@@ -19,7 +19,9 @@ export default function CompleteWorkoutButton({
   const [loading, setLoading] = useState(false);
 
   async function handleClick() {
-    if (completedSets === 0 && !confirming) {
+    if (completedSets === 0) {
+      // Server-side guard blocks empty completions; surface that requirement here
+      // instead of letting the user attempt and fail silently.
       setConfirming(true);
       return;
     }
@@ -32,27 +34,16 @@ export default function CompleteWorkoutButton({
     return (
       <div className="flex flex-col gap-2">
         <p className="text-center text-sm text-primary/60">
-          You haven&apos;t logged any sets. Complete anyway?
+          Log at least one set before completing this workout.
         </p>
-        <div className="flex gap-2">
-          <Button
-            variant="secondary"
-            fullWidth
-            size="lg"
-            onClick={() => setConfirming(false)}
-          >
-            Keep logging
-          </Button>
-          <Button
-            fullWidth
-            size="lg"
-            variant="accent"
-            loading={loading}
-            onClick={handleClick}
-          >
-            Yes, complete
-          </Button>
-        </div>
+        <Button
+          variant="secondary"
+          fullWidth
+          size="lg"
+          onClick={() => setConfirming(false)}
+        >
+          Keep logging
+        </Button>
       </div>
     );
   }

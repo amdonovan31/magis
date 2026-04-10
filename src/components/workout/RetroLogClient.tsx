@@ -34,6 +34,7 @@ function parseFirstNumber(str: string | null): string {
 export default function RetroLogClient({ workout, weightUnit }: RetroLogClientProps) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const [exerciseSets, setExerciseSets] = useState<Record<string, SetEntry[]>>(() => {
     const init: Record<string, SetEntry[]> = {};
@@ -103,6 +104,7 @@ export default function RetroLogClient({ workout, weightUnit }: RetroLogClientPr
 
   async function handleSave() {
     setSaving(true);
+    setSaveError(null);
 
     const sets = Object.entries(exerciseSets).flatMap(([templateExerciseId, entries]) =>
       entries.map((entry, i) => ({
@@ -130,6 +132,7 @@ export default function RetroLogClient({ workout, weightUnit }: RetroLogClientPr
     });
 
     if (result?.error) {
+      setSaveError(result.error);
       setSaving(false);
       return;
     }
@@ -296,6 +299,11 @@ export default function RetroLogClient({ workout, weightUnit }: RetroLogClientPr
 
       {/* Fixed save button */}
       <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-primary/10 bg-background px-4 py-3 pb-safe">
+        {saveError && (
+          <div className="mb-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2">
+            <p className="text-xs font-medium text-red-800">{saveError}</p>
+          </div>
+        )}
         <Button
           fullWidth
           size="lg"

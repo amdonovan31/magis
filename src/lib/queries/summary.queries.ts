@@ -40,12 +40,14 @@ export async function getSessionSummary(
   const setLogs = (session.set_logs ?? []) as {
     template_exercise_id: string | null;
     is_completed: boolean;
+    is_skipped: boolean;
     reps_completed: number | null;
     weight_used: string | null;
   }[];
 
   const exercises = template?.exercises ?? [];
-  const completedSetLogs = setLogs.filter((l) => l.is_completed);
+  const completedSetLogs = setLogs.filter((l) => l.is_completed && !l.is_skipped);
+  const skippedSetCount = setLogs.filter((l) => l.is_skipped).length;
   const skippedIds: string[] = (session as { skipped_exercises?: string[] }).skipped_exercises ?? [];
 
   // Count exercises that have at least one completed set
@@ -115,6 +117,7 @@ export async function getSessionSummary(
     totalVolume: Math.round(totalVolume),
     weightUnit,
     skippedExercises,
+    skippedSetCount,
     prs: prList,
   };
 }

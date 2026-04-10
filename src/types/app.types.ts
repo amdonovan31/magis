@@ -95,6 +95,7 @@ export type SessionSummary = {
   totalVolume: number;
   weightUnit: string;
   skippedExercises: { id: string; name: string }[];
+  skippedSetCount: number;
   prs: {
     exerciseId: string;
     exerciseName: string;

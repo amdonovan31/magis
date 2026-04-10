@@ -618,3 +618,44 @@ export async function unpublishProgram(
   revalidatePath("/programs");
   return {};
 }
+
+export interface ProgramEditChanges {
+  exerciseUpdates: { id: string; prescribed_sets?: number; prescribed_reps?: string; prescribed_weight?: string; rest_seconds?: number }[];
+  exerciseSwaps: { id: string; new_exercise_id: string }[];
+  exerciseAdds: { workout_template_id: string; exercise_id: string; prescribed_sets?: number; prescribed_reps?: string; rest_seconds?: number }[];
+  exerciseRemoves: string[];
+  templateUpdates: { id: string; title?: string; notes?: string | null; scheduled_days?: number[] | null }[];
+  dateChanges: { scheduled_workout_id: string; new_date: string }[];
+}
+
+export async function applyProgramEdits(
+  programId: string,
+  changes: ProgramEditChanges
+): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
+  const { error } = await supabase.rpc("apply_program_edits", {
+    p_program_id: programId,
+    p_exercise_updates: JSON.parse(JSON.stringify(changes.exerciseUpdates)),
+    p_exercise_swaps: JSON.parse(JSON.stringify(changes.exerciseSwaps)),
+    p_exercise_adds: JSON.parse(JSON.stringify(changes.exerciseAdds)),
+    p_exercise_removes: JSON.parse(JSON.stringify(changes.exerciseRemoves)),
+    p_template_updates: JSON.parse(JSON.stringify(changes.templateUpdates)),
+    p_date_changes: JSON.parse(JSON.stringify(changes.dateChanges)),
+  });
+
+  if (error) {
+    // Extract meaningful message from Postgres exception
+    const msg = error.message?.replace(/^ERROR:\s*/, "") ?? "Failed to save changes";
+    return { error: msg };
+  }
+
+  revalidatePath("/programs");
+  revalidatePath(`/programs/${programId}`);
+  revalidatePath(`/programs/${programId}/edit`);
+  return {};
+}

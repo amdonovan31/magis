@@ -3,6 +3,9 @@
 import { useState, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils/cn";
 import { logExtraWork, deleteExtraWorkGroup } from "@/lib/actions/session.actions";
+import { searchExercises } from "@/lib/actions/exercise.actions";
+import Modal from "@/components/ui/Modal";
+import type { Exercise } from "@/types/app.types";
 
 interface ExtraWorkSet {
   setNumber: number;
@@ -36,10 +39,17 @@ export default function ExtraWorkEntry({
   );
   const nameDebounceRef = useRef<ReturnType<typeof setTimeout>>();
 
-  const handleNameChange = useCallback(
+  // Picker state
+  const [showPicker, setShowPicker] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<Exercise[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [useCustomName, setUseCustomName] = useState(false);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const customInputRef = useRef<HTMLInputElement>(null);
+
+  const persistNameChange = useCallback(
     (value: string) => {
-      setExerciseName(value);
-      // Update name on all existing saved sets via debounce
       if (nameDebounceRef.current) clearTimeout(nameDebounceRef.current);
       nameDebounceRef.current = setTimeout(() => {
         sets.forEach((s) => {
@@ -59,6 +69,52 @@ export default function ExtraWorkEntry({
     },
     [sessionId, groupId, sets, weightUnit]
   );
+
+  function handleSelectExercise(name: string) {
+    setExerciseName(name);
+    setShowPicker(false);
+    setSearchQuery("");
+    setSearchResults([]);
+    setUseCustomName(false);
+    persistNameChange(name);
+  }
+
+  function handleCustomNameFallback() {
+    setShowPicker(false);
+    setSearchQuery("");
+    setSearchResults([]);
+    setUseCustomName(true);
+    // Focus the custom input after render
+    setTimeout(() => customInputRef.current?.focus(), 100);
+  }
+
+  function handleCustomNameChange(value: string) {
+    setExerciseName(value);
+    persistNameChange(value);
+  }
+
+  const handleSearch = useCallback((value: string) => {
+    setSearchQuery(value);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    if (!value.trim()) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
+    setSearchLoading(true);
+    searchDebounceRef.current = setTimeout(async () => {
+      const data = await searchExercises(value);
+      setSearchResults(data);
+      setSearchLoading(false);
+    }, 300);
+  }, []);
+
+  function openPicker() {
+    setUseCustomName(false);
+    setSearchQuery("");
+    setSearchResults([]);
+    setShowPicker(true);
+  }
 
   function handleSetComplete(index: number) {
     const s = sets[index];
@@ -99,15 +155,34 @@ export default function ExtraWorkEntry({
 
   return (
     <div className="rounded-2xl border border-dashed border-primary/15 bg-surface/50 overflow-hidden">
-      {/* Exercise name input */}
+      {/* Exercise name display / picker trigger */}
       <div className="px-4 pt-4 pb-2">
-        <input
-          type="text"
-          value={exerciseName}
-          onChange={(e) => handleNameChange(e.target.value)}
-          placeholder="Exercise name"
-          className="w-full bg-transparent text-base font-semibold text-primary placeholder:text-primary/30 focus:outline-none"
-        />
+        {exerciseName && !useCustomName ? (
+          <button
+            type="button"
+            onClick={openPicker}
+            className="w-full text-left text-base font-semibold text-primary"
+          >
+            {exerciseName}
+          </button>
+        ) : useCustomName ? (
+          <input
+            ref={customInputRef}
+            type="text"
+            value={exerciseName}
+            onChange={(e) => handleCustomNameChange(e.target.value)}
+            placeholder="Exercise name"
+            className="w-full bg-transparent text-base font-semibold text-primary placeholder:text-primary/30 focus:outline-none"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={openPicker}
+            className="w-full text-left text-base font-semibold text-primary/30"
+          >
+            Tap to choose exercise
+          </button>
+        )}
         <p className="text-[10px] font-semibold uppercase tracking-widest text-primary/30 mt-1">
           Extra work
         </p>
@@ -210,6 +285,70 @@ export default function ExtraWorkEntry({
           Remove
         </button>
       </div>
+
+      {/* Exercise picker bottom sheet */}
+      <Modal isOpen={showPicker} onClose={() => setShowPicker(false)} title="Choose Exercise">
+        {/* Search input */}
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => handleSearch(e.target.value)}
+          placeholder="Search exercises..."
+          autoFocus
+          className="w-full rounded-xl border border-primary/20 bg-surface px-4 py-3 text-sm text-primary placeholder:text-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
+        />
+
+        {/* Results */}
+        <div className="mt-3 max-h-64 overflow-y-auto flex flex-col gap-0.5">
+          {searchLoading && (
+            <p className="py-4 text-center text-xs text-primary/40 animate-pulse">Searching...</p>
+          )}
+          {!searchLoading && searchQuery.trim() && searchResults.length === 0 && (
+            <div className="py-4 text-center">
+              <p className="text-xs text-primary/40">No exercises found</p>
+              <button
+                type="button"
+                onClick={handleCustomNameFallback}
+                className="mt-2 text-sm font-medium text-accent hover:text-accent/80 transition-colors"
+              >
+                Use custom name
+              </button>
+            </div>
+          )}
+          {!searchLoading &&
+            searchResults.map((ex) => (
+              <button
+                key={ex.id}
+                type="button"
+                onClick={() => handleSelectExercise(ex.name)}
+                className="flex items-center justify-between rounded-lg px-2.5 py-2.5 text-left hover:bg-primary/5 transition-colors"
+              >
+                <div>
+                  <p className="text-sm font-medium text-primary">{ex.name}</p>
+                  {ex.muscle_group && (
+                    <p className="text-[10px] text-primary/40 mt-0.5">{ex.muscle_group}</p>
+                  )}
+                </div>
+                {ex.equipment && (
+                  <span className="shrink-0 ml-2 rounded-full bg-primary/5 px-2 py-0.5 text-[10px] text-primary/40">
+                    {ex.equipment}
+                  </span>
+                )}
+              </button>
+            ))}
+        </div>
+
+        {/* Persistent custom name option when there are results */}
+        {!searchLoading && searchResults.length > 0 && (
+          <button
+            type="button"
+            onClick={handleCustomNameFallback}
+            className="mt-2 w-full py-2 text-center text-xs font-medium text-primary/40 hover:text-primary/60 transition-colors"
+          >
+            Or enter a custom name
+          </button>
+        )}
+      </Modal>
     </div>
   );
 }

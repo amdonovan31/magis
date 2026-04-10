@@ -171,7 +171,13 @@ export default async function CoachSessionDetailPage({ params }: SessionDetailPa
                       weight_value: number | null;
                       weight_unit: string | null;
                       rpe: number | null;
-                    }) => (
+                      is_skipped: boolean;
+                    }) => log.is_skipped ? (
+                      <div key={log.id} className="grid grid-cols-4 gap-2 text-sm py-0.5">
+                        <span className="text-primary/30">{log.set_number}</span>
+                        <span className="col-span-3 text-xs text-amber-600 italic">Skipped</span>
+                      </div>
+                    ) : (
                       <div key={log.id} className="grid grid-cols-4 gap-2 text-sm text-primary py-0.5">
                         <span>{log.set_number}</span>
                         <span>{log.reps_completed ?? "–"}</span>

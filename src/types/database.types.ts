@@ -1256,6 +1256,7 @@ export type Database = {
           exercise_id: string | null
           id: string
           is_completed: boolean
+          is_skipped: boolean
           logged_at: string
           reps_completed: number | null
           rpe: number | null
@@ -1271,6 +1272,7 @@ export type Database = {
           exercise_id?: string | null
           id?: string
           is_completed?: boolean
+          is_skipped?: boolean
           logged_at?: string
           reps_completed?: number | null
           rpe?: number | null
@@ -1286,6 +1288,7 @@ export type Database = {
           exercise_id?: string | null
           id?: string
           is_completed?: boolean
+          is_skipped?: boolean
           logged_at?: string
           reps_completed?: number | null
           rpe?: number | null
@@ -1524,6 +1527,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_program_edits: {
+        Args: {
+          p_date_changes?: Json
+          p_exercise_adds?: Json
+          p_exercise_removes?: Json
+          p_exercise_swaps?: Json
+          p_exercise_updates?: Json
+          p_program_id: string
+          p_template_updates?: Json
+        }
+        Returns: Json
+      }
       get_my_role: { Args: never; Returns: string }
     }
     Enums: {

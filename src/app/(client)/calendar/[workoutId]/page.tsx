@@ -24,6 +24,26 @@ export default async function WorkoutDetailPage({
   const workout = await getScheduledWorkout(workoutId);
   if (!workout) notFound();
 
+  // Check for any existing session for this template+client.
+  // Prevents duplicate logging when a user has an in-progress or completed
+  // session that the scheduled_workouts.status hasn't been updated to reflect.
+  const { data: existingSession } = await supabase
+    .from("workout_sessions")
+    .select("id, status")
+    .eq("client_id", user.id)
+    .eq("workout_template_id", workout.template.id)
+    .in("status", ["in_progress", "completed"])
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const inProgressSessionId =
+    existingSession?.status === "in_progress" ? existingSession.id : null;
+  const completedSessionId =
+    existingSession?.status === "completed"
+      ? existingSession.id
+      : workout.session_id ?? null;
+
   // Fetch exercise notes and substitutions for completed workouts
   const notesByExercise: Record<string, string> = {};
   const subsByExercise: Record<string, { substituteName: string; originalName: string }> = {};
@@ -62,7 +82,9 @@ export default async function WorkoutDetailPage({
   const isScheduled = workout.status === "scheduled";
   const isMissed = workout.status === "missed";
   const isSkipped = workout.status === "skipped";
-  const canLog = isScheduled || isMissed || isSkipped;
+  const isCompleted = workout.status === "completed" || completedSessionId != null;
+  // Only allow new starts/logs if there's no existing session for this template
+  const canLog = (isScheduled || isMissed || isSkipped) && !inProgressSessionId && !isCompleted;
 
   async function startSession() {
     "use server";
@@ -133,7 +155,26 @@ export default async function WorkoutDetailPage({
           </p>
         )}
 
-        {isScheduled && (
+        {/* In-progress session takes priority — show resume */}
+        {inProgressSessionId && (
+          <Link href={`/workout/${inProgressSessionId}`}>
+            <Button fullWidth size="lg" variant="accent">
+              Resume Workout →
+            </Button>
+          </Link>
+        )}
+
+        {/* Completed session — show summary */}
+        {!inProgressSessionId && isCompleted && completedSessionId && (
+          <Link href={`/workout/${completedSessionId}/summary`}>
+            <Button fullWidth size="lg" variant="secondary">
+              View Summary →
+            </Button>
+          </Link>
+        )}
+
+        {/* No existing session — allow start (today's scheduled) */}
+        {isScheduled && !inProgressSessionId && !isCompleted && (
           <form action={startSession}>
             <Button type="submit" fullWidth size="lg">
               Start Workout →
@@ -141,6 +182,7 @@ export default async function WorkoutDetailPage({
           </form>
         )}
 
+        {/* No existing session — allow retro log (past or skipped) */}
         {canLog && (
           <Link href={`/calendar/${workoutId}/log`}>
             <Button

@@ -2,7 +2,6 @@ import { getSession } from "@/lib/queries/session.queries";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import WorkoutClient from "@/components/workout/WorkoutClient";
-import WorkoutProgress from "@/components/workout/WorkoutProgress";
 import CompleteWorkoutButton from "@/components/workout/CompleteWorkoutButton";
 import ConnectivityBanner from "@/components/workout/ConnectivityBanner";
 import ProgramDisclaimerFooter from "@/components/disclaimer/ProgramDisclaimerFooter";
@@ -67,7 +66,9 @@ export default async function WorkoutPage({ params }: WorkoutPageProps) {
     (sum, te) => sum + (te.prescribed_sets ?? 0),
     0
   ) ?? 0;
-  const completedSets = setLogs.filter((l) => l.is_completed).length;
+  const resolvedSets = setLogs.filter((l) =>
+    l.is_completed || (l as unknown as { is_skipped?: boolean }).is_skipped
+  ).length;
 
   const handleFinish = finishSession.bind(null, sessionId);
 
@@ -79,18 +80,13 @@ export default async function WorkoutPage({ params }: WorkoutPageProps) {
           ✕ Exit
         </Link>
         <h1 className="text-sm font-semibold">{template?.title ?? "Workout"}</h1>
-        <span className="text-white/70 text-xs">{completedSets}/{totalSets}</span>
+        <span className="text-white/70 text-xs">{resolvedSets}/{totalSets}</span>
       </header>
-
-      {/* Progress bar */}
-      <div className="px-4 pt-3 pb-2 bg-primary/5">
-        <WorkoutProgress completed={completedSets} total={totalSets} />
-      </div>
 
       {/* Connectivity indicator — workout page only */}
       <ConnectivityBanner />
 
-      {/* Exercise loggers with rest timer */}
+      {/* Exercise loggers with rest timer — includes optimistic progress bar */}
       {template && (
         <WorkoutClient
           sessionId={sessionId}
@@ -100,6 +96,8 @@ export default async function WorkoutPage({ params }: WorkoutPageProps) {
           initialSkippedExercises={session.skipped_exercises ?? []}
           exerciseNotes={exerciseNotes}
           initialExtraWork={extraWork}
+          initialResolvedSets={resolvedSets}
+          totalSets={totalSets}
         />
       )}
 
@@ -112,7 +110,7 @@ export default async function WorkoutPage({ params }: WorkoutPageProps) {
       <div className="fixed bottom-0 left-1/2 z-10 w-full max-w-md -translate-x-1/2 bg-surface p-4 pb-safe border-t border-primary/10">
         <CompleteWorkoutButton
           sessionId={sessionId}
-          completedSets={completedSets}
+          completedSets={resolvedSets}
           onComplete={handleFinish}
         />
       </div>

@@ -6,7 +6,7 @@ import SetRow from "./SetRow";
 import ExerciseDemoModal from "./ExerciseDemoModal";
 import { persistSwap, removeSwap } from "@/lib/workout-persistence";
 import { searchExercises } from "@/lib/actions/exercise.actions";
-import { saveExerciseNote } from "@/lib/actions/session.actions";
+import { saveExerciseNote, skipSet, unskipSet } from "@/lib/actions/session.actions";
 import type { WorkoutTemplateExerciseWithExercise, SetLog, Exercise } from "@/types/app.types";
 
 interface ExerciseLoggerProps {
@@ -19,6 +19,8 @@ interface ExerciseLoggerProps {
   isSkipped: boolean;
   onSkip: () => void;
   initialNote?: string;
+  onSetResolved?: () => void;
+  onSetUnresolved?: () => void;
 }
 
 export default function ExerciseLogger({
@@ -31,8 +33,21 @@ export default function ExerciseLogger({
   isSkipped,
   onSkip,
   initialNote = "",
+  onSetResolved,
+  onSetUnresolved,
 }: ExerciseLoggerProps) {
   const [showDemo, setShowDemo] = useState(false);
+
+  // Per-set skip tracking
+  const [skippedSets, setSkippedSets] = useState<Set<number>>(() => {
+    const initial = new Set<number>();
+    for (const log of existingLogs) {
+      if ((log as unknown as { is_skipped?: boolean }).is_skipped) {
+        initial.add(log.set_number);
+      }
+    }
+    return initial;
+  });
   const [confirmingSkip, setConfirmingSkip] = useState(false);
   const [swappedExercise, setSwappedExercise] = useState<Exercise | null>(initialSwappedExercise);
   const [hideLoggedSets, setHideLoggedSets] = useState(false);
@@ -81,6 +96,23 @@ export default function ExerciseLogger({
     if (rest && onSetComplete) {
       onSetComplete(rest);
     }
+    onSetResolved?.();
+  }
+
+  function handleSetSkip(setNumber: number) {
+    setSkippedSets((prev) => new Set([...Array.from(prev), setNumber]));
+    skipSet(sessionId, templateExercise.id, setNumber);
+    onSetResolved?.();
+  }
+
+  function handleSetUnskip(setNumber: number) {
+    setSkippedSets((prev) => {
+      const next = new Set(Array.from(prev));
+      next.delete(setNumber);
+      return next;
+    });
+    unskipSet(sessionId, templateExercise.id, setNumber);
+    onSetUnresolved?.();
   }
 
   // Debounced note save
@@ -347,7 +379,10 @@ export default function ExerciseLogger({
                 initialWeightUnit={existingLog?.weight_unit ?? null}
                 onSetComplete={handleSetComplete}
                 weightUnit={weightUnit}
-                isActive={isActive}
+                isActive={isActive && !skippedSets.has(setNum)}
+                isSkipped={skippedSets.has(setNum)}
+                onSkip={() => handleSetSkip(setNum)}
+                onUnskip={() => handleSetUnskip(setNum)}
               />
             );
           });

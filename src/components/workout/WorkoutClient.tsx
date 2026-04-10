@@ -6,6 +6,7 @@ import ExerciseLogger from "./ExerciseLogger";
 import ExtraWorkEntry from "./ExtraWorkEntry";
 import RestTimer from "./RestTimer";
 import UnitToggle from "./UnitToggle";
+import WorkoutProgress from "./WorkoutProgress";
 import { getPersistedSession, persistSkip } from "@/lib/workout-persistence";
 import { logSet, skipExercise } from "@/lib/actions/session.actions";
 import { fetchExercisesByIds } from "@/lib/actions/exercise.actions";
@@ -30,6 +31,8 @@ interface WorkoutClientProps {
     weight_value: number | null;
     weight_unit: string | null;
   }[];
+  initialResolvedSets: number;
+  totalSets: number;
 }
 
 export default function WorkoutClient({
@@ -40,6 +43,8 @@ export default function WorkoutClient({
   initialSkippedExercises,
   exerciseNotes,
   initialExtraWork,
+  initialResolvedSets,
+  totalSets,
 }: WorkoutClientProps) {
   const router = useRouter();
   const [weightUnit, setWeightUnit] = useState<WeightUnit>(preferredUnit);
@@ -51,6 +56,9 @@ export default function WorkoutClient({
   const [persistedSwaps, setPersistedSwaps] = useState<Record<string, string>>({});
   const [swappedExerciseCache, setSwappedExerciseCache] = useState<Record<string, Exercise>>({});
   const syncAttempted = useRef(false);
+
+  // Optimistic progress count
+  const [resolvedCount, setResolvedCount] = useState(initialResolvedSets);
 
   // Extra work state — group initial data by group_id
   const [extraExercises, setExtraExercises] = useState<
@@ -218,6 +226,11 @@ export default function WorkoutClient({
         </div>
       )}
 
+      {/* Progress bar (optimistic) */}
+      <div className="px-4 pt-3 pb-2 bg-primary/5">
+        <WorkoutProgress completed={resolvedCount} total={totalSets} />
+      </div>
+
       {/* Unit toggle */}
       <div className="flex items-center justify-end px-4 pt-2">
         <UnitToggle unit={weightUnit} onChange={setWeightUnit} />
@@ -242,6 +255,8 @@ export default function WorkoutClient({
               isSkipped={skippedExercises.has(te.id)}
               onSkip={() => handleSkipExercise(te.id)}
               initialNote={notesByExercise[te.id] ?? ""}
+              onSetResolved={() => setResolvedCount((c) => c + 1)}
+              onSetUnresolved={() => setResolvedCount((c) => c - 1)}
             />
           </div>
         ))}
