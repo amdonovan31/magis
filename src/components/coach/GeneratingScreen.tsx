@@ -40,13 +40,23 @@ export default function GeneratingScreen({
         body: JSON.stringify(body),
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        setErrorMessage(data.error ?? "An unexpected error occurred.");
+        let message = `Server error (${res.status})`;
+        try {
+          const data = await res.json();
+          message = data.error ?? message;
+        } catch {
+          // Response wasn't JSON (e.g. Vercel timeout HTML page)
+          if (res.status === 504) {
+            message = "Program generation timed out. Try reducing the number of weeks or try again.";
+          }
+        }
+        setErrorMessage(message);
         setStatus("error");
         return;
       }
+
+      const data = await res.json();
 
       router.push(`/clients/${clientId}/generate/review?programId=${data.programId}`);
     } catch {
