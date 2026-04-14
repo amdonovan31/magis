@@ -3,8 +3,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/utils/logger";
 
-// Extend Vercel serverless function timeout (default is 10s on Hobby, 15s on Pro)
-export const maxDuration = 60;
+// Extend Vercel serverless function timeout (Pro plan supports up to 300s)
+export const maxDuration = 300;
 
 interface GeneratedExercise {
   exercise_id: string;
