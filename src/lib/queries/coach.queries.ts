@@ -37,7 +37,38 @@ export async function getCoachDashboard(): Promise<CoachDashboardData | null> {
     relationships.map(async (rel) => {
       const profile = rel.profiles as unknown as Profile | null;
 
-      if (!profile?.id) return null;
+      // If the profile join returned null, the client has a relationship row but
+      // no profile (likely a manually-created auth user where the trigger failed).
+      // Surface with a minimal placeholder instead of silently dropping them.
+      if (!profile?.id) {
+        return {
+          profile: {
+            id: rel.client_id,
+            full_name: null,
+            role: "client",
+            roles: ["client"],
+            avatar_url: null,
+            created_at: "",
+            updated_at: "",
+            onboarding_complete: false,
+            intake_requested: false,
+            disclaimer_accepted_at: null,
+            birthdate: null,
+            gender: null,
+            height_cm: null,
+            weight_kg: null,
+            training_age_years: null,
+            preferred_unit: null,
+            coach_code: null,
+          } as unknown as Profile,
+          activeProgram: null,
+          lastSessionDate: null,
+          streak: 0,
+          unreadNotes: 0,
+          intakeComplete: false,
+          intakeRequested: false,
+        };
+      }
 
       // Fetch last 60 days of completed sessions for streak calculation
       const sixtyDaysAgo = new Date();
@@ -95,6 +126,17 @@ export async function getCoachDashboard(): Promise<CoachDashboardData | null> {
   );
 
   const clients = clientResults.filter(Boolean) as ClientWithProgram[];
+
+  // Sort by most recently active (lastSessionDate DESC), null-last.
+  // This ensures the dashboard's 5-client slice shows the most relevant clients
+  // and both the dashboard and Clients tab render the same consistent order.
+  clients.sort((a, b) => {
+    if (!a.lastSessionDate && !b.lastSessionDate) return 0;
+    if (!a.lastSessionDate) return 1;
+    if (!b.lastSessionDate) return -1;
+    return b.lastSessionDate.localeCompare(a.lastSessionDate);
+  });
+
   return { coach, clients };
 }
 

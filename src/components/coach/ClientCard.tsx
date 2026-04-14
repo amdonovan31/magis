@@ -28,7 +28,7 @@ export default function ClientCard({ client, currentUserId }: ClientCardProps) {
         {/* Info */}
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-primary truncate">
-            {profile.full_name ?? "Unnamed Client"}
+            {profile.full_name || "Unnamed Client"}
             {currentUserId && profile.id === currentUserId && (
               <span className="ml-1 text-sm font-normal text-primary/50">(You)</span>
             )}
