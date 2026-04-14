@@ -11,7 +11,8 @@ export async function signUp(formData: FormData) {
   const password = formData.get("password") as string;
   const fullName = (formData.get("full_name") as string)?.trim();
   const role = (formData.get("role") as string) || "coach";
-  const coachId = (formData.get("coach_id") as string)?.trim() || null;
+  let coachId = (formData.get("coach_id") as string)?.trim() || null;
+  const coachCode = (formData.get("coach_code") as string)?.trim().toUpperCase() || null;
 
   if (!email || !password || !fullName) {
     return { error: "All fields are required" };
@@ -28,6 +29,21 @@ export async function signUp(formData: FormData) {
   }
 
   const supabase = await createClient();
+
+  // Resolve coach_code → coach_id if a code was entered (client self-signup)
+  if (coachCode && !coachId && role === "client") {
+    const { data: coachProfile } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("coach_code", coachCode)
+      .eq("role", "coach")
+      .maybeSingle();
+
+    if (!coachProfile) {
+      return { error: "Coach code not found — check with your coach and try again." };
+    }
+    coachId = coachProfile.id;
+  }
 
   // Build metadata — include coach_id only if present so the handle_new_user
   // trigger can create the coach_client_relationships row automatically.

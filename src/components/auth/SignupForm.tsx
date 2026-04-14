@@ -55,6 +55,17 @@ export default function SignupForm({ role, coachId }: SignupFormProps) {
         hint="Minimum 8 characters"
       />
 
+      {/* Optional coach code for client self-signup (not shown for invite-link signups) */}
+      {role === "client" && !coachId && (
+        <Input
+          label="Have a coach? Enter their code (optional)"
+          name="coach_code"
+          type="text"
+          placeholder="e.g. SMITH-4X2"
+          autoCapitalize="characters"
+        />
+      )}
+
       {error && (
         <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}

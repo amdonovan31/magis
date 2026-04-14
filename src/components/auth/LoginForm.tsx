@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { signIn } from "@/lib/actions/auth.actions";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -48,8 +49,11 @@ export default function LoginForm() {
         Sign In
       </Button>
 
-      <p className="text-center text-xs text-primary/50">
-        New client? Check your email for an invite link from your coach.
+      <p className="text-center text-sm text-primary/60">
+        Don&apos;t have an account?{" "}
+        <Link href="/signup" className="font-medium text-[#1B2E4B] hover:underline">
+          Create one
+        </Link>
       </p>
     </form>
   );

@@ -5,6 +5,7 @@ import TopBar from "@/components/layout/TopBar";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import EnrollAsClientButton from "@/components/coach/EnrollAsClientButton";
+import CoachCodeCard from "@/components/coach/CoachCodeCard";
 import DisclaimerAcceptButton from "@/components/disclaimer/DisclaimerAcceptButton";
 import { DISCLAIMER_BODY } from "@/lib/disclaimer/constants";
 import type { Profile } from "@/types/app.types";
@@ -65,6 +66,11 @@ export default async function CoachProfilePage() {
             </div>
           </div>
         </Card>
+
+        {/* Coach code */}
+        {(profile as unknown as { coach_code?: string })?.coach_code && (
+          <CoachCodeCard coachCode={(profile as unknown as { coach_code: string }).coach_code} />
+        )}
 
         {/* Train as client — only show if not already enrolled */}
         {profile && !profile.roles.includes("client") && !profile.roles.includes("solo") && (
