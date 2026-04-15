@@ -4,12 +4,12 @@ import GeneratingScreen from "@/components/coach/GeneratingScreen";
 
 export default async function GenerateLoadingPage({
   params,
-  searchParams,
+  searchParams: searchParamsPromise,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: { regenFeedback?: string; regenProgramId?: string };
+  searchParams: Promise<{ guidelinesId?: string; regenFeedback?: string; regenProgramId?: string }>;
 }) {
-  const { id: clientId } = await params;
+  const [{ id: clientId }, searchParams] = await Promise.all([params, searchParamsPromise]);
   const supabase = await createClient();
   const {
     data: { user },
@@ -27,28 +27,31 @@ export default async function GenerateLoadingPage({
 
   if (!relationship) notFound();
 
-  // Get client name + most recent guidelines in parallel
-  const [{ data: profile }, { data: guidelines }] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("full_name")
-      .eq("id", clientId)
-      .single(),
-    supabase
+  // Use guidelinesId from URL if available (passed by GuidelinesForm), otherwise look up most recent
+  let guidelinesId = searchParams.guidelinesId;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("id", clientId)
+    .single();
+
+  if (!profile) notFound();
+
+  if (!guidelinesId) {
+    const { data: guidelines } = await supabase
       .from("coach_guidelines")
       .select("id")
       .eq("client_id", clientId)
       .eq("coach_id", user.id)
       .order("created_at", { ascending: false })
       .limit(1)
-      .maybeSingle(),
-  ]);
+      .maybeSingle();
 
-  if (!profile) notFound();
-
-  // No guidelines saved yet — send coach back to the form
-  if (!guidelines) {
-    redirect(`/clients/${clientId}/generate`);
+    if (!guidelines) {
+      redirect(`/clients/${clientId}/generate`);
+    }
+    guidelinesId = guidelines.id;
   }
 
   // If regenerating, reconstruct AI JSON from the draft program's DB rows
@@ -128,7 +131,7 @@ export default async function GenerateLoadingPage({
     <GeneratingScreen
       clientId={clientId}
       clientName={profile.full_name ?? "Client"}
-      guidelinesId={guidelines.id}
+      guidelinesId={guidelinesId}
       regenerationFeedback={searchParams.regenFeedback ?? null}
       previousProgramJson={previousProgramJson}
     />
