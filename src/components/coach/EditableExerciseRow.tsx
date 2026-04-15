@@ -75,7 +75,7 @@ export default function EditableExerciseRow({
         onClick={() => onSwap(exercise.id)}
         className="flex-1 min-w-0 text-left"
       >
-        <p className="text-sm font-medium text-primary truncate hover:text-accent transition-colors">
+        <p className="text-sm font-medium text-primary hover:text-accent transition-colors">
           {exercise.exercise.name}
         </p>
         {exercise.exercise.muscle_group && (

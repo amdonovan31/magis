@@ -613,7 +613,7 @@ export default function ProgramEditor({
                         className="flex items-center justify-between rounded-lg bg-bg/50 px-3 py-2"
                       >
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-primary truncate">
+                          <p className="text-sm font-medium text-primary">
                             {ex.exercise.name}
                           </p>
                         </div>
