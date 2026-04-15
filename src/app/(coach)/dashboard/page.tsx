@@ -43,12 +43,7 @@ export default async function DashboardPage() {
 
       {/* Client list */}
       <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-primary">My Clients</h2>
-          <Link href="/clients" className="text-sm text-[#1B2E4B] font-medium">
-            View all
-          </Link>
-        </div>
+        <h2 className="font-semibold text-primary">My Clients</h2>
 
         {clients.length === 0 ? (
           <div className="flex flex-col items-center gap-3 rounded-xl border border-primary/10 bg-surface py-10 text-center">
@@ -58,7 +53,7 @@ export default async function DashboardPage() {
             </Link>
           </div>
         ) : (
-          clients.slice(0, 5).map((client) => (
+          clients.map((client) => (
             <ClientCard key={client.profile.id} client={client} />
           ))
         )}
