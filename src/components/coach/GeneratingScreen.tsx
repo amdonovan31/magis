@@ -34,11 +34,16 @@ export default function GeneratingScreen({
         try { body.previousProgram = JSON.parse(previousProgramJson); } catch { /* ignore */ }
       }
 
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4 * 60 * 1000); // 4 min client-side timeout
+
       const res = await fetch("/api/generate-program", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
 
       if (!res.ok) {
         let message = `Server error (${res.status})`;

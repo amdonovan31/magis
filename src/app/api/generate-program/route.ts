@@ -182,8 +182,15 @@ export async function POST(req: NextRequest) {
         );
 
   // Use filtered list if it has enough variety, otherwise fall back to full list
-  const libraryExercises =
+  const equipmentFiltered =
     filteredExercises.length >= 30 ? filteredExercises : exercises;
+
+  // Cap the library to foundational (non-custom) exercises + any coach-specified includes.
+  // Sending 500+ exercises bloats the prompt and causes timeouts.
+  const includeSet = new Set(guidelines.exercises_to_include as string[] | null ?? []);
+  const libraryExercises = equipmentFiltered.filter(
+    (e) => !e.is_custom || includeSet.has(e.id)
+  );
 
   // ------------------------------------------------------------------
   // Build the exercise library text (compact format)
