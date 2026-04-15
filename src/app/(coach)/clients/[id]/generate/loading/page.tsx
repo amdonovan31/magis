@@ -51,28 +51,77 @@ export default async function GenerateLoadingPage({
     redirect(`/clients/${clientId}/generate`);
   }
 
-  // If regenerating, fetch the previous program's pending_json
+  // If regenerating, reconstruct AI JSON from the draft program's DB rows
   let previousProgramJson: string | null = null;
   if (searchParams.regenProgramId) {
+    const reverseDayMap: Record<number, string> = {
+      0: "Sunday", 1: "Monday", 2: "Tuesday", 3: "Wednesday",
+      4: "Thursday", 5: "Friday", 6: "Saturday",
+    };
+
     const { data: prevProgram } = await supabase
       .from("programs")
-      .select("pending_json")
+      .select(`
+        title, description,
+        workout_templates (
+          id, title, week_number, day_number, scheduled_days,
+          workout_template_exercises (
+            exercise_id, position, prescribed_sets, prescribed_reps,
+            rest_seconds, alternate_exercise_ids,
+            exercise:exercises ( muscle_group )
+          )
+        )
+      `)
       .eq("id", searchParams.regenProgramId)
       .single();
 
-    if (prevProgram?.pending_json) {
-      const pending = prevProgram.pending_json as { program?: unknown };
-      if (pending.program) {
-        previousProgramJson = JSON.stringify(pending.program);
+    if (prevProgram?.workout_templates) {
+      // Group templates by week_number
+      const weekMap = new Map<number, typeof prevProgram.workout_templates>();
+      for (const t of prevProgram.workout_templates) {
+        const wn = t.week_number ?? 1;
+        if (!weekMap.has(wn)) weekMap.set(wn, []);
+        weekMap.get(wn)!.push(t);
       }
+
+      const weeks = Array.from(weekMap.entries())
+        .sort(([a], [b]) => a - b)
+        .map(([weekNumber, templates]) => ({
+          week_number: weekNumber,
+          workouts: templates
+            .sort((a, b) => (a.day_number ?? 0) - (b.day_number ?? 0))
+            .map((t) => {
+              const dayNum = t.scheduled_days?.[0];
+              return {
+                day_of_week: dayNum != null ? reverseDayMap[dayNum] ?? "Monday" : "Monday",
+                workout_name: t.title,
+                muscle_groups: [] as string[],
+                exercises: (t.workout_template_exercises ?? [])
+                  .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+                  .map((ex) => ({
+                    exercise_id: ex.exercise_id,
+                    sets: ex.prescribed_sets ?? 3,
+                    reps: ex.prescribed_reps ?? "8-12",
+                    rest_seconds: ex.rest_seconds ?? 90,
+                    alternate_exercise_ids: ex.alternate_exercise_ids ?? [],
+                  })),
+              };
+            }),
+        }));
+
+      previousProgramJson = JSON.stringify({
+        program_name: prevProgram.title,
+        program_description: prevProgram.description ?? "",
+        weeks,
+      });
     }
 
-    // Delete the old pending_review program since we're regenerating
+    // Delete the old draft program since we're regenerating (cascade deletes templates/exercises)
     await supabase
       .from("programs")
       .delete()
       .eq("id", searchParams.regenProgramId)
-      .eq("status", "pending_review");
+      .eq("status", "draft");
   }
 
   return (

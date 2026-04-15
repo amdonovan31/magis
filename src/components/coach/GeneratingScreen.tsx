@@ -58,7 +58,7 @@ export default function GeneratingScreen({
 
       const data = await res.json();
 
-      router.push(`/clients/${clientId}/generate/review?programId=${data.programId}`);
+      router.push(`/programs/${data.programId}/edit`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("AbortError") || msg.includes("abort") || msg.includes("timeout")) {

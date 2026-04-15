@@ -414,36 +414,88 @@ PROGRAMMING PRINCIPLES (follow these strictly):
       ai_model: "claude-sonnet-4-6",
     });
 
-    // Build exercise name lookup for client-side display
-    const exerciseNames: Record<string, string> = {};
-    for (const e of libraryExercises) {
-      exerciseNames[e.id] = e.name;
-    }
+    // ------------------------------------------------------------------
+    // Materialize program directly into workout_templates + exercises
+    // ------------------------------------------------------------------
+    const dayMap: Record<string, number> = {
+      sunday: 0, monday: 1, tuesday: 2, wednesday: 3,
+      thursday: 4, friday: 5, saturday: 6,
+    };
 
-    // Save pending program to DB so the review page can load it server-side
-    const { data: pendingRow, error: pendingError } = await supabase
+    // 1. Insert program row as draft
+    const { data: programRow, error: programError } = await supabase
       .from("programs")
       .insert({
         coach_id: user.id,
         client_id: clientId,
         title: program.program_name,
         description: program.program_description,
-        is_active: false,
-        status: "pending_review",
-        pending_json: { program, exerciseNames } as unknown as import("@/types/database.types").Json,
+        is_active: true,
+        status: "draft",
       })
       .select("id")
       .single();
 
-    if (pendingError || !pendingRow) {
-      logger.error("Failed to save pending program", { error: pendingError });
+    if (programError || !programRow) {
+      logger.error("Failed to create program", { error: programError });
       return NextResponse.json(
-        { error: `Database save failed: ${pendingError?.message ?? "Unknown error"}. Please try again.` },
+        { error: `Database save failed: ${programError?.message ?? "Unknown error"}. Please try again.` },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ programId: pendingRow.id });
+    // 2. Insert workout templates and exercises per week
+    for (const week of program.weeks) {
+      for (let dayIdx = 0; dayIdx < week.workouts.length; dayIdx++) {
+        const workout = week.workouts[dayIdx];
+        const scheduledDay = dayMap[workout.day_of_week.toLowerCase()];
+
+        const { data: template, error: templateError } = await supabase
+          .from("workout_templates")
+          .insert({
+            program_id: programRow.id,
+            title: workout.workout_name,
+            day_number: dayIdx + 1,
+            week_number: week.week_number,
+            scheduled_days: scheduledDay != null ? [scheduledDay] : null,
+            notes: null,
+          })
+          .select("id")
+          .single();
+
+        if (templateError || !template) {
+          logger.error("Template insert error", { error: templateError });
+          continue;
+        }
+
+        // 3. Insert exercises for this template
+        if (workout.exercises.length > 0) {
+          const exerciseRows = workout.exercises.map((ex, i) => ({
+            workout_template_id: template.id,
+            exercise_id: ex.exercise_id,
+            position: i + 1,
+            prescribed_sets: ex.sets,
+            prescribed_reps: ex.reps,
+            prescribed_weight: null,
+            rest_seconds: ex.rest_seconds,
+            notes: null,
+            alternate_exercise_ids: ex.alternate_exercise_ids?.length
+              ? ex.alternate_exercise_ids
+              : null,
+          }));
+
+          const { error: exError } = await supabase
+            .from("workout_template_exercises")
+            .insert(exerciseRows);
+
+          if (exError) {
+            logger.error("Exercise insert error", { error: exError });
+          }
+        }
+      }
+    }
+
+    return NextResponse.json({ programId: programRow.id });
   } catch (err) {
     const errMsg = String(err);
     logger.error("AI generation error", { error: errMsg });

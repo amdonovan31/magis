@@ -90,6 +90,10 @@ export default function ProgramEditor({
     return map;
   });
 
+  // Regenerate modal state (draft programs with a client only)
+  const [regenModalOpen, setRegenModalOpen] = useState(false);
+  const [regenFeedback, setRegenFeedback] = useState("");
+
   // Exercise search modal state
   const [searchModal, setSearchModal] = useState<{
     open: boolean;
@@ -640,9 +644,22 @@ export default function ProgramEditor({
         })}
       </div>
 
-      {/* Delete program (not in edit mode) */}
+      {/* Program actions (not in edit mode) */}
       {!inEditMode && (
-        <div className="px-4 pb-4">
+        <div className="px-4 pb-4 flex flex-col gap-3">
+          {/* Regenerate — only for draft programs assigned to a client */}
+          {status === "draft" && program.client_id && (
+            <Button
+              variant="secondary"
+              fullWidth
+              onClick={() => {
+                setRegenFeedback("");
+                setRegenModalOpen(true);
+              }}
+            >
+              Regenerate with AI
+            </Button>
+          )}
           <DeleteProgramButton
             programId={program.id}
             programName={program.title}
@@ -704,6 +721,41 @@ export default function ProgramEditor({
         excludeIds={searchModal.excludeIds}
         title={searchModal.mode === "swap" ? "Swap Exercise" : "Add Exercise"}
       />
+
+      {/* Regeneration feedback modal */}
+      <Modal
+        isOpen={regenModalOpen}
+        onClose={() => setRegenModalOpen(false)}
+        title="Regenerate Program"
+      >
+        <p className="text-sm text-primary/70 mb-3">
+          The AI will generate a new program based on the original guidelines.
+          Optionally describe what you&apos;d like changed:
+        </p>
+        <textarea
+          value={regenFeedback}
+          onChange={(e) => setRegenFeedback(e.target.value)}
+          placeholder="e.g. More emphasis on compound lifts, reduce arm volume..."
+          rows={3}
+          className="w-full rounded-lg border border-primary/15 bg-bg px-3 py-2 text-sm text-primary placeholder:text-primary/30 focus:border-primary/40 focus:outline-none"
+        />
+        <div className="mt-4 flex gap-3">
+          <Button variant="secondary" fullWidth onClick={() => setRegenModalOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            fullWidth
+            onClick={() => {
+              const params = new URLSearchParams();
+              params.set("regenProgramId", program.id);
+              if (regenFeedback.trim()) params.set("regenFeedback", regenFeedback.trim());
+              router.push(`/clients/${program.client_id}/generate/loading?${params.toString()}`);
+            }}
+          >
+            Regenerate
+          </Button>
+        </div>
+      </Modal>
     </>
   );
 }
