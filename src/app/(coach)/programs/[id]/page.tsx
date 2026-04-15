@@ -76,39 +76,56 @@ export default async function ProgramDetailPage({
         {program.workout_templates.length === 0 ? (
           <p className="text-sm text-primary/40 italic">No workout days added yet.</p>
         ) : (
-          program.workout_templates.map((template) => (
-            <Card key={template.id}>
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="font-semibold text-primary">{template.title}</p>
-                  {template.notes && (
-                    <p className="mt-1 text-sm text-primary/60">{template.notes}</p>
-                  )}
-                </div>
-                {template.day_number != null && (
-                  <Badge>Day {template.day_number}</Badge>
-                )}
-              </div>
+          (() => {
+            const weekMap = new Map<number, typeof program.workout_templates>();
+            for (const t of program.workout_templates) {
+              const wn = t.week_number ?? 1;
+              if (!weekMap.has(wn)) weekMap.set(wn, []);
+              weekMap.get(wn)!.push(t);
+            }
+            return Array.from(weekMap.entries())
+              .sort(([a], [b]) => a - b)
+              .map(([weekNumber, templates]) => (
+                <div key={weekNumber} className="flex flex-col gap-3">
+                  <h4 className="text-sm font-semibold uppercase tracking-wide text-primary/50">
+                    Week {weekNumber}
+                  </h4>
+                  {templates.map((template) => (
+                    <Card key={template.id}>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="font-semibold text-primary">{template.title}</p>
+                          {template.notes && (
+                            <p className="mt-1 text-sm text-primary/60">{template.notes}</p>
+                          )}
+                        </div>
+                        {template.day_number != null && (
+                          <Badge>Day {template.day_number}</Badge>
+                        )}
+                      </div>
 
-              {template.exercises.length > 0 && (
-                <div className="mt-3 flex flex-col gap-1">
-                  {template.exercises.map((te) => (
-                    <div
-                      key={te.id}
-                      className="flex items-center justify-between rounded-lg bg-primary/5 px-3 py-2 text-sm"
-                    >
-                      <span className="text-primary">{te.exercise.name}</span>
-                      <span className="text-primary/50">
-                        {te.prescribed_sets && `${te.prescribed_sets}×`}
-                        {te.prescribed_reps ?? ""}
-                        {te.prescribed_weight ? ` @ ${te.prescribed_weight}` : ""}
-                      </span>
-                    </div>
+                      {template.exercises.length > 0 && (
+                        <div className="mt-3 flex flex-col gap-1">
+                          {template.exercises.map((te) => (
+                            <div
+                              key={te.id}
+                              className="flex items-center justify-between rounded-lg bg-primary/5 px-3 py-2 text-sm"
+                            >
+                              <span className="text-primary">{te.exercise.name}</span>
+                              <span className="text-primary/50">
+                                {te.prescribed_sets && `${te.prescribed_sets}×`}
+                                {te.prescribed_reps ?? ""}
+                                {te.prescribed_weight ? ` @ ${te.prescribed_weight}` : ""}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </Card>
                   ))}
                 </div>
-              )}
-            </Card>
-          ))
+              ));
+          })()
         )}
       </div>
     </>
