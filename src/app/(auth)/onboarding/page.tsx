@@ -30,8 +30,9 @@ export default async function OnboardingPage() {
     redirect("/home");
   }
 
-  // Clients (invited via magic link) need to set a password
-  const needsPassword = role === "client";
+  // Only invited clients (magic link) need to set a password;
+  // self-signup clients already set one during registration.
+  const needsPassword = role === "client" && !!user.invited_at;
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-4">
