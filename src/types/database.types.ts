@@ -1542,6 +1542,7 @@ export type Database = {
         }
         Returns: Json
       }
+      ensure_coach_code: { Args: { target_id: string }; Returns: string }
       get_my_role: { Args: never; Returns: string }
     }
     Enums: {

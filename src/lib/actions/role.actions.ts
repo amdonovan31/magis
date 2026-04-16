@@ -79,5 +79,12 @@ export async function addRoleToProfile(newRole: "coach" | "client" | "solo") {
       );
   }
 
+  // Ensure the user has a coach_code if they now have the coach role.
+  // The handle_new_user trigger only generates a code for fresh coach signups;
+  // users who upgrade into coach later need this explicit call.
+  if (newRole === "coach") {
+    await supabase.rpc("ensure_coach_code", { target_id: user.id });
+  }
+
   return { success: true };
 }

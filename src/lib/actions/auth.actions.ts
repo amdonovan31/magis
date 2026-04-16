@@ -30,13 +30,15 @@ export async function signUp(formData: FormData) {
 
   const supabase = await createClient();
 
-  // Resolve coach_code → coach_id if a code was entered (client self-signup)
+  // Resolve coach_code → coach_id if a code was entered (client self-signup).
+  // Filter on `roles` (the array of granted roles), not `role` (the currently
+  // active role) so multi-role coaches in client mode are still findable.
   if (coachCode && !coachId && role === "client") {
     const { data: coachProfile } = await supabase
       .from("profiles")
       .select("id")
       .eq("coach_code", coachCode)
-      .eq("role", "coach")
+      .contains("roles", ["coach"])
       .maybeSingle();
 
     if (!coachProfile) {
@@ -296,6 +298,19 @@ export async function completeOnboarding(input: {
 
   // Clients redirect to home
   redirect("/home");
+}
+
+export async function requestPasswordReset(formData: FormData) {
+  const email = (formData.get("email") as string)?.trim();
+  if (!email) return { error: "Email is required" };
+
+  const supabase = await createClient();
+  await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback?next=/reset-password`,
+  });
+
+  // Always return success to prevent email enumeration
+  return { success: true };
 }
 
 export async function signOut() {
