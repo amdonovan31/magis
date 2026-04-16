@@ -21,6 +21,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/login?error=auth_callback_error`);
   }
 
+  // Allow callers (e.g. password reset) to override the post-auth destination.
+  const next = searchParams.get("next");
+  if (next && next.startsWith("/")) {
+    return NextResponse.redirect(`${origin}${next}`);
+  }
+
   const user = data.user;
   // Role can come from app_metadata (set by trigger) or user_metadata (set by
   // inviteUserByEmail). For fresh invites the JWT predates the trigger, so

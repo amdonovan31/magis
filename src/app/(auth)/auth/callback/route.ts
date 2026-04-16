@@ -5,12 +5,18 @@ export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
 
-  // PKCE code exchange flow (normal sign-up / sign-in)
+  // PKCE code exchange flow (normal sign-up / sign-in / password reset)
   if (code) {
     const supabase = await createClient();
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error && data.user) {
+      // Allow callers (e.g. password reset) to override the post-auth destination.
+      const next = searchParams.get("next");
+      if (next && next.startsWith("/")) {
+        return NextResponse.redirect(`${origin}${next}`);
+      }
+
       return NextResponse.redirect(
         `${origin}${await getRedirectPath(supabase, data.user)}`
       );
@@ -41,10 +47,13 @@ export async function GET(request: NextRequest) {
     var accessToken = params.get('access_token');
     var refreshToken = params.get('refresh_token');
     if (accessToken && refreshToken) {
-      // Redirect to the complete endpoint with tokens as query params
+      // Forward any next param from the query string (e.g. password reset)
+      var qs = new URLSearchParams(window.location.search);
+      var next = qs.get('next') || '';
+      var extra = next ? '&next=' + encodeURIComponent(next) : '';
       window.location.href = '/auth/callback/complete?access_token=' +
         encodeURIComponent(accessToken) +
-        '&refresh_token=' + encodeURIComponent(refreshToken);
+        '&refresh_token=' + encodeURIComponent(refreshToken) + extra;
     } else {
       window.location.href = '/login?error=auth_callback_error';
     }

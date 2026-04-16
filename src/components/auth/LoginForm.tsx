@@ -39,6 +39,15 @@ export default function LoginForm() {
         required
       />
 
+      <div className="flex justify-end -mt-2">
+        <Link
+          href="/forgot-password"
+          className="text-xs font-medium text-[#1B2E4B] hover:underline"
+        >
+          Forgot your password?
+        </Link>
+      </div>
+
       {error && (
         <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
