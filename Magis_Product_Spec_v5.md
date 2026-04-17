@@ -78,7 +78,7 @@ The solo tier is not just a product — it is a top-of-funnel for coached conver
 
 | Feature | Description | Priority |
 |---|---|---|
-| AI Program Generator | Complete a 6-step onboarding wizard (profile, body metrics, PAR-Q, goals, equipment and focus preferences) — Claude generates a personalised 4-week program instantly with explanation of the approach | Must Have |
+| AI Program Generator | Complete the signup onboarding wizard (profile, body metrics, health disclaimer, PAR-Q, goals, equipment and focus preferences, review) — Claude generates a personalised 4-week program instantly with explanation of the approach | Must Have |
 | Live Set Logging | Log weight and reps for each set with minimal taps | Must Have |
 | Rest Timer | Auto-starts between sets | Must Have |
 | Exercise Demo | Text instructions and form cues for every exercise; muscle diagrams and media planned for Phase 2 | Must Have |
@@ -240,33 +240,54 @@ The onboarding experience is tailored for each user type from the first screen. 
 
 **Core principle:** Solo users and coaches never see the same onboarding. The app detects or asks user type at the very first screen and diverges immediately.
 
-### Solo / AI User Onboarding
+### Signup Onboarding (Solo + Coached Client)
 
 **Goal:** From download to first logged set in under 5 minutes.
+
+Both solo users and coached clients complete the same onboarding wizard at `/onboarding` (`OnboardingForm.tsx`). The wizard has 6 visible steps plus a health disclaimer interstitial:
+
+1. **Profile** — full name (+ password fields for invited clients only; self-signup clients already set theirs during registration)
+2. **Body metrics** — birthdate, gender, height, weight, training experience
+3. *Health disclaimer interstitial* — user acknowledges Magis provides fitness suggestions, not medical advice (not counted as a step in the progress indicator)
+4. **PAR-Q health screening** — 7 yes/no questions with optional notes
+5. **Training goals** — primary goal, secondary goal, injuries/limitations
+6. **Preferences** — days per week, session duration, training focus, equipment
+7. **Review** — summary of all answers before submission
+
+After submission, solo users receive an AI-generated program immediately. Coached clients are redirected to their home screen to await a coach-assigned program.
 
 | Step | 🏋️ Solo / AI User | 👤 Coach |
 |---|---|---|
 | 1 | Sign up: 'Get a smarter workout. No coach needed.' — email or Apple/Google sign-in | Sign up: 'Grow your coaching business with AI.' — separate CTA from solo user flow |
-| 2 | 6-step intake wizard: profile (name), body metrics (birthdate, gender, height, weight, training experience), PAR-Q health screening (7 questions), training goals, equipment and focus preferences, review | Name, email, password — straight to dashboard. No mandatory wizard. |
+| 2 | Complete signup onboarding wizard (see above) | Name, email, password — straight to dashboard. No mandatory wizard. |
 | 3 | Claude generates a personalised 4-week program instantly — shown with explanation of the approach | Coach profile (speciality, style, photo) available via settings at any time |
-| 4 | Result card with program title, day count and AI explanation — 'Start Training' button | Invite first client via email link from dashboard |
+| 4 | Result card with program title, day count and AI explanation — 'Start Training' button | Invite first client via email link or shareable coach code from dashboard |
 | 5 | Home screen: Today's Workout visible — one tap to start | First program generation — enter client brief and watch Claude build a full program |
 | 6 | Post-session: celebrate first completed workout, prompt to share to the social feed | Client accepts invite, completes intake, logs first workout — coach sees data in real time |
 | 7 | Day 3 nudge: 'You hit a PR on bench press. 3 friends reacted.' — social hook lands naturally | Week 1 summary: coach sees client activity, PRs, and agent substitutions in the activity log |
 
 ### Coached Client Onboarding
 
-Coached clients are invited by their coach. They complete the same 6-step intake wizard as solo users, ensuring coaches receive accurate, first-party health and preference data directly from the client.
+Coached clients join via email invite (magic link) or self-signup with a coach code. They complete the same signup onboarding wizard as solo users, ensuring coaches receive accurate, first-party health and preference data directly from the client.
 
-1. Coach sends email invite from the dashboard — client receives a personalised link
-2. Client clicks link, creates an account — name, email, password
-3. Client completes 6-step intake: profile, body metrics, PAR-Q, goals, equipment preferences, review
+1. Coach sends email invite or shares their coach code (format: `XXXXX-YYY`)
+2. Client clicks invite link or enters coach code during self-signup — creates account
+3. Client completes signup onboarding wizard (6 steps + disclaimer — see above)
 4. Intake data saved with coach ID — visible on coach dashboard immediately
 5. Client sees their assigned program waiting — coach's name visible throughout
 6. Client taps to start today's workout — lands directly in the live logging screen
 7. Post-session: session summary shown, prompt to share to the social feed
 
 The coached client experience is deliberate: the client does their own intake so the coach receives accurate, first-party health data. The program is already there. The coach has done the work. The client's only job is to show up and log.
+
+### Re-Intake Flow
+
+When a coach enrolls as their own client (via `EnrollAsClientButton`) or requests an intake refresh, a shorter 4-step re-intake wizard is shown at `/onboarding/intake` (`IntakeForm.tsx`). Profile and body metrics are pulled from the existing `profiles` row, so the wizard skips straight to:
+
+1. **PAR-Q health screening**
+2. **Training goals**
+3. **Preferences**
+4. **Review**
 
 ### Onboarding Messaging by User Type
 
