@@ -100,6 +100,67 @@ export async function getScheduledWorkouts(
 }
 
 /**
+ * Fetch scheduled workouts for a specific client (coach calling on their behalf).
+ * Authorization must be verified by the caller before invoking.
+ */
+export async function getScheduledWorkoutsForClient(
+  clientId: string,
+  startDate: string,
+  endDate: string
+): Promise<ScheduledWorkoutWithDetails[]> {
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("scheduled_workouts")
+    .select(`
+      id,
+      scheduled_date,
+      status,
+      session_id,
+      program:programs!inner(id, title),
+      template:workout_templates!inner(
+        id,
+        title,
+        exercises:workout_template_exercises(
+          id,
+          position,
+          prescribed_sets,
+          prescribed_reps,
+          prescribed_weight,
+          rest_seconds,
+          alternate_exercise_ids,
+          exercise:exercises(id, name, muscle_group)
+        )
+      )
+    `)
+    .eq("client_id", clientId)
+    .gte("scheduled_date", startDate)
+    .lte("scheduled_date", endDate)
+    .in("status", ["scheduled", "completed", "missed", "skipped"])
+    .order("scheduled_date", { ascending: true });
+
+  if (!data) return [];
+
+  return data.map((row) => {
+    const program = row.program as unknown as { id: string; title: string };
+    const template = row.template as unknown as ScheduledWorkoutWithDetails["template"];
+    return {
+      id: row.id,
+      scheduled_date: row.scheduled_date,
+      status: row.status,
+      session_id: row.session_id,
+      program,
+      template: {
+        ...template,
+        exercises: (template.exercises ?? []).sort(
+          (a, b) => a.position - b.position
+        ),
+      },
+    };
+  });
+}
+
+/**
  * Fetch a single scheduled workout by ID with full exercise details.
  */
 export async function getScheduledWorkout(
