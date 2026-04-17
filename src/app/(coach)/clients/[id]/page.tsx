@@ -38,10 +38,9 @@ export default async function ClientDetailPage({
   if (!relationship) notFound();
 
   const today = new Date();
-  const twentyEightDaysAgo = new Date(today);
-  twentyEightDaysAgo.setDate(today.getDate() - 27);
-  const calendarStart = twentyEightDaysAgo.toISOString().split("T")[0];
-  const calendarEnd = today.toISOString().split("T")[0];
+  const calendarStart = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-01`;
+  const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  const calendarEnd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
   const [
     { data: profile },

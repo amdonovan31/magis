@@ -2,6 +2,7 @@
 
 interface ActivityDay {
   date: string;
+  dayNum: number;
   status: "completed" | "missed" | "skipped" | "scheduled" | "none";
 }
 
@@ -14,32 +15,45 @@ interface ActivityCalendarProps {
 
 const DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
 
+function buildCalendarMonth(): { year: number; month: number; daysInMonth: number; startDow: number } {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstOfMonth = new Date(year, month, 1);
+  const dow = firstOfMonth.getDay();
+  const startDow = dow === 0 ? 6 : dow - 1; // Monday = 0
+  return { year, month, daysInMonth, startDow };
+}
+
 function buildDays(
   sessions: ActivityCalendarProps["sessions"],
-  scheduledDates: string[]
+  scheduledDates: string[],
+  year: number,
+  month: number,
+  daysInMonth: number
 ): ActivityDay[] {
   const sessionMap = new Map(sessions.map((s) => [s.date, s.status]));
   const scheduledSet = new Set(scheduledDates);
 
-  const today = new Date();
   const days: ActivityDay[] = [];
-
-  for (let i = 27; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    const iso = d.toISOString().split("T")[0];
-
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    let status: ActivityDay["status"] = "none";
     if (sessionMap.has(iso)) {
-      days.push({ date: iso, status: sessionMap.get(iso)! });
+      status = sessionMap.get(iso)!;
     } else if (scheduledSet.has(iso)) {
-      days.push({ date: iso, status: "scheduled" });
-    } else {
-      days.push({ date: iso, status: "none" });
+      status = "scheduled";
     }
+    days.push({ date: iso, dayNum: d, status });
   }
-
   return days;
 }
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
 
 export default function ActivityCalendar({
   sessions,
@@ -47,47 +61,53 @@ export default function ActivityCalendar({
   currentStreak,
   longestStreak,
 }: ActivityCalendarProps) {
-  const days = buildDays(sessions, scheduledDates);
-  const todayIso = new Date().toISOString().split("T")[0];
-
-  const firstDayOfWeek = new Date(days[0].date).getDay();
-  const mondayOffset = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+  const { year, month, daysInMonth, startDow } = buildCalendarMonth();
+  const days = buildDays(sessions, scheduledDates, year, month, daysInMonth);
+  const todayNum = new Date().getDate();
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex gap-1 justify-center">
+      <p className="text-center text-sm font-semibold text-primary">
+        {MONTH_NAMES[month]} {year}
+      </p>
+
+      <div className="grid grid-cols-7 gap-1">
         {DAY_LABELS.map((label, i) => (
           <div
             key={i}
-            className="w-8 text-center text-[10px] font-medium text-primary/30"
+            className="text-center text-[10px] font-medium text-primary/30 pb-1"
           >
             {label}
           </div>
         ))}
-      </div>
 
-      <div className="flex flex-wrap gap-1 justify-center">
-        {Array.from({ length: mondayOffset }).map((_, i) => (
-          <div key={`pad-${i}`} className="h-8 w-8" />
+        {Array.from({ length: startDow }).map((_, i) => (
+          <div key={`pad-${i}`} />
         ))}
 
         {days.map((day) => {
-          const isToday = day.date === todayIso;
-          let bg = "bg-primary/8";
-          if (day.status === "completed") bg = "bg-primary";
-          else if (day.status === "missed" || day.status === "skipped")
-            bg = "bg-transparent border-2 border-red-300";
-          else if (day.status === "scheduled")
-            bg = "bg-transparent border-2 border-primary/20";
+          const isToday = day.dayNum === todayNum;
+          const isFuture = day.dayNum > todayNum;
+
+          let cellClass = "bg-surface text-primary/60";
+          if (isFuture) {
+            cellClass = "bg-surface text-primary/20";
+          } else if (day.status === "completed") {
+            cellClass = "bg-primary text-white";
+          } else if (day.status === "missed" || day.status === "skipped") {
+            cellClass = "bg-surface text-red-500";
+          }
 
           return (
             <div
               key={day.date}
               title={`${day.date} — ${day.status}`}
-              className={`h-8 w-8 rounded-md transition-colors ${bg} ${
+              className={`flex h-9 items-center justify-center rounded-lg text-xs font-semibold transition-colors ${cellClass} ${
                 isToday ? "ring-2 ring-accent ring-offset-1" : ""
               }`}
-            />
+            >
+              {day.dayNum}
+            </div>
           );
         })}
       </div>
