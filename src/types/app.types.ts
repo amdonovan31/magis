@@ -194,6 +194,11 @@ export type VolumeDataPoint = {
   setCount: number;
 };
 
+export type VolumeResult = {
+  data: VolumeDataPoint[];
+  unit: "kg" | "lbs";
+};
+
 // Consistent color mapping for muscle groups in charts
 export const MUSCLE_GROUP_COLORS: Record<string, string> = {
   Chest: "#E07A5F",

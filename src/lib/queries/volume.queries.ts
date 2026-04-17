@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getWeekStartUTC } from "@/lib/utils/date";
-import type { VolumeDataPoint } from "@/types/app.types";
+import type { VolumeDataPoint, VolumeResult } from "@/types/app.types";
 
 // Alias for backward compatibility within this file
 const getWeekStart = getWeekStartUTC;
@@ -38,6 +38,18 @@ async function resolveUserId(
   }
 
   return user.id;
+}
+
+async function getPreferredUnit(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+): Promise<"kg" | "lbs"> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("preferred_unit")
+    .eq("id", userId)
+    .single();
+  return (data?.preferred_unit as "kg" | "lbs") ?? "lbs";
 }
 
 /**
@@ -129,13 +141,17 @@ export async function getWeeklyVolume(
   clientId?: string,
   muscleGroup?: string,
   weeksBack: number = 12
-): Promise<VolumeDataPoint[]> {
+): Promise<VolumeResult> {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - weeksBack * 7);
   const cutoffDate = cutoff.toISOString();
 
+  const supabase = await createClient();
+  const userId = await resolveUserId(supabase, clientId);
+  const unit = userId ? await getPreferredUnit(supabase, userId) : "lbs";
+
   const logs = await fetchSetLogs(clientId, cutoffDate);
-  if (logs.length === 0) return [];
+  if (logs.length === 0) return { data: [], unit };
 
   // Aggregate by week + muscle group
   const map = new Map<string, { totalVolume: number; setCount: number }>();
@@ -167,7 +183,7 @@ export async function getWeeklyVolume(
   });
 
   result.sort((a, b) => a.periodStart.localeCompare(b.periodStart));
-  return result;
+  return { data: result, unit };
 }
 
 /**
@@ -178,13 +194,17 @@ export async function getMonthlyVolume(
   clientId?: string,
   muscleGroup?: string,
   monthsBack: number = 6
-): Promise<VolumeDataPoint[]> {
+): Promise<VolumeResult> {
   const cutoff = new Date();
   cutoff.setMonth(cutoff.getMonth() - monthsBack);
   const cutoffDate = cutoff.toISOString();
 
+  const supabase = await createClient();
+  const userId = await resolveUserId(supabase, clientId);
+  const unit = userId ? await getPreferredUnit(supabase, userId) : "lbs";
+
   const logs = await fetchSetLogs(clientId, cutoffDate);
-  if (logs.length === 0) return [];
+  if (logs.length === 0) return { data: [], unit };
 
   const map = new Map<string, { totalVolume: number; setCount: number }>();
 
@@ -215,5 +235,5 @@ export async function getMonthlyVolume(
   });
 
   result.sort((a, b) => a.periodStart.localeCompare(b.periodStart));
-  return result;
+  return { data: result, unit };
 }

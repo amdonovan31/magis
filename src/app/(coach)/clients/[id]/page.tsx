@@ -51,7 +51,7 @@ export default async function ClientDetailPage({
     { data: sessions },
     notes,
     prs,
-    volumeData,
+    volumeResult,
     streakData,
     scheduledWorkouts,
   ] = await Promise.all([
@@ -349,7 +349,7 @@ export default async function ClientDetailPage({
         <h3 className="text-sm font-semibold uppercase tracking-wide text-primary/50">
           Training Volume
         </h3>
-        <VolumeWithRange volumeData={volumeData} />
+        <VolumeWithRange volumeData={volumeResult.data} unit={volumeResult.unit} />
 
         {/* 6. Notes & Messages */}
         <h3 className="text-sm font-semibold uppercase tracking-wide text-primary/50">

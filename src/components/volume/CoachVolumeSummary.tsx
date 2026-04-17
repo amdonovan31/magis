@@ -7,6 +7,7 @@ import { MUSCLE_GROUP_COLORS } from "@/types/app.types";
 
 interface CoachVolumeSummaryProps {
   volumeData: VolumeDataPoint[];
+  unit?: "kg" | "lbs";
 }
 
 interface MuscleGroupSummary {
@@ -75,6 +76,7 @@ function buildSummaries(data: VolumeDataPoint[]): {
 
 export default function CoachVolumeSummary({
   volumeData,
+  unit = "lbs",
 }: CoachVolumeSummaryProps) {
   if (volumeData.length === 0) {
     return (
@@ -98,7 +100,7 @@ export default function CoachVolumeSummary({
             <p className="text-xs text-primary/50">This Week</p>
             <p className="text-lg font-semibold text-primary">
               {totalThisWeek.toLocaleString()}{" "}
-              <span className="text-sm font-normal text-primary/50">kg</span>
+              <span className="text-sm font-normal text-primary/50">{unit}</span>
             </p>
           </div>
           {pctChange !== null && pctChange !== 0 && (
@@ -129,7 +131,7 @@ export default function CoachVolumeSummary({
                 <span className="font-semibold">
                   {s.thisWeekVolume.toLocaleString()}
                 </span>
-                <span className="text-primary/50 ml-1">kg</span>
+                <span className="text-primary/50 ml-1">{unit}</span>
               </p>
             </div>
             {s.sparklineValues.length >= 2 && (

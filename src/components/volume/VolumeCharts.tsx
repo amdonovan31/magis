@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Card from "@/components/ui/Card";
 import Sparkline from "@/components/pr/Sparkline";
 import Spinner from "@/components/ui/Spinner";
 import VolumeBarChart from "@/components/volume/VolumeBarChart";
+import BodyHeatMap from "@/components/volume/BodyHeatMap";
 import {
   fetchWeeklyVolume,
   fetchMonthlyVolume,
@@ -15,6 +16,7 @@ import { MUSCLE_GROUP_COLORS } from "@/types/app.types";
 
 interface VolumeChartsProps {
   initialData: VolumeDataPoint[];
+  unit?: "kg" | "lbs";
 }
 
 interface MuscleGroupSummary {
@@ -79,7 +81,7 @@ const TIME_RANGES: { key: TimeRange; label: string }[] = [
   { key: "6m", label: "6 mo" },
 ];
 
-export default function VolumeCharts({ initialData }: VolumeChartsProps) {
+export default function VolumeCharts({ initialData, unit = "lbs" }: VolumeChartsProps) {
   const [timeRange, setTimeRange] = useState<TimeRange>("8w");
   const [aggregation, setAggregation] = useState<Aggregation>("weekly");
   const [chartData, setChartData] = useState<VolumeDataPoint[]>(initialData);
@@ -91,11 +93,11 @@ export default function VolumeCharts({ initialData }: VolumeChartsProps) {
 
     async function fetchData() {
       setLoading(true);
-      let result: VolumeDataPoint[];
 
       if (aggregation === "monthly") {
         const months = timeRange === "6m" ? 6 : timeRange === "12w" ? 3 : 3;
-        result = await fetchMonthlyVolume(months);
+        const { data } = await fetchMonthlyVolume(months);
+        if (!cancelled) setChartData(data);
       } else {
         const weeks =
           timeRange === "4w"
@@ -105,13 +107,11 @@ export default function VolumeCharts({ initialData }: VolumeChartsProps) {
               : timeRange === "12w"
                 ? 12
                 : 26;
-        result = await fetchWeeklyVolume(weeks);
+        const { data } = await fetchWeeklyVolume(weeks);
+        if (!cancelled) setChartData(data);
       }
 
-      if (!cancelled) {
-        setChartData(result);
-        setLoading(false);
-      }
+      if (!cancelled) setLoading(false);
     }
 
     // Skip fetch on initial render if we have initialData and defaults match
@@ -128,6 +128,14 @@ export default function VolumeCharts({ initialData }: VolumeChartsProps) {
 
   const summaries = buildSummaries(chartData);
 
+  const volumeByMuscle = useMemo(() => {
+    const result: Record<string, number> = {};
+    for (const d of chartData) {
+      result[d.muscleGroup] = (result[d.muscleGroup] ?? 0) + d.totalVolume;
+    }
+    return result;
+  }, [chartData]);
+
   if (initialData.length === 0 && chartData.length === 0) {
     return (
       <div className="flex flex-col items-center py-10 text-center">
@@ -141,6 +149,9 @@ export default function VolumeCharts({ initialData }: VolumeChartsProps) {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Body heat map */}
+      <BodyHeatMap volumeByMuscle={volumeByMuscle} unit={unit} />
+
       {/* Section 1: Muscle group summary cards */}
       <div className="flex flex-col gap-2">
         {summaries.map((s) => {
@@ -179,7 +190,7 @@ export default function VolumeCharts({ initialData }: VolumeChartsProps) {
                       <span className="font-semibold">
                         {s.thisWeekVolume.toLocaleString()}
                       </span>
-                      <span className="text-primary/50 ml-1">kg</span>
+                      <span className="text-primary/50 ml-1">{unit}</span>
                     </p>
                     <span className="text-xs text-primary/40">
                       {s.thisWeekSets} sets
@@ -255,7 +266,7 @@ export default function VolumeCharts({ initialData }: VolumeChartsProps) {
             No data for this period.
           </p>
         ) : (
-          <VolumeBarChart data={chartData} periodType={aggregation} />
+          <VolumeBarChart data={chartData} periodType={aggregation} unit={unit} />
         )}
       </Card>
     </div>

@@ -47,7 +47,7 @@ function WorkoutsList({ sessions }: { sessions: SessionWithTemplate[] }) {
 }
 
 export default async function HistoryPage() {
-  const [rawSessions, prs, measurements, volumeData] = await Promise.all([
+  const [rawSessions, prs, measurements, volumeResult] = await Promise.all([
     getClientHistory(),
     getAllPRs(),
     getMeasurements(),
@@ -64,7 +64,7 @@ export default async function HistoryPage() {
             workoutsContent={<WorkoutsList sessions={sessions} />}
             prs={prs}
             measurementsContent={<MeasurementsHistory measurements={measurements} />}
-            volumeContent={<VolumeCharts initialData={volumeData} />}
+            volumeContent={<VolumeCharts initialData={volumeResult.data} unit={volumeResult.unit} />}
           />
         </Suspense>
       </div>

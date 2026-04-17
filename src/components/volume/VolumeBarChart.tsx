@@ -7,6 +7,7 @@ import { MUSCLE_GROUP_COLORS } from "@/types/app.types";
 interface VolumeBarChartProps {
   data: VolumeDataPoint[];
   periodType: "weekly" | "monthly";
+  unit?: "kg" | "lbs";
 }
 
 const CHART_HEIGHT = 220;
@@ -29,6 +30,7 @@ function formatVolume(v: number): string {
 export default function VolumeBarChart({
   data,
   periodType,
+  unit = "lbs",
 }: VolumeBarChartProps) {
   const [activeBar, setActiveBar] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -183,7 +185,7 @@ export default function VolumeBarChart({
             {formatPeriodLabel(activeData.period, periodType)}
           </p>
           <p className="text-white/70">
-            Total: {activeData.total.toLocaleString()} kg
+            Total: {activeData.total.toLocaleString()} {unit}
           </p>
           {activeData.segments
             .filter((s) => s.volume > 0)
