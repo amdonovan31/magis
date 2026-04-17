@@ -108,12 +108,14 @@ export default function ActivityCalendar({
           const isFuture = day.date > todayIso;
 
           let cellClass = "bg-surface text-primary/60";
-          if (isFuture) {
-            cellClass = "bg-surface text-primary/20";
-          } else if (day.status === "completed") {
+          if (day.status === "completed") {
             cellClass = "bg-primary text-white";
           } else if (day.status === "missed" || day.status === "skipped") {
             cellClass = "bg-surface text-red-500";
+          } else if (day.status === "scheduled") {
+            cellClass = "bg-surface text-primary/60 ring-2 ring-inset ring-primary/30";
+          } else if (isFuture) {
+            cellClass = "bg-surface text-primary/20";
           }
 
           return (
