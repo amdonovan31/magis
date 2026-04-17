@@ -1,10 +1,6 @@
 "use client";
 
-interface ActivityDay {
-  date: string;
-  dayNum: number;
-  status: "completed" | "missed" | "skipped" | "scheduled" | "none";
-}
+import { useState, useMemo } from "react";
 
 interface ActivityCalendarProps {
   sessions: { date: string; status: "completed" | "missed" | "skipped" }[];
@@ -13,47 +9,25 @@ interface ActivityCalendarProps {
   longestStreak: number;
 }
 
-const DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
+const DAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 
-function buildCalendarMonth(): { year: number; month: number; daysInMonth: number; startDow: number } {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstOfMonth = new Date(year, month, 1);
-  const dow = firstOfMonth.getDay();
-  const startDow = dow === 0 ? 6 : dow - 1; // Monday = 0
-  return { year, month, daysInMonth, startDow };
+function getSunday(date: Date): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() - d.getDay());
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
 
-function buildDays(
-  sessions: ActivityCalendarProps["sessions"],
-  scheduledDates: string[],
-  year: number,
-  month: number,
-  daysInMonth: number
-): ActivityDay[] {
-  const sessionMap = new Map(sessions.map((s) => [s.date, s.status]));
-  const scheduledSet = new Set(scheduledDates);
-
-  const days: ActivityDay[] = [];
-  for (let d = 1; d <= daysInMonth; d++) {
-    const iso = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    let status: ActivityDay["status"] = "none";
-    if (sessionMap.has(iso)) {
-      status = sessionMap.get(iso)!;
-    } else if (scheduledSet.has(iso)) {
-      status = "scheduled";
-    }
-    days.push({ date: iso, dayNum: d, status });
-  }
-  return days;
+function toIso(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
-const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
+function formatShortDate(date: Date): string {
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
 
 export default function ActivityCalendar({
   sessions,
@@ -61,15 +35,63 @@ export default function ActivityCalendar({
   currentStreak,
   longestStreak,
 }: ActivityCalendarProps) {
-  const { year, month, daysInMonth, startDow } = buildCalendarMonth();
-  const days = buildDays(sessions, scheduledDates, year, month, daysInMonth);
-  const todayNum = new Date().getDate();
+  const [weekOffset, setWeekOffset] = useState(0);
+
+  const sessionMap = useMemo(
+    () => new Map(sessions.map((s) => [s.date, s.status])),
+    [sessions]
+  );
+  const scheduledSet = useMemo(() => new Set(scheduledDates), [scheduledDates]);
+
+  const todayIso = toIso(new Date());
+
+  const thisSunday = getSunday(new Date());
+
+  // Default view: 4 weeks ending with current week
+  // weekOffset shifts the window: negative = further back, positive = forward
+  const startSunday = new Date(thisSunday);
+  startSunday.setDate(startSunday.getDate() - 21 + weekOffset * 7);
+
+  const endSaturday = new Date(startSunday);
+  endSaturday.setDate(endSaturday.getDate() + 27);
+
+  const days: { date: string; dayNum: number; status: string }[] = [];
+  for (let i = 0; i < 28; i++) {
+    const d = new Date(startSunday);
+    d.setDate(d.getDate() + i);
+    const iso = toIso(d);
+    let status = "none";
+    if (sessionMap.has(iso)) {
+      status = sessionMap.get(iso)!;
+    } else if (scheduledSet.has(iso)) {
+      status = "scheduled";
+    }
+    days.push({ date: iso, dayNum: d.getDate(), status });
+  }
+
+  const rangeLabel = `${formatShortDate(startSunday)} – ${formatShortDate(endSaturday)}`;
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-center text-sm font-semibold text-primary">
-        {MONTH_NAMES[month]} {year}
-      </p>
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => setWeekOffset((o) => o - 4)}
+          className="flex h-7 w-7 items-center justify-center rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-colors"
+          aria-label="Previous weeks"
+        >
+          &#x25B2;
+        </button>
+        <p className="text-center text-sm font-semibold text-primary">
+          {rangeLabel}
+        </p>
+        <button
+          onClick={() => setWeekOffset((o) => o + 4)}
+          className="flex h-7 w-7 items-center justify-center rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-colors"
+          aria-label="Next weeks"
+        >
+          &#x25BC;
+        </button>
+      </div>
 
       <div className="grid grid-cols-7 gap-1">
         {DAY_LABELS.map((label, i) => (
@@ -81,13 +103,9 @@ export default function ActivityCalendar({
           </div>
         ))}
 
-        {Array.from({ length: startDow }).map((_, i) => (
-          <div key={`pad-${i}`} />
-        ))}
-
         {days.map((day) => {
-          const isToday = day.dayNum === todayNum;
-          const isFuture = day.dayNum > todayNum;
+          const isToday = day.date === todayIso;
+          const isFuture = day.date > todayIso;
 
           let cellClass = "bg-surface text-primary/60";
           if (isFuture) {
@@ -116,14 +134,26 @@ export default function ActivityCalendar({
         <span>
           {currentStreak > 0 ? (
             <>
-              <span className="font-semibold text-primary">{currentStreak}w</span> streak
+              <span className="font-semibold text-primary">
+                {currentStreak}w
+              </span>{" "}
+              streak
             </>
           ) : (
             "No active streak"
           )}
         </span>
+        {weekOffset !== 0 && (
+          <button
+            onClick={() => setWeekOffset(0)}
+            className="text-xs font-medium text-accent hover:underline"
+          >
+            Today
+          </button>
+        )}
         <span>
-          Best: <span className="font-semibold text-primary">{longestStreak}w</span>
+          Best:{" "}
+          <span className="font-semibold text-primary">{longestStreak}w</span>
         </span>
       </div>
     </div>

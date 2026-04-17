@@ -38,9 +38,12 @@ export default async function ClientDetailPage({
   if (!relationship) notFound();
 
   const today = new Date();
-  const calendarStart = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-01`;
-  const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-  const calendarEnd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+  const calStart = new Date(today);
+  calStart.setDate(calStart.getDate() - 12 * 7);
+  const calEnd = new Date(today);
+  calEnd.setDate(calEnd.getDate() + 4 * 7);
+  const calendarStart = calStart.toISOString().split("T")[0];
+  const calendarEnd = calEnd.toISOString().split("T")[0];
 
   const [
     { data: profile },
