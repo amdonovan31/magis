@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionSummary } from "@/lib/queries/summary.queries";
 import { getStreakData } from "@/lib/queries/streaks.queries";
+import { isTemplateSaved } from "@/lib/queries/saved-workout.queries";
 import { formatDate, formatDuration } from "@/lib/utils/date";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
@@ -11,6 +12,7 @@ import PostSessionNote from "@/components/notes/PostSessionNote";
 import StreakMilestoneBanner from "@/components/streaks/StreakMilestoneBanner";
 import ProgramDisclaimerFooter from "@/components/disclaimer/ProgramDisclaimerFooter";
 import ConfettiBurst from "@/components/workout/ConfettiBurst";
+import SaveWorkoutButton from "@/components/library/SaveWorkoutButton";
 
 interface SummaryPageProps {
   params: Promise<{ sessionId: string }>;
@@ -46,6 +48,18 @@ export default async function SummaryPage({ params }: SummaryPageProps) {
   ]);
 
   const firstName = profile?.full_name?.split(" ")[0] ?? "champ";
+
+  // Check if this workout can/should be saved to library
+  const { data: sessionRow } = await supabase
+    .from("workout_sessions")
+    .select("workout_template_id, program_id")
+    .eq("id", sessionId)
+    .single();
+
+  const templateId = sessionRow?.workout_template_id;
+  const isFreeWorkout = !templateId;
+  const alreadySaved = templateId ? await isTemplateSaved(templateId) : false;
+  const showSavePrompt = isFreeWorkout || !alreadySaved;
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -164,6 +178,17 @@ export default async function SummaryPage({ params }: SummaryPageProps) {
             clientId={user.id}
             coachId={relationship.coach_id}
             sessionId={sessionId}
+          />
+        )}
+
+        {/* Save to Library */}
+        {showSavePrompt && (
+          <SaveWorkoutButton
+            sessionId={sessionId}
+            suggestedTitle={summary.templateTitle}
+            source={isFreeWorkout ? "custom" : "program"}
+            templateId={templateId ?? undefined}
+            programTitle={summary.programTitle || undefined}
           />
         )}
 

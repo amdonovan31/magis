@@ -1,14 +1,17 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getSavedWorkoutDetail } from "@/lib/queries/saved-workout.queries";
 import FreeWorkoutClient from "@/components/workout/FreeWorkoutClient";
 import type { SetLog } from "@/types/app.types";
 
 interface FreeWorkoutPageProps {
   params: Promise<{ sessionId: string }>;
+  searchParams: Promise<{ saved?: string }>;
 }
 
-export default async function FreeWorkoutPage({ params }: FreeWorkoutPageProps) {
+export default async function FreeWorkoutPage({ params, searchParams }: FreeWorkoutPageProps) {
   const { sessionId } = await params;
+  const { saved: savedWorkoutId } = await searchParams;
 
   const supabase = await createClient();
   const {
@@ -38,12 +41,37 @@ export default async function FreeWorkoutPage({ params }: FreeWorkoutPageProps) 
     .single();
   const preferredUnit = (profile?.preferred_unit as "kg" | "lbs") ?? "lbs";
 
+  // If started from a saved workout, fetch the template exercises
+  let initialExercises: {
+    exerciseId: string;
+    exerciseName: string;
+    muscleGroup: string | null;
+    defaultSets: number;
+    defaultReps: string | null;
+    defaultWeight: string | null;
+  }[] | undefined;
+
+  if (savedWorkoutId && (!setLogs || setLogs.length === 0)) {
+    const saved = await getSavedWorkoutDetail(savedWorkoutId);
+    if (saved) {
+      initialExercises = saved.exercises.map((e) => ({
+        exerciseId: e.exercise_id,
+        exerciseName: e.exercise?.name ?? "Exercise",
+        muscleGroup: e.exercise?.muscle_group ?? null,
+        defaultSets: e.default_sets,
+        defaultReps: e.default_reps,
+        defaultWeight: e.default_weight,
+      }));
+    }
+  }
+
   return (
     <FreeWorkoutClient
       sessionId={sessionId}
       startedAt={session.started_at}
       existingLogs={(setLogs ?? []) as SetLog[]}
       preferredUnit={preferredUnit}
+      initialExercises={initialExercises}
     />
   );
 }

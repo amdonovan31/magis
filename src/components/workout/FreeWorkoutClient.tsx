@@ -33,11 +33,21 @@ type FreeExercise = {
   sets: FreeSet[];
 };
 
+type InitialExercise = {
+  exerciseId: string;
+  exerciseName: string;
+  muscleGroup: string | null;
+  defaultSets: number;
+  defaultReps: string | null;
+  defaultWeight: string | null;
+};
+
 interface FreeWorkoutClientProps {
   sessionId: string;
   startedAt: string;
   existingLogs: SetLog[];
   preferredUnit: "kg" | "lbs";
+  initialExercises?: InitialExercise[];
 }
 
 function formatElapsed(seconds: number): string {
@@ -51,6 +61,7 @@ export default function FreeWorkoutClient({
   startedAt,
   existingLogs,
   preferredUnit,
+  initialExercises,
 }: FreeWorkoutClientProps) {
   const router = useRouter();
   const [exercises, setExercises] = useState<FreeExercise[]>([]);
@@ -61,9 +72,36 @@ export default function FreeWorkoutClient({
   const [discarding, setDiscarding] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Hydrate from existing set_logs (resume support)
+  // Hydrate from initial exercises (saved workout), existing logs (resume), or localStorage
   useEffect(() => {
     if (existingLogs.length === 0) {
+      // Priority 1: initial exercises from saved workout
+      if (initialExercises?.length) {
+        const hydrated: FreeExercise[] = initialExercises.map((ie) => ({
+          exerciseId: ie.exerciseId,
+          exerciseName: ie.exerciseName,
+          muscleGroup: ie.muscleGroup,
+          sets: Array.from({ length: ie.defaultSets }, (_, i) => ({
+            setNumber: i + 1,
+            reps: ie.defaultReps ? parseInt(ie.defaultReps) || null : null,
+            weight: ie.defaultWeight,
+            isCompleted: false,
+            saving: false,
+          })),
+        }));
+        setExercises(hydrated);
+        persistFreeExerciseList(
+          sessionId,
+          hydrated.map((e) => ({
+            exerciseId: e.exerciseId,
+            exerciseName: e.exerciseName,
+            muscleGroup: e.muscleGroup,
+          }))
+        );
+        return;
+      }
+
+      // Priority 2: localStorage persistence
       const persisted = getPersistedSession(sessionId);
       if (persisted?.mode === "free" && persisted.freeExercises?.length) {
         const restored: FreeExercise[] = persisted.freeExercises.map((fe) => ({

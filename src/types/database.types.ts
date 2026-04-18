@@ -1093,6 +1093,111 @@ export type Database = {
           },
         ]
       }
+      saved_workout_exercises: {
+        Row: {
+          default_reps: string | null
+          default_sets: number
+          default_weight: string | null
+          exercise_id: string
+          id: string
+          notes: string | null
+          position: number
+          rest_seconds: number | null
+          saved_workout_id: string
+        }
+        Insert: {
+          default_reps?: string | null
+          default_sets?: number
+          default_weight?: string | null
+          exercise_id: string
+          id?: string
+          notes?: string | null
+          position: number
+          rest_seconds?: number | null
+          saved_workout_id: string
+        }
+        Update: {
+          default_reps?: string | null
+          default_sets?: number
+          default_weight?: string | null
+          exercise_id?: string
+          id?: string
+          notes?: string | null
+          position?: number
+          rest_seconds?: number | null
+          saved_workout_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_workout_exercises_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_workout_exercises_saved_workout_id_fkey"
+            columns: ["saved_workout_id"]
+            isOneToOne: false
+            referencedRelation: "saved_workouts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saved_workouts: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          last_used_at: string | null
+          source: string
+          source_program_title: string | null
+          source_template_id: string | null
+          title: string
+          updated_at: string
+          use_count: number
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          last_used_at?: string | null
+          source?: string
+          source_program_title?: string | null
+          source_template_id?: string | null
+          title: string
+          updated_at?: string
+          use_count?: number
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          last_used_at?: string | null
+          source?: string
+          source_program_title?: string | null
+          source_template_id?: string | null
+          title?: string
+          updated_at?: string
+          use_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_workouts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_workouts_source_template_id_fkey"
+            columns: ["source_template_id"]
+            isOneToOne: false
+            referencedRelation: "workout_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scheduled_workouts: {
         Row: {
           client_id: string

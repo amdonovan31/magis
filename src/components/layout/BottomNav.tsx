@@ -64,6 +64,12 @@ const clientNav: NavItem[] = [
     activeIcon: <HistoryIcon filled />,
   },
   {
+    href: "/my-library",
+    label: "Library",
+    icon: <BookIcon />,
+    activeIcon: <BookIcon filled />,
+  },
+  {
     href: "/profile",
     label: "Profile",
     icon: <UserIcon />,
