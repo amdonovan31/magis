@@ -591,7 +591,37 @@ export default function ProgramEditor({
                 </div>
               )}
 
-              {/* Exercises */}
+              {/* Cardio prescription (cardio days) */}
+              {(template as unknown as { type?: string }).type === "cardio" ? (() => {
+                const t = template as unknown as {
+                  cardio_modality?: string | null;
+                  cardio_duration_minutes?: number | null;
+                  cardio_distance_target?: number | null;
+                  cardio_distance_unit?: string | null;
+                  cardio_hr_zone?: number | null;
+                  cardio_notes?: string | null;
+                };
+                return (
+                  <div className="rounded-lg bg-bg/50 px-3 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-primary/40 mb-2">Cardio</p>
+                    <div className="flex flex-col gap-1 text-sm text-primary">
+                      {t.cardio_modality && <p>{t.cardio_modality}</p>}
+                      <div className="flex gap-3 text-xs text-primary/60">
+                        {t.cardio_duration_minutes && <span>{t.cardio_duration_minutes} min</span>}
+                        {t.cardio_distance_target && (
+                          <span>{t.cardio_distance_target} {t.cardio_distance_unit ?? ""}</span>
+                        )}
+                        {t.cardio_hr_zone && <span>Zone {t.cardio_hr_zone}</span>}
+                      </div>
+                      {t.cardio_notes && (
+                        <p className="text-xs text-primary/40 mt-1">{t.cardio_notes}</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })() : (
+              <>
+              {/* Exercises (strength days) */}
               <div className="flex flex-col gap-1.5">
                 {template.exercises
                   .sort((a, b) => a.position - b.position)
@@ -638,6 +668,8 @@ export default function ProgramEditor({
                   </svg>
                   Add Exercise
                 </button>
+              )}
+              </>
               )}
             </Card>
           );

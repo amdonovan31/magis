@@ -53,6 +53,13 @@ export async function createProgram(state: ProgramBuilderState) {
           scheduled_days: day.scheduledDays.length > 0 ? day.scheduledDays : null,
           week_number: week.weekNumber,
           is_deload: week.isDeload,
+          type: day.type ?? "strength",
+          cardio_modality: day.cardio?.modality || null,
+          cardio_duration_minutes: day.cardio?.durationMinutes ?? null,
+          cardio_distance_target: day.cardio?.distanceTarget ?? null,
+          cardio_distance_unit: day.cardio?.distanceUnit || null,
+          cardio_hr_zone: day.cardio?.hrZone ?? null,
+          cardio_notes: day.cardio?.notes || null,
         })
         .select("id")
         .single();
@@ -61,8 +68,8 @@ export async function createProgram(state: ProgramBuilderState) {
         return { error: templateError?.message ?? "Failed to create workout template" };
       }
 
-      // 3. Insert exercises for this template
-      if (day.exercises.length > 0) {
+      // 3. Insert exercises for this template (strength days only)
+      if (day.type !== "cardio" && day.exercises.length > 0) {
         const exerciseRows = day.exercises.map((ex) => ({
           workout_template_id: template.id,
           exercise_id: ex.exerciseId,

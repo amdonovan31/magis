@@ -6,13 +6,15 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import ExerciseCard from "@/components/exercises/ExerciseCard";
 import ExerciseSearch from "@/components/exercises/ExerciseSearch";
-import { DAYS_OF_WEEK } from "@/types/app.types";
+import { DAYS_OF_WEEK, CARDIO_MODALITIES, HR_ZONES, DISTANCE_UNITS } from "@/types/app.types";
 import { cn } from "@/lib/utils/cn";
 import type {
   ProgramBuilderState,
   ProgramBuilderWeek,
   ProgramBuilderDay,
   ProgramBuilderExercise,
+  ProgramBuilderCardio,
+  DistanceUnit,
   Exercise,
   Profile,
 } from "@/types/app.types";
@@ -23,12 +25,23 @@ interface ProgramBuilderProps {
   currentUserId?: string;
 }
 
-const defaultDay = (dayNumber: number = 1): ProgramBuilderDay => ({
+const defaultCardio: ProgramBuilderCardio = {
+  modality: "",
+  durationMinutes: null,
+  distanceTarget: null,
+  distanceUnit: null,
+  hrZone: null,
+  notes: "",
+};
+
+const defaultDay = (dayNumber: number = 1, type: "strength" | "cardio" = "strength"): ProgramBuilderDay => ({
   title: "",
   dayNumber,
   notes: "",
   scheduledDays: [],
+  type,
   exercises: [],
+  ...(type === "cardio" ? { cardio: { ...defaultCardio } } : {}),
 });
 
 const defaultState: ProgramBuilderState = {
@@ -100,6 +113,7 @@ export default function ProgramBuilder({ clients, exercises, currentUserId }: Pr
                 days: w.days.map((d, di) => ({
                   ...d,
                   exercises: source.days[di]?.exercises.map((e) => ({ ...e })) ?? [],
+                  cardio: source.days[di]?.cardio ? { ...source.days[di].cardio! } : d.cardio,
                 })),
               }
             : w
@@ -194,29 +208,49 @@ export default function ProgramBuilder({ clients, exercises, currentUserId }: Pr
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-primary">Workout Days</h2>
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={() => {
-            const newDayNumber = state.weeks[0].days.length + 1;
-            const newDay = defaultDay(newDayNumber);
-            setState((s) => ({
-              ...s,
-              weeks: s.weeks.map((w) => ({
-                ...w,
-                days: [...w.days, { ...newDay, exercises: [] }],
-              })),
-            }));
-            setActiveDayIdx(state.weeks[0].days.length);
-          }}
-        >
-          + Add Day
-        </Button>
+        <div className="flex gap-1.5">
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              const newDayNumber = state.weeks[0].days.length + 1;
+              const newDay = defaultDay(newDayNumber, "strength");
+              setState((s) => ({
+                ...s,
+                weeks: s.weeks.map((w) => ({
+                  ...w,
+                  days: [...w.days, newDay],
+                })),
+              }));
+              setActiveDayIdx(state.weeks[0].days.length);
+            }}
+          >
+            + Strength
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              const newDayNumber = state.weeks[0].days.length + 1;
+              const newDay = defaultDay(newDayNumber, "cardio");
+              setState((s) => ({
+                ...s,
+                weeks: s.weeks.map((w) => ({
+                  ...w,
+                  days: [...w.days, newDay],
+                })),
+              }));
+              setActiveDayIdx(state.weeks[0].days.length);
+            }}
+          >
+            + Cardio
+          </Button>
+        </div>
       </div>
 
       {/* Day tabs */}
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {state.weeks[0].days.map((_, i) => (
+        {state.weeks[0].days.map((day, i) => (
           <button
             key={i}
             onClick={() => setActiveDayIdx(i)}
@@ -226,6 +260,9 @@ export default function ProgramBuilder({ clients, exercises, currentUserId }: Pr
             )}
           >
             Day {i + 1}
+            {day.type === "cardio" && (
+              <span className="ml-1 text-[10px] opacity-70">&#x1F3C3;</span>
+            )}
           </button>
         ))}
       </div>
@@ -370,12 +407,35 @@ export default function ProgramBuilder({ clients, exercises, currentUserId }: Pr
               )}
             >
               {day.title || `Day ${i + 1}`}
+              {day.type === "cardio" && <span className="ml-1 text-[10px] opacity-70">&#x1F3C3;</span>}
             </button>
           ))}
         </div>
 
-        {/* Selected exercises */}
-        {currentDay.exercises.length > 0 && (
+        {/* Cardio editor (for cardio days) */}
+        {currentDay.type === "cardio" && (
+          <CardioEditor
+            cardio={currentDay.cardio ?? defaultCardio}
+            onChange={(cardio) => {
+              setState((s) => ({
+                ...s,
+                weeks: s.weeks.map((w, wi) =>
+                  wi === activeWeekIdx
+                    ? {
+                        ...w,
+                        days: w.days.map((d, di) =>
+                          di === activeDayIdx ? { ...d, cardio } : d
+                        ),
+                      }
+                    : w
+                ),
+              }));
+            }}
+          />
+        )}
+
+        {/* Selected exercises (strength days only) */}
+        {currentDay.type === "strength" && currentDay.exercises.length > 0 && (
           <div className="flex flex-col gap-2">
             <p className="text-xs font-medium text-primary/60 uppercase tracking-wide">
               Selected ({currentDay.exercises.length})
@@ -429,7 +489,8 @@ export default function ProgramBuilder({ clients, exercises, currentUserId }: Pr
           </div>
         )}
 
-        {/* Exercise search + picker */}
+        {/* Exercise search + picker (strength days only) */}
+        {currentDay.type === "strength" && <>
         <p className="text-xs font-medium text-primary/60 uppercase tracking-wide">
           Add Exercise
         </p>
@@ -481,6 +542,7 @@ export default function ProgramBuilder({ clients, exercises, currentUserId }: Pr
             ))
           )}
         </div>
+        </>}
       </div>
     );
   };
@@ -523,9 +585,17 @@ export default function ProgramBuilder({ clients, exercises, currentUserId }: Pr
                   {day.scheduledDays.map((d) => DAYS_OF_WEEK[d].label).join(", ")}
                 </p>
               )}
-              <p className="text-xs text-primary/40">
-                {day.exercises.length} exercise{day.exercises.length !== 1 ? "s" : ""}
-              </p>
+              {day.type === "cardio" && day.cardio ? (
+                <p className="text-xs text-primary/40">
+                  {day.cardio.modality || "Cardio"}
+                  {day.cardio.durationMinutes ? ` · ${day.cardio.durationMinutes} min` : ""}
+                  {day.cardio.hrZone ? ` · Zone ${day.cardio.hrZone}` : ""}
+                </p>
+              ) : (
+                <p className="text-xs text-primary/40">
+                  {day.exercises.length} exercise{day.exercises.length !== 1 ? "s" : ""}
+                </p>
+              )}
             </div>
           ))}
         </div>
@@ -667,6 +737,157 @@ function ExerciseSetEditor({
             className="h-9 rounded-lg border border-primary/20 bg-surface px-2 text-center text-sm text-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
+      </div>
+    </div>
+  );
+}
+
+function CardioEditor({
+  cardio,
+  onChange,
+}: {
+  cardio: ProgramBuilderCardio;
+  onChange: (cardio: ProgramBuilderCardio) => void;
+}) {
+  const [customModality, setCustomModality] = useState(
+    !CARDIO_MODALITIES.includes(cardio.modality as (typeof CARDIO_MODALITIES)[number]) && cardio.modality !== ""
+  );
+
+  return (
+    <div className="flex flex-col gap-4 rounded-xl border border-primary/10 bg-surface p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-primary/50">
+        Cardio Prescription
+      </p>
+
+      {/* Modality */}
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium text-primary">Activity</label>
+        {customModality ? (
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={cardio.modality}
+              onChange={(e) => onChange({ ...cardio, modality: e.target.value })}
+              placeholder="e.g. Jump rope"
+              className="h-10 flex-1 rounded-xl border border-primary/20 bg-surface px-3 text-sm text-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+            <button
+              onClick={() => { setCustomModality(false); onChange({ ...cardio, modality: "" }); }}
+              className="text-xs text-primary/40 hover:text-primary"
+            >
+              List
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {CARDIO_MODALITIES.map((mod) => (
+              <button
+                key={mod}
+                onClick={() => onChange({ ...cardio, modality: mod })}
+                className={cn(
+                  "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+                  cardio.modality === mod
+                    ? "bg-primary text-white"
+                    : "bg-primary/10 text-primary"
+                )}
+              >
+                {mod}
+              </button>
+            ))}
+            <button
+              onClick={() => setCustomModality(true)}
+              className="rounded-full px-3 py-1.5 text-xs font-medium bg-primary/5 text-primary/50 hover:bg-primary/10 transition-colors"
+            >
+              Other...
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Duration */}
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium text-primary">Duration (minutes)</label>
+        <input
+          type="number"
+          inputMode="numeric"
+          value={cardio.durationMinutes ?? ""}
+          onChange={(e) =>
+            onChange({ ...cardio, durationMinutes: e.target.value ? parseInt(e.target.value) : null })
+          }
+          placeholder="e.g. 30"
+          className="h-10 w-32 rounded-xl border border-primary/20 bg-surface px-3 text-sm text-primary focus:outline-none focus:ring-1 focus:ring-primary"
+        />
+      </div>
+
+      {/* Distance target (optional) */}
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium text-primary">
+          Distance target <span className="text-primary/40">(optional)</span>
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="number"
+            inputMode="decimal"
+            value={cardio.distanceTarget ?? ""}
+            onChange={(e) =>
+              onChange({ ...cardio, distanceTarget: e.target.value ? parseFloat(e.target.value) : null })
+            }
+            placeholder="—"
+            className="h-10 w-24 rounded-xl border border-primary/20 bg-surface px-3 text-sm text-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+          <select
+            value={cardio.distanceUnit ?? ""}
+            onChange={(e) =>
+              onChange({ ...cardio, distanceUnit: (e.target.value as DistanceUnit) || null })
+            }
+            className="h-10 rounded-xl border border-primary/20 bg-surface px-3 text-sm text-primary"
+          >
+            <option value="">Unit</option>
+            {DISTANCE_UNITS.map((u) => (
+              <option key={u} value={u}>{u}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* HR Zone */}
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium text-primary">
+          Heart rate zone <span className="text-primary/40">(optional)</span>
+        </label>
+        <div className="flex flex-col gap-1">
+          {HR_ZONES.map((z) => (
+            <button
+              key={z.zone}
+              onClick={() =>
+                onChange({ ...cardio, hrZone: cardio.hrZone === z.zone ? null : z.zone })
+              }
+              className={cn(
+                "flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                cardio.hrZone === z.zone
+                  ? "bg-primary text-white"
+                  : "bg-primary/5 text-primary hover:bg-primary/10"
+              )}
+            >
+              <span className="font-semibold">{z.label}</span>
+              <span className={cn("text-xs", cardio.hrZone === z.zone ? "text-white/70" : "text-primary/40")}>
+                {z.description}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Notes */}
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium text-primary">Coach Notes</label>
+        <textarea
+          value={cardio.notes}
+          onChange={(e) => onChange({ ...cardio, notes: e.target.value })}
+          placeholder="e.g. Keep it conversational, steady pace"
+          rows={2}
+          className="rounded-xl border border-primary/20 bg-surface px-3 py-2 text-sm text-primary resize-none focus:outline-none focus:ring-1 focus:ring-primary"
+        />
       </div>
     </div>
   );

@@ -115,12 +115,39 @@ export type ProgramBuilderDetails = {
   startsOn: string;
 };
 
+export const CARDIO_MODALITIES = [
+  "Run", "Bike", "Row", "Ski Erg", "Incline Walk",
+  "Swim", "Elliptical", "Stair Climber",
+] as const;
+
+export const HR_ZONES = [
+  { zone: 1, label: "Zone 1", description: "Very light — recovery, warm-up" },
+  { zone: 2, label: "Zone 2", description: "Light — conversational, nose-breathing" },
+  { zone: 3, label: "Zone 3", description: "Moderate — comfortably hard" },
+  { zone: 4, label: "Zone 4", description: "Hard — threshold, limited talking" },
+  { zone: 5, label: "Zone 5", description: "Max effort — sprint, unsustainable" },
+] as const;
+
+export const DISTANCE_UNITS = ["miles", "km", "meters"] as const;
+export type DistanceUnit = (typeof DISTANCE_UNITS)[number];
+
+export type ProgramBuilderCardio = {
+  modality: string;
+  durationMinutes: number | null;
+  distanceTarget: number | null;
+  distanceUnit: DistanceUnit | null;
+  hrZone: number | null;
+  notes: string;
+};
+
 export type ProgramBuilderDay = {
   title: string;
   dayNumber: number;
   notes: string;
   scheduledDays: number[];
+  type: "strength" | "cardio";
   exercises: ProgramBuilderExercise[];
+  cardio?: ProgramBuilderCardio;
 };
 
 export type ProgramBuilderExercise = {
@@ -185,6 +212,18 @@ export const MUSCLE_GROUPS = [
 ] as const;
 
 export type MuscleGroup = (typeof MUSCLE_GROUPS)[number];
+
+export type CardioLog = {
+  id: string;
+  session_id: string;
+  duration_seconds: number | null;
+  distance_value: number | null;
+  distance_unit: string | null;
+  avg_heart_rate: number | null;
+  rpe: number | null;
+  notes: string | null;
+  logged_at: string;
+};
 
 // Volume data point for weekly/monthly charts
 export type VolumeDataPoint = {

@@ -113,6 +113,50 @@ export type Database = {
           },
         ]
       }
+      cardio_logs: {
+        Row: {
+          avg_heart_rate: number | null
+          distance_unit: string | null
+          distance_value: number | null
+          duration_seconds: number | null
+          id: string
+          logged_at: string
+          notes: string | null
+          rpe: number | null
+          session_id: string
+        }
+        Insert: {
+          avg_heart_rate?: number | null
+          distance_unit?: string | null
+          distance_value?: number | null
+          duration_seconds?: number | null
+          id?: string
+          logged_at?: string
+          notes?: string | null
+          rpe?: number | null
+          session_id: string
+        }
+        Update: {
+          avg_heart_rate?: number | null
+          distance_unit?: string | null
+          distance_value?: number | null
+          duration_seconds?: number | null
+          id?: string
+          logged_at?: string
+          notes?: string | null
+          rpe?: number | null
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cardio_logs_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: true
+            referencedRelation: "workout_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_exercise_feedback: {
         Row: {
           client_id: string
@@ -1585,6 +1629,12 @@ export type Database = {
       }
       workout_templates: {
         Row: {
+          cardio_distance_target: number | null
+          cardio_distance_unit: string | null
+          cardio_duration_minutes: number | null
+          cardio_hr_zone: number | null
+          cardio_modality: string | null
+          cardio_notes: string | null
           created_at: string
           day_number: number | null
           id: string
@@ -1594,9 +1644,16 @@ export type Database = {
           scheduled_dates: string[] | null
           scheduled_days: number[] | null
           title: string
+          type: string
           week_number: number
         }
         Insert: {
+          cardio_distance_target?: number | null
+          cardio_distance_unit?: string | null
+          cardio_duration_minutes?: number | null
+          cardio_hr_zone?: number | null
+          cardio_modality?: string | null
+          cardio_notes?: string | null
           created_at?: string
           day_number?: number | null
           id?: string
@@ -1606,9 +1663,16 @@ export type Database = {
           scheduled_dates?: string[] | null
           scheduled_days?: number[] | null
           title: string
+          type?: string
           week_number?: number
         }
         Update: {
+          cardio_distance_target?: number | null
+          cardio_distance_unit?: string | null
+          cardio_duration_minutes?: number | null
+          cardio_hr_zone?: number | null
+          cardio_modality?: string | null
+          cardio_notes?: string | null
           created_at?: string
           day_number?: number | null
           id?: string
@@ -1618,6 +1682,7 @@ export type Database = {
           scheduled_dates?: string[] | null
           scheduled_days?: number[] | null
           title?: string
+          type?: string
           week_number?: number
         }
         Relationships: [
