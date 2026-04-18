@@ -434,11 +434,8 @@ function ExercisePickerModal({
         return;
       }
       setLoading(true);
-      const data = await searchExercises(query || muscleFilter || "a");
-      const filtered = muscleFilter
-        ? data.filter((e) => e.muscle_group === muscleFilter)
-        : data;
-      setResults(filtered.filter((e) => !excludeIds.includes(e.id)));
+      const data = await searchExercises(query, muscleFilter ?? undefined);
+      setResults(data.filter((e) => !excludeIds.includes(e.id)));
       setLoading(false);
     }, 300);
     return () => clearTimeout(timer);
