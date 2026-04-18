@@ -79,7 +79,8 @@ export async function saveWorkoutFromSession(sessionId: string, title: string) {
 
 export async function saveWorkoutFromTemplate(
   workoutTemplateId: string,
-  programTitle: string
+  programTitle: string,
+  customTitle?: string
 ) {
   const supabase = await createClient();
   const {
@@ -105,7 +106,7 @@ export async function saveWorkoutFromTemplate(
     .from("saved_workouts")
     .insert({
       client_id: user.id,
-      title: template.title ?? "Saved Workout",
+      title: customTitle?.trim() || template.title || "Saved Workout",
       source: "program",
       source_template_id: workoutTemplateId,
       source_program_title: programTitle,

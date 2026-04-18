@@ -41,7 +41,7 @@ export default function SaveWorkoutSheet({
 
     let result;
     if (source === "program" && templateId) {
-      result = await saveWorkoutFromTemplate(templateId, programTitle ?? "");
+      result = await saveWorkoutFromTemplate(templateId, programTitle ?? "", title.trim());
     } else {
       result = await saveWorkoutFromSession(sessionId, title.trim());
     }
