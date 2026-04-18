@@ -8,29 +8,61 @@ import type { TodayWorkout } from "@/types/app.types";
 interface TodayWorkoutCardProps {
   todayWorkout: TodayWorkout;
   hasProgram?: boolean;
+  activeFreeSessionId?: string | null;
 }
 
-export default function TodayWorkoutCard({ todayWorkout, hasProgram = true }: TodayWorkoutCardProps) {
+async function startFree() {
+  "use server";
+  const { startFreeWorkout } = await import("@/lib/actions/session.actions");
+  await startFreeWorkout();
+}
+
+function FreeWorkoutCTA({ activeFreeSessionId }: { activeFreeSessionId?: string | null }) {
+  if (activeFreeSessionId) {
+    return (
+      <Link href={`/free-workout/${activeFreeSessionId}`} className="block mt-3">
+        <Button fullWidth variant="secondary" size="lg">
+          Resume Free Workout &rarr;
+        </Button>
+      </Link>
+    );
+  }
+  return (
+    <form action={startFree} className="mt-3">
+      <Button type="submit" fullWidth variant="secondary" size="lg">
+        Free Workout
+      </Button>
+    </form>
+  );
+}
+
+export default function TodayWorkoutCard({ todayWorkout, hasProgram = true, activeFreeSessionId }: TodayWorkoutCardProps) {
   if (!todayWorkout) {
     if (!hasProgram) {
       return (
-        <Card padding="lg" className="text-center">
-          <div className="text-4xl mb-3">📋</div>
-          <h2 className="text-lg font-semibold text-primary">Program Coming Soon</h2>
-          <p className="mt-1 text-sm text-primary/60">
-            Your coach is preparing your program — you&apos;ll get a notification when it&apos;s ready.
-          </p>
-        </Card>
+        <>
+          <Card padding="lg" className="text-center">
+            <div className="text-4xl mb-3">📋</div>
+            <h2 className="text-lg font-semibold text-primary">Program Coming Soon</h2>
+            <p className="mt-1 text-sm text-primary/60">
+              Your coach is preparing your program — you&apos;ll get a notification when it&apos;s ready.
+            </p>
+          </Card>
+          <FreeWorkoutCTA activeFreeSessionId={activeFreeSessionId} />
+        </>
       );
     }
     return (
-      <Card padding="lg" className="text-center">
-        <div className="text-4xl mb-3">🌿</div>
-        <h2 className="text-lg font-semibold text-primary">Rest Day</h2>
-        <p className="mt-1 text-sm text-primary/60">
-          No workout scheduled for today. Rest up!
-        </p>
-      </Card>
+      <>
+        <Card padding="lg" className="text-center">
+          <div className="text-4xl mb-3">🌿</div>
+          <h2 className="text-lg font-semibold text-primary">Rest Day</h2>
+          <p className="mt-1 text-sm text-primary/60">
+            No workout scheduled for today. Rest up!
+          </p>
+        </Card>
+        <FreeWorkoutCTA activeFreeSessionId={activeFreeSessionId} />
+      </>
     );
   }
 
@@ -80,6 +112,7 @@ export default function TodayWorkoutCard({ todayWorkout, hasProgram = true }: To
   }
 
   return (
+    <>
     <Card padding="lg">
       <p className="text-[10px] font-semibold uppercase tracking-widest text-primary/40">
         Today&apos;s Workout
@@ -112,10 +145,12 @@ export default function TodayWorkoutCard({ todayWorkout, hasProgram = true }: To
 
       <form action={startSession} className="mt-4">
         <Button type="submit" fullWidth size="lg">
-          Start Workout →
+          Start Workout &rarr;
         </Button>
       </form>
       <ProgramDisclaimerFooter variant="coached" />
     </Card>
+    <FreeWorkoutCTA activeFreeSessionId={activeFreeSessionId} />
+    </>
   );
 }

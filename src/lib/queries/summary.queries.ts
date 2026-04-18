@@ -49,11 +49,18 @@ export async function getSessionSummary(
   const completedSetLogs = setLogs.filter((l) => l.is_completed && !l.is_skipped);
   const skippedSetCount = setLogs.filter((l) => l.is_skipped).length;
   const skippedIds: string[] = (session as { skipped_exercises?: string[] }).skipped_exercises ?? [];
+  const isFreeWorkout = !template;
 
   // Count exercises that have at least one completed set
-  const exercisesWithSets = new Set(
-    completedSetLogs.map((l) => l.template_exercise_id).filter(Boolean)
-  );
+  const exercisesWithSets = isFreeWorkout
+    ? new Set(
+        completedSetLogs
+          .map((l) => (l as { exercise_id?: string }).exercise_id)
+          .filter(Boolean)
+      )
+    : new Set(
+        completedSetLogs.map((l) => l.template_exercise_id).filter(Boolean)
+      );
 
   // Map skipped template exercise IDs to names
   const skippedExercises = exercises
@@ -71,10 +78,9 @@ export async function getSessionSummary(
     totalVolume += reps * weight;
   }
 
-  const totalSets = exercises.reduce(
-    (sum, e) => sum + (e.prescribed_sets ?? 0),
-    0
-  );
+  const totalSets = isFreeWorkout
+    ? completedSetLogs.length
+    : exercises.reduce((sum, e) => sum + (e.prescribed_sets ?? 0), 0);
 
   // Fetch user's preferred unit
   const { data: profile } = await supabase
@@ -106,12 +112,12 @@ export async function getSessionSummary(
 
   return {
     sessionId,
-    templateTitle: template?.title ?? "Workout",
+    templateTitle: template?.title ?? (isFreeWorkout ? "Free Workout" : "Workout"),
     programTitle: program?.title ?? "",
     date: session.started_at,
     durationSeconds: session.duration_seconds,
     exercisesCompleted: exercisesWithSets.size,
-    totalExercises: exercises.length,
+    totalExercises: isFreeWorkout ? exercisesWithSets.size : exercises.length,
     setsCompleted: completedSetLogs.length,
     totalSets,
     totalVolume: Math.round(totalVolume),

@@ -12,6 +12,13 @@ export type PersistedSet = {
   weightUsed: string | null;
   completed: boolean;
   completedAt: number;
+  exerciseId?: string;
+};
+
+export type FreeExerciseEntry = {
+  exerciseId: string;
+  exerciseName: string;
+  muscleGroup: string | null;
 };
 
 export type PersistedSession = {
@@ -20,6 +27,8 @@ export type PersistedSession = {
   sets: Record<string, PersistedSet>;
   swappedExercises: Record<string, string>;
   skippedExercises?: string[];
+  mode?: "template" | "free";
+  freeExercises?: FreeExerciseEntry[];
 };
 
 function getKey(sessionId: string): string {
@@ -107,6 +116,40 @@ export function clearPersistedSession(sessionId: string): void {
   } catch {
     // fail silently
   }
+}
+
+export function persistFreeSet(
+  sessionId: string,
+  exerciseId: string,
+  setNumber: number,
+  data: { repsCompleted: number | null; weightUsed: string | null }
+): void {
+  const session = ensureSession(sessionId);
+  session.mode = "free";
+  const key = `${exerciseId}_${setNumber}`;
+  session.sets[key] = {
+    templateExerciseId: "",
+    exerciseIdOverride: null,
+    exerciseId,
+    setNumber,
+    repsCompleted: data.repsCompleted,
+    weightUsed: data.weightUsed,
+    completed: true,
+    completedAt: Date.now(),
+  };
+  session.lastUpdated = Date.now();
+  writeSession(session);
+}
+
+export function persistFreeExerciseList(
+  sessionId: string,
+  exercises: FreeExerciseEntry[]
+): void {
+  const session = ensureSession(sessionId);
+  session.mode = "free";
+  session.freeExercises = exercises;
+  session.lastUpdated = Date.now();
+  writeSession(session);
 }
 
 export function pruneOldSessions(

@@ -99,7 +99,7 @@ export default function HistoryCard({ session }: HistoryCardProps) {
     <Card className="flex items-start justify-between gap-3">
       <div className="flex-1 min-w-0">
         <p className="font-medium text-primary">
-          {session.workout_template?.title ?? "Workout"}
+          {session.workout_template?.title ?? "Free Workout"}
         </p>
         {session.started_at && (
           <p className="text-sm text-primary/60">

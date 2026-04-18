@@ -19,7 +19,7 @@ export default async function ClientHomePage() {
 
   if (!user) redirect("/login");
 
-  const [{ data: rawProfile }, { count: intakeCount }, todayWorkout, streakData, { count: programCount }, todayWeight] = await Promise.all([
+  const [{ data: rawProfile }, { count: intakeCount }, todayWorkout, streakData, { count: programCount }, todayWeight, { data: activeFreeSession }] = await Promise.all([
     supabase
       .from("profiles")
       .select("full_name, intake_requested")
@@ -38,6 +38,13 @@ export default async function ClientHomePage() {
       .eq("is_active", true)
       .eq("status", "published"),
     getTodayWeight(),
+    supabase
+      .from("workout_sessions")
+      .select("id")
+      .eq("client_id", user.id)
+      .is("workout_template_id", null)
+      .eq("status", "in_progress")
+      .maybeSingle(),
   ]);
 
   const profile = rawProfile as Pick<Profile, "full_name" | "intake_requested"> | null;
@@ -72,7 +79,7 @@ export default async function ClientHomePage() {
       <WeightCheckInCard todayEntry={todayWeight.entry} preferredUnit={todayWeight.preferredUnit} />
 
       {/* Today's workout card */}
-      <TodayWorkoutCard todayWorkout={todayWorkout} hasProgram={(programCount ?? 0) > 0} />
+      <TodayWorkoutCard todayWorkout={todayWorkout} hasProgram={(programCount ?? 0) > 0} activeFreeSessionId={activeFreeSession?.id ?? null} />
 
       {/* Streak card */}
       <StreakCard streakData={streakData} />

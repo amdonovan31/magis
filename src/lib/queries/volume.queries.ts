@@ -114,8 +114,32 @@ async function fetchSetLogs(
     if (logs) allLogs.push(...(logs as typeof allLogs));
   }
 
+  // Step 2b: Fetch free workout sets (template_exercise_id is null)
+  const freeLogs: {
+    session_id: string;
+    reps_completed: number | null;
+    weight_used: string | null;
+    exercise: { muscle_group: string | null } | null;
+  }[] = [];
+
+  for (let i = 0; i < sessionIds.length; i += batchSize) {
+    const batch = sessionIds.slice(i, i + batchSize);
+    const { data: logs } = await supabase
+      .from("set_logs")
+      .select(
+        `session_id, reps_completed, weight_used,
+         exercise:exercises!exercise_id(muscle_group)`
+      )
+      .in("session_id", batch)
+      .eq("is_completed", true)
+      .is("template_exercise_id", null)
+      .not("exercise_id", "is", null);
+
+    if (logs) freeLogs.push(...(logs as typeof freeLogs));
+  }
+
   // Step 3: Combine with session dates
-  return allLogs.map((log) => {
+  const combined = allLogs.map((log) => {
     const startedAt = sessionMap.get(log.session_id) ?? "";
     const muscleGroup =
       (log.template_exercise as { exercise: { muscle_group: string | null } | null } | null)
@@ -131,6 +155,23 @@ async function fetchSetLogs(
       setCount: 1,
     };
   });
+
+  for (const log of freeLogs) {
+    const startedAt = sessionMap.get(log.session_id) ?? "";
+    const muscleGroup =
+      (log.exercise as { muscle_group: string | null } | null)?.muscle_group ?? "Other";
+    const reps = log.reps_completed ?? 0;
+    const weight = parseFloat(log.weight_used ?? "0") || 0;
+
+    combined.push({
+      date: new Date(startedAt),
+      muscleGroup,
+      volume: reps * weight,
+      setCount: 1,
+    });
+  }
+
+  return combined;
 }
 
 /**

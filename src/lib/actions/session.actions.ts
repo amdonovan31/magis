@@ -43,6 +43,42 @@ export async function startWorkoutSession(
   redirect(`/workout/${session.id}`);
 }
 
+export async function startFreeWorkout() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
+  // Check for existing in-progress free workout
+  const { data: existing } = await supabase
+    .from("workout_sessions")
+    .select("id")
+    .eq("client_id", user.id)
+    .is("workout_template_id", null)
+    .eq("status", "in_progress")
+    .maybeSingle();
+
+  if (existing) {
+    redirect(`/free-workout/${existing.id}`);
+  }
+
+  const { data: session, error } = await supabase
+    .from("workout_sessions")
+    .insert({
+      client_id: user.id,
+      workout_template_id: null,
+      program_id: null,
+      status: "in_progress",
+    })
+    .select("id")
+    .single();
+
+  if (error || !session) return { error: error?.message ?? "Failed to start session" };
+
+  redirect(`/free-workout/${session.id}`);
+}
+
 export async function saveRetroLog(input: {
   scheduledWorkoutId: string;
   workoutTemplateId: string;
@@ -299,7 +335,7 @@ export async function saveExerciseNote(
 
 export async function logSet(data: {
   sessionId: string;
-  templateExerciseId: string;
+  templateExerciseId?: string | null;
   exerciseIdOverride?: string;
   setNumber: number;
   repsCompleted: number | null;
@@ -314,28 +350,29 @@ export async function logSet(data: {
   if (!user) return { error: "Unauthorized" };
 
   const weightValue = data.weightUsed ? parseFloat(data.weightUsed) : null;
+  const isFreeWorkout = !data.templateExerciseId && data.exerciseIdOverride;
 
-  // Upsert — if set already exists for this session+exercise+setNumber, update it
+  const row = {
+    session_id: data.sessionId,
+    template_exercise_id: data.templateExerciseId ?? null,
+    exercise_id: data.exerciseIdOverride ?? null,
+    set_number: data.setNumber,
+    reps_completed: data.repsCompleted,
+    weight_used: data.weightUsed,
+    weight_value: !isNaN(weightValue as number) ? weightValue : null,
+    weight_unit: data.weightUnit ?? null,
+    rpe: data.rpe,
+    is_completed: true,
+    logged_at: new Date().toISOString(),
+  };
+
   const { data: result, error } = await supabase
     .from("set_logs")
-    .upsert(
-      {
-        session_id: data.sessionId,
-        template_exercise_id: data.templateExerciseId,
-        exercise_id: data.exerciseIdOverride ?? null,
-        set_number: data.setNumber,
-        reps_completed: data.repsCompleted,
-        weight_used: data.weightUsed,
-        weight_value: !isNaN(weightValue as number) ? weightValue : null,
-        weight_unit: data.weightUnit ?? null,
-        rpe: data.rpe,
-        is_completed: true,
-        logged_at: new Date().toISOString(),
-      },
-      {
-        onConflict: "session_id,template_exercise_id,set_number",
-      }
-    )
+    .upsert(row, {
+      onConflict: isFreeWorkout
+        ? "session_id,exercise_id,set_number"
+        : "session_id,template_exercise_id,set_number",
+    })
     .select("id")
     .single();
 

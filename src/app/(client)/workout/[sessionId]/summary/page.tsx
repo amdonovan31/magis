@@ -172,7 +172,7 @@ export default async function SummaryPage({ params }: SummaryPageProps) {
           Share to Feed (Coming Soon)
         </Button>
 
-        <ProgramDisclaimerFooter variant="coached" />
+        {summary.programTitle && <ProgramDisclaimerFooter variant="coached" />}
       </div>
 
       {/* Done button */}
