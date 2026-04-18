@@ -797,3 +797,11 @@ export async function updateClientSchedule(data: {
   revalidatePath("/home");
   return { success: true };
 }
+
+export async function fetchExerciseHistory(
+  exerciseId: string,
+  excludeSessionId: string
+) {
+  const { getExerciseHistory } = await import("@/lib/queries/session.queries");
+  return getExerciseHistory(exerciseId, excludeSessionId);
+}

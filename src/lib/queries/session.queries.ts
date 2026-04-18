@@ -360,3 +360,86 @@ export async function getClientHistory(limit = 20) {
 
   return data ?? [];
 }
+
+export type ExerciseHistorySession = {
+  sessionId: string;
+  date: string;
+  templateTitle: string | null;
+  sets: {
+    setNumber: number;
+    reps: number | null;
+    weight: string | null;
+    weightUnit: string;
+    rpe: number | null;
+  }[];
+};
+
+export async function getExerciseHistory(
+  exerciseId: string,
+  excludeSessionId?: string,
+  limit: number = 5
+): Promise<ExerciseHistorySession[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  let query = supabase
+    .from("set_logs")
+    .select(`
+      session_id,
+      set_number,
+      reps_completed,
+      weight_used,
+      weight_unit,
+      rpe,
+      session:workout_sessions!inner(
+        id, started_at, client_id,
+        workout_template:workout_templates(title)
+      )
+    `)
+    .eq("exercise_id", exerciseId)
+    .eq("is_completed", true)
+    .eq("session.client_id", user.id)
+    .eq("session.status", "completed")
+    .order("set_number", { ascending: true });
+
+  if (excludeSessionId) {
+    query = query.neq("session_id", excludeSessionId);
+  }
+
+  const { data } = await query;
+  if (!data || data.length === 0) return [];
+
+  const sessionMap = new Map<string, ExerciseHistorySession>();
+
+  for (const row of data) {
+    const session = row.session as unknown as {
+      id: string;
+      started_at: string;
+      workout_template: { title: string } | null;
+    };
+
+    if (!sessionMap.has(session.id)) {
+      sessionMap.set(session.id, {
+        sessionId: session.id,
+        date: session.started_at,
+        templateTitle: session.workout_template?.title ?? null,
+        sets: [],
+      });
+    }
+
+    sessionMap.get(session.id)!.sets.push({
+      setNumber: row.set_number,
+      reps: row.reps_completed,
+      weight: row.weight_used,
+      weightUnit: row.weight_unit ?? "lbs",
+      rpe: row.rpe,
+    });
+  }
+
+  return Array.from(sessionMap.values())
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, limit);
+}

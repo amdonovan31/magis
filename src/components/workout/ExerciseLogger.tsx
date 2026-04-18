@@ -7,6 +7,7 @@ import ExerciseDemoModal from "./ExerciseDemoModal";
 import { persistSwap, removeSwap } from "@/lib/workout-persistence";
 import { searchExercises } from "@/lib/actions/exercise.actions";
 import { saveExerciseNote, skipSet, unskipSet } from "@/lib/actions/session.actions";
+import ExerciseHistoryModal from "./ExerciseHistoryModal";
 import type { WorkoutTemplateExerciseWithExercise, SetLog, Exercise } from "@/types/app.types";
 
 import type { LastPerformance } from "@/lib/queries/session.queries";
@@ -69,6 +70,7 @@ export default function ExerciseLogger({
 
   // Exercise note state
   const [noteContent, setNoteContent] = useState(initialNote);
+  const [showHistory, setShowHistory] = useState(false);
 
   const setCount = templateExercise.prescribed_sets ?? 3;
   const displayExercise = swappedExercise ?? templateExercise.exercise;
@@ -93,6 +95,7 @@ export default function ExerciseLogger({
   function handleSwap(exercise: Exercise) {
     setSwappedExercise(exercise);
     setHideLoggedSets(true);
+    setShowHistory(false);
     persistSwap(sessionId, templateExercise.id, exercise.id);
   }
 
@@ -300,6 +303,16 @@ export default function ExerciseLogger({
               <h3 className="font-semibold text-primary flex-1">
                 {displayExercise.name}
               </h3>
+              <button
+                onClick={() => setShowHistory(true)}
+                className="shrink-0 flex items-center justify-center h-7 w-7 rounded-full text-primary/30 hover:text-primary hover:bg-primary/5 transition-colors"
+                title="Exercise history"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+              </button>
               {swappedExercise && (
                 <span className="shrink-0 rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent">
                   swapped
@@ -462,6 +475,17 @@ export default function ExerciseLogger({
         isOpen={showDemo}
         onClose={() => setShowDemo(false)}
       />
+
+      {/* Exercise history modal */}
+      {showHistory && (
+        <ExerciseHistoryModal
+          exerciseId={resolvedExerciseId}
+          exerciseName={displayExercise.name}
+          excludeSessionId={sessionId}
+          weightUnit={weightUnit}
+          onClose={() => setShowHistory(false)}
+        />
+      )}
     </div>
   );
 }

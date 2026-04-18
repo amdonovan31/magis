@@ -6,6 +6,7 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import RestTimer from "@/components/workout/RestTimer";
+import ExerciseHistoryModal from "@/components/workout/ExerciseHistoryModal";
 import { logSet } from "@/lib/actions/session.actions";
 import { completeSession, deleteSession } from "@/lib/actions/session.actions";
 import { searchExercises } from "@/lib/actions/exercise.actions";
@@ -71,6 +72,7 @@ export default function FreeWorkoutClient({
   const [completing, setCompleting] = useState(false);
   const [discarding, setDiscarding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [historyExerciseId, setHistoryExerciseId] = useState<string | null>(null);
 
   // Hydrate from initial exercises (saved workout), existing logs (resume), or localStorage
   useEffect(() => {
@@ -339,6 +341,16 @@ export default function FreeWorkoutClient({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <p className="font-semibold text-primary">{ex.exerciseName}</p>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setHistoryExerciseId(ex.exerciseId); }}
+                    className="shrink-0 flex items-center justify-center h-7 w-7 rounded-full text-primary/30 hover:text-primary hover:bg-primary/5 transition-colors"
+                    title="Exercise history"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+                      <circle cx="12" cy="12" r="10" />
+                      <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                  </button>
                   {ex.muscleGroup && (
                     <Badge variant="default">{ex.muscleGroup}</Badge>
                   )}
@@ -441,6 +453,17 @@ export default function FreeWorkoutClient({
           onSelect={addExercise}
           onClose={() => setShowPicker(false)}
           excludeIds={exercises.map((e) => e.exerciseId)}
+        />
+      )}
+
+      {/* Exercise History Modal */}
+      {historyExerciseId && (
+        <ExerciseHistoryModal
+          exerciseId={historyExerciseId}
+          exerciseName={exercises.find((e) => e.exerciseId === historyExerciseId)?.exerciseName ?? "Exercise"}
+          excludeSessionId={sessionId}
+          weightUnit={preferredUnit}
+          onClose={() => setHistoryExerciseId(null)}
         />
       )}
     </div>
