@@ -385,20 +385,23 @@ export async function getExerciseHistory(
   } = await supabase.auth.getUser();
   if (!user) return [];
 
-  let query = supabase
+  const selectFields = `
+    session_id,
+    set_number,
+    reps_completed,
+    weight_used,
+    weight_unit,
+    rpe,
+    session:workout_sessions!inner(
+      id, started_at, client_id,
+      workout_template:workout_templates(title)
+    )
+  `;
+
+  // Path 1: direct exercise_id match (swaps + free workouts)
+  let path1 = supabase
     .from("set_logs")
-    .select(`
-      session_id,
-      set_number,
-      reps_completed,
-      weight_used,
-      weight_unit,
-      rpe,
-      session:workout_sessions!inner(
-        id, started_at, client_id,
-        workout_template:workout_templates(title)
-      )
-    `)
+    .select(selectFields)
     .eq("exercise_id", exerciseId)
     .eq("is_completed", true)
     .eq("session.client_id", user.id)
@@ -406,15 +409,58 @@ export async function getExerciseHistory(
     .order("set_number", { ascending: true });
 
   if (excludeSessionId) {
-    query = query.neq("session_id", excludeSessionId);
+    path1 = path1.neq("session_id", excludeSessionId);
   }
 
-  const { data } = await query;
-  if (!data || data.length === 0) return [];
+  // Path 2: non-swapped coach sets (exercise_id is null, resolved via template)
+  const { data: templateExercises } = await supabase
+    .from("workout_template_exercises")
+    .select("id")
+    .eq("exercise_id", exerciseId);
+
+  const templateIds = (templateExercises ?? []).map((te) => te.id);
+
+  const path2Promise = templateIds.length > 0
+    ? (() => {
+        let q = supabase
+          .from("set_logs")
+          .select(selectFields)
+          .in("template_exercise_id", templateIds)
+          .is("exercise_id", null)
+          .eq("is_completed", true)
+          .eq("session.client_id", user.id)
+          .eq("session.status", "completed")
+          .order("set_number", { ascending: true });
+        if (excludeSessionId) {
+          q = q.neq("session_id", excludeSessionId);
+        }
+        return q;
+      })()
+    : Promise.resolve({ data: [] as unknown[] });
+
+  const [result1, result2] = await Promise.all([path1, path2Promise]);
+
+  type SetRow = {
+    session_id: string;
+    set_number: number;
+    reps_completed: number | null;
+    weight_used: string | null;
+    weight_unit: string | null;
+    rpe: number | null;
+    session: unknown;
+  };
+
+  const allRows = [
+    ...((result1.data ?? []) as SetRow[]),
+    ...((result2.data ?? []) as SetRow[]),
+  ];
+
+  if (allRows.length === 0) return [];
 
   const sessionMap = new Map<string, ExerciseHistorySession>();
+  const seenSets = new Set<string>();
 
-  for (const row of data) {
+  for (const row of allRows) {
     const session = row.session as unknown as {
       id: string;
       started_at: string;
@@ -429,6 +475,10 @@ export async function getExerciseHistory(
         sets: [],
       });
     }
+
+    const dedupeKey = `${session.id}_${row.set_number}`;
+    if (seenSets.has(dedupeKey)) continue;
+    seenSets.add(dedupeKey);
 
     sessionMap.get(session.id)!.sets.push({
       setNumber: row.set_number,
