@@ -25,12 +25,6 @@ const coachNav: NavItem[] = [
     activeIcon: <UsersIcon filled />,
   },
   {
-    href: "/library",
-    label: "Library",
-    icon: <BookIcon />,
-    activeIcon: <BookIcon filled />,
-  },
-  {
     href: "/programs",
     label: "Programs",
     icon: <ClipboardIcon />,

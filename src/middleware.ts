@@ -70,8 +70,7 @@ export async function middleware(request: NextRequest) {
 
     // Protect coach routes from clients/solo
     if (pathname.startsWith("/dashboard") || pathname.startsWith("/clients") ||
-        pathname.startsWith("/library") || pathname.startsWith("/programs") ||
-        pathname.startsWith("/coach-profile")) {
+        pathname.startsWith("/programs") || pathname.startsWith("/coach-profile")) {
       if (role !== "coach") {
         const redirectUrl = request.nextUrl.clone();
         redirectUrl.pathname = "/home";

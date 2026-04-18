@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getExercises, getExercisesByIds } from "@/lib/queries/exercise.queries";
 import type { Exercise } from "@/types/app.types";
@@ -47,7 +46,6 @@ export async function createExercise(formData: FormData) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/library");
   return { success: true };
 }
 
@@ -74,7 +72,6 @@ export async function updateExercise(id: string, formData: FormData) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/library");
   return { success: true };
 }
 
@@ -93,6 +90,5 @@ export async function archiveExercise(id: string) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/library");
   return { success: true };
 }
