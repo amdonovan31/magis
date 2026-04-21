@@ -92,13 +92,11 @@ export default async function ClientDetailPage({
   let programWeekInfo: { currentWeek: number; totalWeeks: number; completedSessions: number; totalSessions: number } | null = null;
 
   if (activeProgram) {
-    const [{ data: scheduledRange }, { count: totalScheduled }, { count: completedScheduled }] = await Promise.all([
+    const [{ data: templateWeeks }, { count: totalScheduled }, { count: completedScheduled }] = await Promise.all([
       supabase
-        .from("scheduled_workouts")
-        .select("scheduled_date")
-        .eq("program_id", activeProgram.id)
-        .eq("client_id", id)
-        .order("scheduled_date", { ascending: true }),
+        .from("workout_templates")
+        .select("week_number")
+        .eq("program_id", activeProgram.id),
       supabase
         .from("scheduled_workouts")
         .select("*", { count: "exact", head: true })
@@ -112,22 +110,23 @@ export default async function ClientDetailPage({
         .eq("status", "completed"),
     ]);
 
-    if (scheduledRange && scheduledRange.length > 0) {
-      const firstDate = new Date(scheduledRange[0].scheduled_date + "T00:00:00");
-      const lastDate = new Date(scheduledRange[scheduledRange.length - 1].scheduled_date + "T00:00:00");
-      const totalWeeks = Math.ceil((lastDate.getTime() - firstDate.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
-      const now = new Date();
-      const currentWeek = Math.max(1, Math.min(totalWeeks,
-        Math.ceil((now.getTime() - firstDate.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1
-      ));
+    const distinctWeeks = new Set((templateWeeks ?? []).map((t) => t.week_number ?? 1));
+    const totalWeeks = distinctWeeks.size || 1;
 
-      programWeekInfo = {
-        currentWeek,
-        totalWeeks,
-        completedSessions: completedScheduled ?? 0,
-        totalSessions: totalScheduled ?? 0,
-      };
+    let currentWeek = 1;
+    if (activeProgram.starts_on) {
+      const startDate = new Date(activeProgram.starts_on + "T00:00:00");
+      const now = new Date();
+      const daysDiff = Math.floor((now.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000));
+      currentWeek = Math.max(1, Math.min(totalWeeks, Math.floor(daysDiff / 7) + 1));
     }
+
+    programWeekInfo = {
+      currentWeek,
+      totalWeeks,
+      completedSessions: completedScheduled ?? 0,
+      totalSessions: totalScheduled ?? 0,
+    };
   }
 
   // Recent PRs (last 7 days)
