@@ -67,7 +67,9 @@ export default async function GenerateLoadingPage({
       .select(`
         title, description,
         workout_templates (
-          id, title, week_number, day_number, scheduled_days,
+          id, title, type, week_number, day_number, scheduled_days,
+          cardio_modality, cardio_duration_minutes, cardio_distance_target,
+          cardio_distance_unit, cardio_hr_zone, cardio_notes,
           workout_template_exercises (
             exercise_id, position, prescribed_sets, prescribed_reps,
             rest_seconds, alternate_exercise_ids,
@@ -95,9 +97,28 @@ export default async function GenerateLoadingPage({
             .sort((a, b) => (a.day_number ?? 0) - (b.day_number ?? 0))
             .map((t) => {
               const dayNum = t.scheduled_days?.[0];
+              const isCardio = (t as Record<string, unknown>).type === "cardio";
+
+              if (isCardio) {
+                return {
+                  day_of_week: dayNum != null ? reverseDayMap[dayNum] ?? "Monday" : "Monday",
+                  workout_name: t.title,
+                  type: "cardio" as const,
+                  cardio: {
+                    modality: (t as Record<string, unknown>).cardio_modality as string ?? "",
+                    duration_minutes: (t as Record<string, unknown>).cardio_duration_minutes as number ?? 30,
+                    distance_target: (t as Record<string, unknown>).cardio_distance_target as number | null ?? null,
+                    distance_unit: (t as Record<string, unknown>).cardio_distance_unit as string | null ?? null,
+                    hr_zone: (t as Record<string, unknown>).cardio_hr_zone as number ?? 2,
+                    notes: (t as Record<string, unknown>).cardio_notes as string ?? "",
+                  },
+                };
+              }
+
               return {
                 day_of_week: dayNum != null ? reverseDayMap[dayNum] ?? "Monday" : "Monday",
                 workout_name: t.title,
+                type: "strength" as const,
                 muscle_groups: [] as string[],
                 exercises: (t.workout_template_exercises ?? [])
                   .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))

@@ -10,6 +10,11 @@ export interface GuidelinesData {
   exercises_to_include: string[] | null;
   exercises_to_avoid: string[] | null;
   additional_notes: string | null;
+  include_cardio?: boolean;
+  cardio_days_per_week?: number | null;
+  cardio_modalities?: string[] | null;
+  cardio_zone_focus?: number | null;
+  cardio_notes?: string | null;
 }
 
 export async function saveCoachGuidelines(data: GuidelinesData) {
@@ -44,6 +49,11 @@ export async function saveCoachGuidelines(data: GuidelinesData) {
         exercises_to_include: data.exercises_to_include,
         exercises_to_avoid: data.exercises_to_avoid,
         additional_notes: data.additional_notes,
+        include_cardio: data.include_cardio ?? false,
+        cardio_days_per_week: data.cardio_days_per_week ?? null,
+        cardio_modalities: data.cardio_modalities ?? null,
+        cardio_zone_focus: data.cardio_zone_focus ?? null,
+        cardio_notes: data.cardio_notes ?? null,
       })
       .eq("id", existing.id);
 
@@ -62,6 +72,11 @@ export async function saveCoachGuidelines(data: GuidelinesData) {
       exercises_to_include: data.exercises_to_include,
       exercises_to_avoid: data.exercises_to_avoid,
       additional_notes: data.additional_notes,
+      include_cardio: data.include_cardio ?? false,
+      cardio_days_per_week: data.cardio_days_per_week ?? null,
+      cardio_modalities: data.cardio_modalities ?? null,
+      cardio_zone_focus: data.cardio_zone_focus ?? null,
+      cardio_notes: data.cardio_notes ?? null,
     })
     .select("id")
     .single();

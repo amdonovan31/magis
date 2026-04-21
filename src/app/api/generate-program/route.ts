@@ -287,6 +287,28 @@ export async function POST(req: NextRequest) {
     guidelinesSection += `\nCOACH'S SPECIFIC INSTRUCTIONS (high priority — follow these closely):\n${guidelines.additional_notes}\n`;
   }
 
+  if ((guidelines as Record<string, unknown>).include_cardio) {
+    const g = guidelines as Record<string, unknown>;
+    guidelinesSection += `\nCARDIO GUIDELINES:\n`;
+    guidelinesSection += `- Cardio days per week: ${g.cardio_days_per_week ?? 2}\n`;
+    if (g.cardio_modalities && (g.cardio_modalities as string[]).length > 0) {
+      guidelinesSection += `- Available modalities: ${(g.cardio_modalities as string[]).join(", ")}\n`;
+    }
+    if (g.cardio_zone_focus) {
+      const zoneDescs: Record<number, string> = {
+        1: "Very light — recovery, warm-up",
+        2: "Light — conversational, nose-breathing",
+        3: "Moderate — comfortably hard",
+        4: "Hard — threshold, limited talking",
+        5: "Max effort — sprint, unsustainable",
+      };
+      guidelinesSection += `- Primary zone focus: Zone ${g.cardio_zone_focus} (${zoneDescs[g.cardio_zone_focus as number] ?? ""})\n`;
+    }
+    if (g.cardio_notes) {
+      guidelinesSection += `- Coach cardio notes: ${g.cardio_notes}\n`;
+    }
+  }
+
   // ------------------------------------------------------------------
   // Build optional regeneration context
   // ------------------------------------------------------------------
@@ -317,7 +339,7 @@ Exercises marked with ★ are foundational — STRONGLY prefer these. Only use u
 ${exerciseListText}
 
 OUTPUT: Return minified JSON (no extra whitespace) with this structure:
-{"program_name":"string","program_description":"string","weeks":[{"week_number":1,"workouts":[{"day_of_week":"Monday","workout_name":"string","muscle_groups":["Chest","Triceps"],"exercises":[{"exercise_id":"uuid","sets":3,"reps":"8-10","rest_seconds":90,"alternate_exercise_ids":["uuid"]}]}]}]}
+{"program_name":"string","program_description":"string","weeks":[{"week_number":1,"workouts":[{"day_of_week":"Monday","workout_name":"string","type":"strength","muscle_groups":["Chest","Triceps"],"exercises":[{"exercise_id":"uuid","sets":3,"reps":"8-10","rest_seconds":90,"alternate_exercise_ids":["uuid"]}]},{"day_of_week":"Wednesday","workout_name":"Zone 2 Run","type":"cardio","cardio":{"modality":"Run","duration_minutes":40,"distance_target":null,"distance_unit":null,"hr_zone":2,"notes":"Conversational pace"}}]}]}
 
 Rules:
 - exercise_id MUST match an id from the library above.
@@ -330,6 +352,8 @@ Rules:
 - STRONGLY prefer ★ (foundational) exercises. Build the program around proven, standard lifts (bench press, squat, deadlift, rows, overhead press, etc.). Only use advanced exercises (handstand push-ups, muscle-ups, etc.) if the client's training experience and the coach's notes specifically call for it.
 - Match exercise difficulty to client experience: beginners get beginner/intermediate exercises, advanced clients can get advanced exercises.
 - For each exercise, provide exactly 1 alternate_exercise_id that shares the same muscle_group, has similar movement_pattern, and prefers different equipment. Must not duplicate the original or be on the avoid list.
+- For strength workouts, set "type":"strength". For cardio workouts, set "type":"cardio" with a "cardio" object (modality, duration_minutes, hr_zone required; distance_target, distance_unit, notes optional). Cardio workouts have NO exercises array.
+- Only include cardio days if CARDIO GUIDELINES are provided above. Otherwise, all workouts are type "strength".
 - Return ONLY valid JSON — no markdown, no explanation.`;
 
   const systemPrompt = `You are an expert personal trainer and strength & conditioning coach. Your job is to generate a complete, periodized training program based on the client's intake form and the coach's guidelines. You must only use exercises from the provided exercise library. Return your response as valid JSON only — no markdown, no explanation, just the JSON object.
@@ -341,7 +365,16 @@ PROGRAMMING PRINCIPLES (follow these strictly):
 - PROGRESSIVE OVERLOAD: If the program is multi-week, vary rep ranges and intensity across weeks according to the periodization style (e.g., linear: increase weight/decrease reps each week; undulating: alternate heavy/light days).
 - REP RANGES: Strength = 3-6 reps, Hypertrophy = 8-12 reps, Endurance = 12-20 reps. Match the client's goals.
 - MUSCLE GROUP COVERAGE: Over a training week, ensure all major muscle groups are trained. Don't over-concentrate on one area at the expense of others.
-- SMART PAIRING: When programming supersets or same-day muscle groups, pair complementary groups (chest/triceps, back/biceps, quads/hamstrings) not competing ones.`;
+- SMART PAIRING: When programming supersets or same-day muscle groups, pair complementary groups (chest/triceps, back/biceps, quads/hamstrings) not competing ones.
+
+CARDIO PROGRAMMING (only when cardio guidelines are provided):
+- Include cardio days as separate workouts with type "cardio" instead of exercises.
+- Each cardio day has: modality, duration_minutes, optional distance_target + distance_unit, hr_zone (1-5), and notes.
+- Zone 1: Very light — recovery. Zone 2: Light — aerobic base. Zone 3: Moderate — tempo. Zone 4: Hard — threshold. Zone 5: Max effort — sprints.
+- Distribute cardio days to avoid back-to-back with heavy lower body strength days.
+- Respect the coach's zone focus — if they say Zone 2, most cardio should be Zone 2.
+- Duration by zone: Zone 2 = 30-60 min, Zone 3 = 20-40 min, Zone 4-5 = 15-30 min.
+- If multiple modalities available, vary them across the week.`;
 
   // ------------------------------------------------------------------
   // Call Claude API via SDK (handles timeouts properly)
@@ -457,6 +490,17 @@ PROGRAMMING PRINCIPLES (follow these strictly):
         const workout = week.workouts[dayIdx];
         const scheduledDay = dayMap[workout.day_of_week.toLowerCase()];
 
+        const workoutAny = workout as unknown as Record<string, unknown>;
+        const workoutType = workoutAny.type === "cardio" ? "cardio" : "strength";
+        const cardio = workoutAny.cardio as {
+          modality?: string;
+          duration_minutes?: number;
+          distance_target?: number | null;
+          distance_unit?: string | null;
+          hr_zone?: number;
+          notes?: string;
+        } | undefined;
+
         const { data: template, error: templateError } = await supabase
           .from("workout_templates")
           .insert({
@@ -466,6 +510,13 @@ PROGRAMMING PRINCIPLES (follow these strictly):
             week_number: week.week_number,
             scheduled_days: scheduledDay != null ? [scheduledDay] : null,
             notes: null,
+            type: workoutType,
+            cardio_modality: cardio?.modality ?? null,
+            cardio_duration_minutes: cardio?.duration_minutes ?? null,
+            cardio_distance_target: cardio?.distance_target ?? null,
+            cardio_distance_unit: cardio?.distance_unit ?? null,
+            cardio_hr_zone: cardio?.hr_zone ?? null,
+            cardio_notes: cardio?.notes ?? null,
           })
           .select("id")
           .single();
@@ -475,8 +526,8 @@ PROGRAMMING PRINCIPLES (follow these strictly):
           continue;
         }
 
-        // 3. Insert exercises for this template
-        if (workout.exercises.length > 0) {
+        // 3. Insert exercises for this template (strength days only)
+        if (workoutType === "strength" && workout.exercises?.length > 0) {
           const exerciseRows = workout.exercises.map((ex, i) => ({
             workout_template_id: template.id,
             exercise_id: ex.exercise_id,

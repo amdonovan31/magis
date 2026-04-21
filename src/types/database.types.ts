@@ -458,12 +458,17 @@ export type Database = {
       coach_guidelines: {
         Row: {
           additional_notes: string | null
+          cardio_days_per_week: number | null
+          cardio_modalities: string[] | null
+          cardio_notes: string | null
+          cardio_zone_focus: number | null
           client_id: string
           coach_id: string
           created_at: string
           exercises_to_avoid: string[] | null
           exercises_to_include: string[] | null
           id: string
+          include_cardio: boolean
           intensity_level: string
           periodization_style: string
           program_length_weeks: number
@@ -471,12 +476,17 @@ export type Database = {
         }
         Insert: {
           additional_notes?: string | null
+          cardio_days_per_week?: number | null
+          cardio_modalities?: string[] | null
+          cardio_notes?: string | null
+          cardio_zone_focus?: number | null
           client_id: string
           coach_id: string
           created_at?: string
           exercises_to_avoid?: string[] | null
           exercises_to_include?: string[] | null
           id?: string
+          include_cardio?: boolean
           intensity_level: string
           periodization_style: string
           program_length_weeks: number
@@ -484,12 +494,17 @@ export type Database = {
         }
         Update: {
           additional_notes?: string | null
+          cardio_days_per_week?: number | null
+          cardio_modalities?: string[] | null
+          cardio_notes?: string | null
+          cardio_zone_focus?: number | null
           client_id?: string
           coach_id?: string
           created_at?: string
           exercises_to_avoid?: string[] | null
           exercises_to_include?: string[] | null
           id?: string
+          include_cardio?: boolean
           intensity_level?: string
           periodization_style?: string
           program_length_weeks?: number
