@@ -86,7 +86,9 @@ export default async function ClientDetailPage({
     ? formatRelativeTime(lastSession.started_at)
     : "No sessions yet";
 
-  const activeProgram = programs?.find((p) => p.is_active);
+  const activeProgram =
+    programs?.find((p) => p.is_active && p.status === "published") ??
+    programs?.find((p) => p.is_active);
   let programWeekInfo: { currentWeek: number; totalWeeks: number; completedSessions: number; totalSessions: number } | null = null;
 
   if (activeProgram) {

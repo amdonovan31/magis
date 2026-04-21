@@ -354,6 +354,14 @@ export async function publishProgram(
         .eq("status", "published")
         .neq("id", programId);
     }
+
+    // Deactivate stale drafts for the same client
+    await supabase
+      .from("programs")
+      .update({ is_active: false })
+      .eq("client_id", program.client_id)
+      .eq("status", "draft")
+      .neq("id", programId);
   }
 
   const { error } = await supabase

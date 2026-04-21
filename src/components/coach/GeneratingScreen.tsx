@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
@@ -75,7 +75,10 @@ export default function GeneratingScreen({
     }
   }, [clientId, guidelinesId, regenerationFeedback, previousProgramJson, router]);
 
+  const hasStarted = useRef(false);
   useEffect(() => {
+    if (hasStarted.current) return;
+    hasStarted.current = true;
     generate();
   }, [generate]);
 
