@@ -86,26 +86,45 @@ export default async function ClientDetailPage({
     ? formatRelativeTime(lastSession.started_at)
     : "No sessions yet";
 
-  // Adherence: completed vs total scheduled workouts for active program
   const activeProgram = programs?.find((p) => p.is_active);
-  let adherenceText: string | null = null;
+  let programWeekInfo: { currentWeek: number; totalWeeks: number; completedSessions: number; totalSessions: number } | null = null;
+
   if (activeProgram) {
-    const { count: totalScheduled } = await supabase
-      .from("scheduled_workouts")
-      .select("*", { count: "exact", head: true })
-      .eq("client_id", id)
-      .eq("program_id", activeProgram.id);
+    const [{ data: scheduledRange }, { count: totalScheduled }, { count: completedScheduled }] = await Promise.all([
+      supabase
+        .from("scheduled_workouts")
+        .select("scheduled_date")
+        .eq("program_id", activeProgram.id)
+        .eq("client_id", id)
+        .order("scheduled_date", { ascending: true }),
+      supabase
+        .from("scheduled_workouts")
+        .select("*", { count: "exact", head: true })
+        .eq("program_id", activeProgram.id)
+        .eq("client_id", id),
+      supabase
+        .from("scheduled_workouts")
+        .select("*", { count: "exact", head: true })
+        .eq("program_id", activeProgram.id)
+        .eq("client_id", id)
+        .eq("status", "completed"),
+    ]);
 
-    const { count: completedScheduled } = await supabase
-      .from("scheduled_workouts")
-      .select("*", { count: "exact", head: true })
-      .eq("client_id", id)
-      .eq("program_id", activeProgram.id)
-      .eq("status", "completed");
+    if (scheduledRange && scheduledRange.length > 0) {
+      const firstDate = new Date(scheduledRange[0].scheduled_date + "T00:00:00");
+      const lastDate = new Date(scheduledRange[scheduledRange.length - 1].scheduled_date + "T00:00:00");
+      const totalWeeks = Math.ceil((lastDate.getTime() - firstDate.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
+      const now = new Date();
+      const currentWeek = Math.max(1, Math.min(totalWeeks,
+        Math.ceil((now.getTime() - firstDate.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1
+      ));
 
-    if (totalScheduled && totalScheduled > 0) {
-      const pct = Math.round(((completedScheduled ?? 0) / totalScheduled) * 100);
-      adherenceText = `${pct}% adherence · ${completedScheduled ?? 0}/${totalScheduled} sessions`;
+      programWeekInfo = {
+        currentWeek,
+        totalWeeks,
+        completedSessions: completedScheduled ?? 0,
+        totalSessions: totalScheduled ?? 0,
+      };
     }
   }
 
@@ -224,14 +243,64 @@ export default async function ClientDetailPage({
                 {profile.full_name ?? "Unnamed Client"}
               </p>
               <p className="text-xs text-primary/40">{lastActiveText}</p>
-              {adherenceText && (
-                <p className="text-xs text-primary/50 mt-0.5">
-                  {adherenceText}
-                </p>
-              )}
             </div>
           </div>
         </Card>
+
+        {/* 1b. Active Program */}
+        {activeProgram && programWeekInfo ? (
+          <Link href={`/programs/${activeProgram.id}/edit`}>
+            <Card className="active:scale-[0.98] transition-transform border border-accent/20">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-accent/70">
+                    Active Program
+                  </p>
+                  <p className="font-semibold text-primary mt-0.5 truncate">
+                    {activeProgram.title}
+                  </p>
+                  <p className="text-xs text-primary/50 mt-0.5">
+                    Week {programWeekInfo.currentWeek} of {programWeekInfo.totalWeeks}
+                    {" \u00B7 "}
+                    {programWeekInfo.completedSessions}/{programWeekInfo.totalSessions} sessions
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-1.5 shrink-0 ml-3">
+                  <span className="text-sm font-semibold text-accent">
+                    {programWeekInfo.totalSessions > 0
+                      ? Math.round((programWeekInfo.completedSessions / programWeekInfo.totalSessions) * 100)
+                      : 0}%
+                  </span>
+                  <span className="text-primary/30 text-lg">&rsaquo;</span>
+                </div>
+              </div>
+              <div className="mt-2.5 h-1.5 rounded-full bg-primary/10 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-accent transition-all"
+                  style={{
+                    width: `${programWeekInfo.totalSessions > 0
+                      ? Math.round((programWeekInfo.completedSessions / programWeekInfo.totalSessions) * 100)
+                      : 0}%`,
+                  }}
+                />
+              </div>
+            </Card>
+          </Link>
+        ) : (
+          <Link href={`/clients/${id}/generate`}>
+            <Card className="active:scale-[0.98] transition-transform border border-dashed border-primary/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-primary/60">No active program</p>
+                  <p className="text-xs text-primary/40 mt-0.5">
+                    Tap to design a program for this client
+                  </p>
+                </div>
+                <span className="text-primary/30 text-lg">+</span>
+              </div>
+            </Card>
+          </Link>
+        )}
 
         {/* 2. PR Highlights (conditional) */}
         {recentPRs.length > 0 && (
@@ -374,20 +443,6 @@ export default async function ClientDetailPage({
           </Card>
         </Link>
 
-        {/* 8. Design Program */}
-        <Link href={`/clients/${id}/generate`}>
-          <Card className="active:scale-[0.98] transition-transform">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-primary">Design Program</p>
-                <p className="text-xs text-primary/40 mt-0.5">
-                  Generate a new AI program for this client
-                </p>
-              </div>
-              <span className="text-primary/30 text-lg">&rsaquo;</span>
-            </div>
-          </Card>
-        </Link>
       </div>
     </>
   );
