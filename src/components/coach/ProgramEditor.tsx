@@ -291,6 +291,36 @@ export default function ProgramEditor({
         exerciseAdds: [...prev.exerciseAdds, { workout_template_id: workoutTemplateId, exercise_id: exercise.id }],
       }));
     } else {
+      const template = program.workout_templates.find((t) => t.id === workoutTemplateId);
+      const maxPos = template?.exercises.reduce((max, e) => Math.max(max, e.position), 0) ?? 0;
+
+      setProgram((prev) => ({
+        ...prev,
+        workout_templates: prev.workout_templates.map((t) =>
+          t.id === workoutTemplateId
+            ? {
+                ...t,
+                exercises: [
+                  ...t.exercises,
+                  {
+                    id: `temp-${Date.now()}`,
+                    workout_template_id: workoutTemplateId,
+                    exercise_id: exercise.id,
+                    exercise: { name: exercise.name, muscle_group: exercise.muscle_group, id: exercise.id },
+                    position: maxPos + 1,
+                    prescribed_sets: 3,
+                    prescribed_reps: "8-12",
+                    prescribed_weight: null,
+                    rest_seconds: 90,
+                    notes: null,
+                    alternate_exercise_ids: null,
+                  } as unknown as ProgramWithTemplates["workout_templates"][0]["exercises"][0],
+                ],
+              }
+            : t
+        ),
+      }));
+
       startTransition(async () => {
         const res = await addTemplateExercise(workoutTemplateId, exercise.id);
         if (!res.error) router.refresh();
