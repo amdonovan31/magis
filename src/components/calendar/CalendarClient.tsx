@@ -7,13 +7,14 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { cn } from "@/lib/utils/cn";
 import { fetchWeekWorkouts } from "@/lib/actions/calendar.actions";
-import type { ScheduledWorkoutWithDetails } from "@/lib/queries/calendar.queries";
+import type { ScheduledWorkoutWithDetails, ProgramOverview, ProgramOverviewWorkout } from "@/lib/queries/calendar.queries";
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 interface CalendarClientProps {
   workouts: ScheduledWorkoutWithDetails[];
-  weekStart: string; // YYYY-MM-DD (Monday)
+  weekStart: string;
+  programOverview: ProgramOverview;
 }
 
 function toLocalDateString(d: Date): string {
@@ -40,12 +41,13 @@ function formatWeekRange(weekStart: string): string {
   return `${monStr} – ${sunStr}`;
 }
 
-export default function CalendarClient({ workouts: initialWorkouts, weekStart: initialWeekStart }: CalendarClientProps) {
+export default function CalendarClient({ workouts: initialWorkouts, weekStart: initialWeekStart, programOverview }: CalendarClientProps) {
   const todayStr = toLocalDateString(new Date());
   const [currentWeekStart, setCurrentWeekStart] = useState(initialWeekStart);
   const [workouts, setWorkouts] = useState(initialWorkouts);
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<"calendar" | "program">("calendar");
 
   const isInitialWeek = currentWeekStart === initialWeekStart;
 
@@ -95,6 +97,33 @@ export default function CalendarClient({ workouts: initialWorkouts, weekStart: i
 
   return (
     <div>
+      {/* Tab toggle */}
+      <div className="mx-5 mb-4 flex rounded-xl bg-surface p-1">
+        <button
+          onClick={() => setActiveTab("calendar")}
+          className={cn(
+            "flex-1 rounded-lg py-2 text-sm font-semibold transition-colors",
+            activeTab === "calendar" ? "bg-accent text-accent-light" : "text-muted"
+          )}
+        >
+          Calendar
+        </button>
+        <button
+          onClick={() => setActiveTab("program")}
+          className={cn(
+            "flex-1 rounded-lg py-2 text-sm font-semibold transition-colors",
+            activeTab === "program" ? "bg-accent text-accent-light" : "text-muted"
+          )}
+        >
+          Program
+        </button>
+      </div>
+
+      {activeTab === "program" && (
+        <ProgramOverviewView overview={programOverview} />
+      )}
+
+      {activeTab === "calendar" && <>
       {/* Week navigation header */}
       <div className="flex items-center justify-between px-5 pb-3">
         <button
@@ -194,6 +223,140 @@ export default function CalendarClient({ workouts: initialWorkouts, weekStart: i
             ))}
           </div>
         )}
+      </div>
+      </>}
+    </div>
+  );
+}
+
+function ProgramOverviewView({ overview }: { overview: ProgramOverview }) {
+  const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(() => {
+    if (!overview) return new Set();
+    return new Set([overview.currentWeek]);
+  });
+
+  function toggleWeek(weekNum: number) {
+    setExpandedWeeks((prev) => {
+      const next = new Set(prev);
+      if (next.has(weekNum)) next.delete(weekNum);
+      else next.add(weekNum);
+      return next;
+    });
+  }
+
+  if (!overview) {
+    return (
+      <div className="flex flex-col items-center py-16 px-4 text-center">
+        <p className="text-4xl mb-3">📋</p>
+        <p className="font-semibold text-primary">No active program assigned yet</p>
+        <p className="text-sm text-muted mt-1">Your coach will assign a program when it&apos;s ready.</p>
+      </div>
+    );
+  }
+
+  const weekMap = new Map<number, ProgramOverviewWorkout[]>();
+  for (const w of overview.workouts) {
+    const wn = w.template.week_number ?? 1;
+    if (!weekMap.has(wn)) weekMap.set(wn, []);
+    weekMap.get(wn)!.push(w);
+  }
+  const sortedWeeks = Array.from(weekMap.entries()).sort(([a], [b]) => a - b);
+
+  return (
+    <div className="px-4">
+      <div className="mb-4">
+        <h2 className="font-heading text-lg font-semibold text-primary">{overview.programTitle}</h2>
+        <p className="text-xs uppercase tracking-wider text-muted">
+          Week {overview.currentWeek} of {overview.totalWeeks}
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        {sortedWeeks.map(([weekNum, weekWorkouts]) => {
+          const isExpanded = expandedWeeks.has(weekNum);
+          const isCurrent = weekNum === overview.currentWeek;
+          return (
+            <div key={weekNum}>
+              <button
+                onClick={() => toggleWeek(weekNum)}
+                className="flex w-full items-center justify-between px-1 py-3"
+              >
+                <span className="text-sm font-semibold text-primary">
+                  Week {weekNum}
+                  {isCurrent && <span className="ml-2 text-xs text-accent">(Current)</span>}
+                </span>
+                <svg
+                  className={cn("h-4 w-4 text-primary/40 transition-transform", isExpanded && "rotate-180")}
+                  fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {isExpanded && (
+                <div className="flex flex-col gap-3 pb-4">
+                  {weekWorkouts.map((workout) => {
+                    const isCompleted = workout.status === "completed" && workout.session_id;
+                    const isMissed = workout.status === "missed";
+                    const isSkipped = workout.status === "skipped";
+                    const href = isCompleted
+                      ? `/workout/${workout.session_id}/summary`
+                      : `/calendar/${workout.id}`;
+
+                    const dateObj = new Date(workout.scheduled_date + "T00:00:00");
+                    const dateLabel = dateObj.toLocaleDateString("en-US", {
+                      weekday: "short", month: "short", day: "numeric",
+                    });
+
+                    return (
+                      <Link key={workout.id} href={href}>
+                        <Card className={cn(
+                          "active:scale-[0.98] transition-transform",
+                          isMissed && "opacity-50"
+                        )}>
+                          <div className="flex items-center justify-between mb-2">
+                            <div>
+                              <h3 className="text-sm font-semibold text-primary">{workout.template.title}</h3>
+                              <p className="text-xs text-muted">{dateLabel}</p>
+                            </div>
+                            {isCompleted && <Badge variant="success">Completed</Badge>}
+                            {isMissed && (
+                              <span className="rounded-full bg-red-500/10 px-2.5 py-0.5 text-xs font-medium text-red-400">
+                                Missed
+                              </span>
+                            )}
+                            {isSkipped && (
+                              <span className="rounded-full bg-primary/5 px-2.5 py-0.5 text-xs font-medium text-primary/40">
+                                Skipped
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex flex-col gap-0.5">
+                            {workout.template.exercises.map((ex) => (
+                              <p key={ex.id} className="text-xs text-muted">
+                                {ex.exercise?.name}
+                                {ex.prescribed_sets && ex.prescribed_reps && (
+                                  <span className="text-primary/30 ml-1">
+                                    &mdash; {ex.prescribed_sets}&times;{ex.prescribed_reps}
+                                  </span>
+                                )}
+                              </p>
+                            ))}
+                          </div>
+                          {isCompleted && (
+                            <p className="mt-2 text-[10px] text-green-500/70">
+                              &#x2713; {workout.template.exercises.length} exercises completed
+                            </p>
+                          )}
+                        </Card>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

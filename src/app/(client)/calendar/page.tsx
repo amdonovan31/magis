@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getScheduledWorkouts } from "@/lib/queries/calendar.queries";
+import { getScheduledWorkouts, getClientProgramOverview } from "@/lib/queries/calendar.queries";
 import { getTodayISO, getTodayDayOfWeek } from "@/lib/utils/date";
 import CalendarClient from "@/components/calendar/CalendarClient";
 
@@ -34,7 +34,10 @@ export default async function CalendarPage() {
   if (!user) redirect("/login");
 
   const { start, end } = getCurrentWeekRange();
-  const workouts = await getScheduledWorkouts(start, end);
+  const [workouts, programOverview] = await Promise.all([
+    getScheduledWorkouts(start, end),
+    getClientProgramOverview(),
+  ]);
 
   return (
     <div className="flex flex-col gap-0 pb-8">
@@ -43,7 +46,7 @@ export default async function CalendarPage() {
           My Schedule
         </h1>
       </div>
-      <CalendarClient workouts={workouts} weekStart={start} />
+      <CalendarClient workouts={workouts} weekStart={start} programOverview={programOverview} />
     </div>
   );
 }
