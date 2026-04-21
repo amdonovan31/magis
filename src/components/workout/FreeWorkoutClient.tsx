@@ -158,6 +158,8 @@ export default function FreeWorkoutClient({
     [exercises]
   );
 
+  const excludeIds = useMemo(() => exercises.map((e) => e.exerciseId), [exercises]);
+
   const addExercise = useCallback(
     (exercise: Exercise) => {
       setExercises((prev) => {
@@ -452,7 +454,7 @@ export default function FreeWorkoutClient({
         <ExercisePickerModal
           onSelect={addExercise}
           onClose={() => setShowPicker(false)}
-          excludeIds={exercises.map((e) => e.exerciseId)}
+          excludeIds={excludeIds}
         />
       )}
 
@@ -488,6 +490,8 @@ function ExercisePickerModal({
   const [createMuscle, setCreateMuscle] = useState("");
   const [creating, setCreating] = useState(false);
 
+  const excludeKey = excludeIds.join(",");
+
   useEffect(() => {
     const timer = setTimeout(async () => {
       if (!query.trim() && !muscleFilter) {
@@ -500,7 +504,7 @@ function ExercisePickerModal({
       setLoading(false);
     }, 300);
     return () => clearTimeout(timer);
-  }, [query, muscleFilter, excludeIds]);
+  }, [query, muscleFilter, excludeKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleCreate() {
     if (!createName.trim()) return;
