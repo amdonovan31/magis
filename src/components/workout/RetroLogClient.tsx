@@ -53,9 +53,27 @@ export default function RetroLogClient({ workout, weightUnit }: RetroLogClientPr
   const [exerciseNotes, setExerciseNotes] = useState<Record<string, string>>({});
   const [substitutions, setSubstitutions] = useState<Record<string, Substitution>>({});
   const [substituteTarget, setSubstituteTarget] = useState<string | null>(null);
+  const [removedExercises, setRemovedExercises] = useState<Set<string>>(new Set());
 
   function toggleExpanded(id: string) {
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function removeExercise(templateExerciseId: string) {
+    setRemovedExercises((prev) => new Set([...Array.from(prev), templateExerciseId]));
+    setExerciseSets((prev) => { const next = { ...prev }; delete next[templateExerciseId]; return next; });
+    setSubstitutions((prev) => { const next = { ...prev }; delete next[templateExerciseId]; return next; });
+    setExerciseNotes((prev) => { const next = { ...prev }; delete next[templateExerciseId]; return next; });
+  }
+
+  function restoreExercise(templateExerciseId: string, te: (typeof workout.template.exercises)[0]) {
+    setRemovedExercises((prev) => { const next = new Set(Array.from(prev)); next.delete(templateExerciseId); return next; });
+    const count = te.prescribed_sets ?? 3;
+    const defaultReps = parseFirstNumber(te.prescribed_reps);
+    setExerciseSets((prev) => ({
+      ...prev,
+      [templateExerciseId]: Array.from({ length: count }, () => ({ reps: defaultReps, weight: "" })),
+    }));
   }
 
   function updateSet(exerciseId: string, setIndex: number, field: "reps" | "weight", value: string) {
@@ -106,14 +124,16 @@ export default function RetroLogClient({ workout, weightUnit }: RetroLogClientPr
     setSaving(true);
     setSaveError(null);
 
-    const sets = Object.entries(exerciseSets).flatMap(([templateExerciseId, entries]) =>
-      entries.map((entry, i) => ({
-        templateExerciseId,
-        setNumber: i + 1,
-        reps: entry.reps ? parseInt(entry.reps, 10) : null,
-        weight: entry.weight ? parseFloat(entry.weight) || null : null,
-      }))
-    );
+    const sets = Object.entries(exerciseSets)
+      .filter(([templateExerciseId]) => !removedExercises.has(templateExerciseId))
+      .flatMap(([templateExerciseId, entries]) =>
+        entries.map((entry, i) => ({
+          templateExerciseId,
+          setNumber: i + 1,
+          reps: entry.reps ? parseInt(entry.reps, 10) : null,
+          weight: entry.weight ? parseFloat(entry.weight) || null : null,
+        }))
+      );
 
     // Build substitutions map for the server action
     const subsMap: Record<string, { exerciseId: string; reason?: string }> = {};
@@ -152,11 +172,27 @@ export default function RetroLogClient({ workout, weightUnit }: RetroLogClientPr
       </p>
 
       {workout.template.exercises.map((te) => {
+        if (removedExercises.has(te.id)) {
+          return (
+            <div key={te.id} className="rounded-2xl bg-background overflow-hidden opacity-50">
+              <div className="flex items-center justify-between px-4 py-3">
+                <h3 className="font-semibold text-primary/50 line-through">
+                  {te.exercise?.name ?? "Unknown"}
+                </h3>
+                <button type="button" onClick={() => restoreExercise(te.id, te)} className="text-xs text-primary/40 hover:text-primary/60 transition-colors">
+                  Restore
+                </button>
+              </div>
+            </div>
+          );
+        }
+
         const isOpen = expanded[te.id] ?? false;
         const sets = exerciseSets[te.id] ?? [];
         const sub = substitutions[te.id];
         const displayName = sub?.exerciseName ?? te.exercise?.name ?? "Unknown";
         const prescribedLabel = `${te.prescribed_sets ?? "—"} × ${te.prescribed_reps ?? "—"}`;
+        const alts = (te as unknown as { alternateExercises?: { id: string; name: string; equipment?: string | null }[] }).alternateExercises;
 
         return (
           <div key={te.id} className="rounded-2xl bg-background overflow-hidden">
@@ -279,17 +315,48 @@ export default function RetroLogClient({ workout, weightUnit }: RetroLogClientPr
                       onClick={() => removeSubstitution(te.id)}
                       className="text-xs text-primary/40 hover:text-primary/60 transition-colors"
                     >
-                      ← Revert to {te.exercise?.name}
+                      &larr; Revert to {te.exercise?.name}
                     </button>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => setSubstituteTarget(te.id)}
-                      className="text-xs font-medium text-primary/40 hover:text-primary/60 transition-colors"
-                    >
-                      Substitute exercise...
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setSubstituteTarget(te.id)}
+                        className="text-xs font-medium text-primary/40 hover:text-primary/60 transition-colors"
+                      >
+                        Substitute exercise...
+                      </button>
+                      {alts && alts.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-1.5">
+                          <span className="text-[10px] text-primary/30 self-center">Alternatives:</span>
+                          {alts.map((alt) => (
+                            <button
+                              key={alt.id}
+                              type="button"
+                              onClick={() => setSubstitutions((prev) => ({
+                                ...prev,
+                                [te.id]: { exerciseId: alt.id, exerciseName: alt.name },
+                              }))}
+                              className="rounded-full bg-primary/5 border border-primary/10 px-2.5 py-1 text-xs font-medium text-primary/60 hover:bg-primary/10 hover:text-primary transition-colors"
+                            >
+                              {alt.name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </>
                   )}
+                </div>
+
+                {/* Remove exercise */}
+                <div className="mx-3 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => removeExercise(te.id)}
+                    className="text-xs font-medium text-red-400 hover:text-red-600 transition-colors"
+                  >
+                    Remove exercise
+                  </button>
                 </div>
               </div>
             )}

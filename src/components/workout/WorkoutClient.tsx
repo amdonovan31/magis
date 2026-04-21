@@ -261,6 +261,7 @@ export default function WorkoutClient({
               lastPerformanceByExercise={lastPerformanceByExercise}
               onSetResolved={() => setResolvedCount((c) => c + 1)}
               onSetUnresolved={() => setResolvedCount((c) => c - 1)}
+              alternateExercises={(te as unknown as { alternateExercises?: { id: string; name: string; equipment?: string | null }[] }).alternateExercises}
             />
           </div>
         ))}

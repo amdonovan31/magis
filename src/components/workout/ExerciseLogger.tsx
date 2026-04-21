@@ -25,6 +25,7 @@ interface ExerciseLoggerProps {
   lastPerformanceByExercise?: Record<string, LastPerformance>;
   onSetResolved?: () => void;
   onSetUnresolved?: () => void;
+  alternateExercises?: { id: string; name: string; equipment?: string | null }[];
 }
 
 export default function ExerciseLogger({
@@ -40,6 +41,7 @@ export default function ExerciseLogger({
   lastPerformanceByExercise,
   onSetResolved,
   onSetUnresolved,
+  alternateExercises = [],
 }: ExerciseLoggerProps) {
   const [showDemo, setShowDemo] = useState(false);
 
@@ -265,6 +267,29 @@ export default function ExerciseLogger({
                   >
                     Swap anyway
                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* Coach alternatives (shown when search is empty) */}
+            {!confirmSwapExercise && !searchQuery.trim() && alternateExercises.length > 0 && (
+              <div className="mt-2 flex flex-col gap-1">
+                <span className="text-[10px] font-medium uppercase tracking-wide text-primary/30 px-1">Coach alternatives</span>
+                {alternateExercises.map((alt) => (
+                  <button
+                    key={alt.id}
+                    type="button"
+                    onClick={() => handleSelectResult({ id: alt.id, name: alt.name, muscle_group: null, equipment: alt.equipment ?? null } as Exercise)}
+                    className="flex items-center justify-between rounded-lg px-2.5 py-2 text-left bg-primary/5 hover:bg-primary/10 transition-colors"
+                  >
+                    <p className="text-sm font-medium text-primary">{alt.name}</p>
+                    {alt.equipment && (
+                      <span className="shrink-0 ml-2 rounded-full bg-primary/5 px-2 py-0.5 text-[10px] text-primary/40">{alt.equipment}</span>
+                    )}
+                  </button>
+                ))}
+                <div className="border-t border-primary/5 mt-1 pt-1">
+                  <p className="text-[10px] text-primary/25 px-1">Or search for any exercise above</p>
                 </div>
               </div>
             )}

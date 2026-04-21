@@ -173,26 +173,20 @@ export default async function WorkoutDetailPage({
           </Link>
         )}
 
-        {/* No existing session — allow start (today's scheduled) */}
-        {isScheduled && !inProgressSessionId && !isCompleted && (
-          <form action={startSession}>
-            <Button type="submit" fullWidth size="lg">
-              Start Workout →
-            </Button>
-          </form>
-        )}
-
-        {/* No existing session — allow retro log (past or skipped) */}
+        {/* No existing session — allow live start or retro log */}
         {canLog && (
-          <Link href={`/calendar/${workoutId}/log`}>
-            <Button
-              fullWidth
-              size="lg"
-              variant={isMissed || isSkipped ? "primary" : "secondary"}
-            >
-              Log Workout
-            </Button>
-          </Link>
+          <div className="flex flex-col gap-2">
+            <form action={startSession}>
+              <Button type="submit" fullWidth size="lg">
+                Do Workout Now &rarr;
+              </Button>
+            </form>
+            <Link href={`/calendar/${workoutId}/log`}>
+              <Button fullWidth size="lg" variant="secondary">
+                Log Past Results
+              </Button>
+            </Link>
+          </div>
         )}
 
         <ProgramDisclaimerFooter variant="coached" />
