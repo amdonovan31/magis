@@ -805,3 +805,77 @@ export async function fetchExerciseHistory(
   const { getExerciseHistory } = await import("@/lib/queries/session.queries");
   return getExerciseHistory(exerciseId, excludeSessionId);
 }
+
+export async function completeCardioSession(data: {
+  sessionId: string;
+  durationSeconds: number | null;
+  distanceValue: number | null;
+  distanceUnit: string | null;
+  avgHeartRate: number | null;
+  rpe: number | null;
+  notes: string | null;
+}) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
+  const { data: session } = await supabase
+    .from("workout_sessions")
+    .select("id, client_id, started_at, workout_template_id")
+    .eq("id", data.sessionId)
+    .single();
+
+  if (!session || session.client_id !== user.id) return { error: "Session not found" };
+
+  const { error: logError } = await supabase.from("cardio_logs").insert({
+    session_id: data.sessionId,
+    duration_seconds: data.durationSeconds,
+    distance_value: data.distanceValue,
+    distance_unit: data.distanceUnit,
+    avg_heart_rate: data.avgHeartRate,
+    rpe: data.rpe,
+    notes: data.notes,
+  });
+
+  if (logError) return { error: logError.message };
+
+  const now = new Date();
+  const startedAt = new Date(session.started_at);
+  const wallDuration = Math.round((now.getTime() - startedAt.getTime()) / 1000);
+
+  const { error: updateError } = await supabase
+    .from("workout_sessions")
+    .update({
+      status: "completed",
+      completed_at: now.toISOString(),
+      duration_seconds: wallDuration,
+    })
+    .eq("id", data.sessionId);
+
+  if (updateError) return { error: updateError.message };
+
+  if (session.workout_template_id) {
+    const today = now.toISOString().split("T")[0];
+    await supabase
+      .from("scheduled_workouts")
+      .update({ status: "completed", session_id: data.sessionId })
+      .eq("client_id", user.id)
+      .eq("workout_template_id", session.workout_template_id)
+      .eq("scheduled_date", today)
+      .eq("status", "scheduled");
+  }
+
+  revalidatePath("/home");
+  revalidatePath("/history");
+  redirect(`/workout/${data.sessionId}/summary`);
+}
+
+export async function fetchCardioHistory(
+  modality: string,
+  excludeSessionId: string
+) {
+  const { getCardioHistory } = await import("@/lib/queries/session.queries");
+  return getCardioHistory(modality, excludeSessionId);
+}

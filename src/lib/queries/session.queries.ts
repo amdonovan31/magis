@@ -493,3 +493,77 @@ export async function getExerciseHistory(
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, limit);
 }
+
+export type CardioHistorySession = {
+  sessionId: string;
+  date: string;
+  templateTitle: string | null;
+  durationSeconds: number | null;
+  distanceValue: number | null;
+  distanceUnit: string | null;
+  avgHeartRate: number | null;
+  rpe: number | null;
+};
+
+export async function getCardioHistory(
+  modality: string,
+  excludeSessionId?: string,
+  limit: number = 5
+): Promise<CardioHistorySession[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  let query = supabase
+    .from("cardio_logs")
+    .select(`
+      id,
+      duration_seconds,
+      distance_value,
+      distance_unit,
+      avg_heart_rate,
+      rpe,
+      session:workout_sessions!inner(
+        id, started_at, client_id, status,
+        workout_template:workout_templates(title, cardio_modality)
+      )
+    `)
+    .eq("session.client_id", user.id)
+    .eq("session.status", "completed");
+
+  if (excludeSessionId) {
+    query = query.neq("session_id", excludeSessionId);
+  }
+
+  const { data } = await query;
+  if (!data) return [];
+
+  const results: CardioHistorySession[] = [];
+  for (const row of data) {
+    const session = row.session as unknown as {
+      id: string;
+      started_at: string;
+      workout_template: { title: string; cardio_modality: string | null } | null;
+    };
+
+    const rowModality = session.workout_template?.cardio_modality ?? "";
+    if (rowModality.toLowerCase() !== modality.toLowerCase()) continue;
+
+    results.push({
+      sessionId: session.id,
+      date: session.started_at,
+      templateTitle: session.workout_template?.title ?? null,
+      durationSeconds: row.duration_seconds,
+      distanceValue: row.distance_value,
+      distanceUnit: row.distance_unit,
+      avgHeartRate: row.avg_heart_rate,
+      rpe: row.rpe,
+    });
+  }
+
+  return results
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, limit);
+}

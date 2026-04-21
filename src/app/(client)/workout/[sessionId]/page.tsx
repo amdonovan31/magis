@@ -2,6 +2,7 @@ import { getSession, getLastPerformanceForExercises } from "@/lib/queries/sessio
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import WorkoutClient from "@/components/workout/WorkoutClient";
+import CardioWorkoutClient from "@/components/workout/CardioWorkoutClient";
 import CompleteWorkoutButton from "@/components/workout/CompleteWorkoutButton";
 import ConnectivityBanner from "@/components/workout/ConnectivityBanner";
 import ProgramDisclaimerFooter from "@/components/disclaimer/ProgramDisclaimerFooter";
@@ -61,6 +62,36 @@ export default async function WorkoutPage({ params }: WorkoutPageProps) {
     .eq("id", user.id)
     .single();
   const preferredUnit = (profile?.preferred_unit as "kg" | "lbs") ?? "lbs";
+
+  // Cardio day → render cardio logger instead of strength UI
+  const templateType = (template as unknown as { type?: string })?.type;
+  if (templateType === "cardio" && template) {
+    const t = template as unknown as {
+      title: string;
+      cardio_modality?: string | null;
+      cardio_duration_minutes?: number | null;
+      cardio_distance_target?: number | null;
+      cardio_distance_unit?: string | null;
+      cardio_hr_zone?: number | null;
+      cardio_notes?: string | null;
+    };
+    return (
+      <CardioWorkoutClient
+        sessionId={sessionId}
+        startedAt={session.started_at}
+        templateTitle={t.title}
+        preferredUnit={preferredUnit}
+        prescription={{
+          modality: t.cardio_modality ?? "Cardio",
+          durationMinutes: t.cardio_duration_minutes ?? null,
+          distanceTarget: t.cardio_distance_target ?? null,
+          distanceUnit: t.cardio_distance_unit ?? null,
+          hrZone: t.cardio_hr_zone ?? null,
+          notes: t.cardio_notes ?? null,
+        }}
+      />
+    );
+  }
 
   // Fetch last performance for each exercise in the workout (excluding current session)
   const exerciseIds = Array.from(

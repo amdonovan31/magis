@@ -103,6 +103,15 @@ export type SessionSummary = {
     value: number;
     previousValue: number | null;
   }[];
+  templateType?: "strength" | "cardio";
+  cardioStats?: {
+    durationSeconds: number | null;
+    distanceValue: number | null;
+    distanceUnit: string | null;
+    avgHeartRate: number | null;
+    rpe: number | null;
+    notes: string | null;
+  };
 };
 
 // Program builder form state
@@ -212,6 +221,17 @@ export const MUSCLE_GROUPS = [
 ] as const;
 
 export type MuscleGroup = (typeof MUSCLE_GROUPS)[number];
+
+export type CardioHistorySession = {
+  sessionId: string;
+  date: string;
+  templateTitle: string | null;
+  durationSeconds: number | null;
+  distanceValue: number | null;
+  distanceUnit: string | null;
+  avgHeartRate: number | null;
+  rpe: number | null;
+};
 
 export type CardioLog = {
   id: string;

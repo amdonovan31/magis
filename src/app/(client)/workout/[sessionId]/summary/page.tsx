@@ -72,7 +72,51 @@ export default async function SummaryPage({ params }: SummaryPageProps) {
       </header>
 
       <div className="flex-1 px-4 py-6 flex flex-col gap-4 pb-32">
-        {/* Stats grid */}
+        {/* Stats grid — cardio vs strength */}
+        {summary.templateType === "cardio" && summary.cardioStats ? (
+          <div className="grid grid-cols-2 gap-3">
+            {summary.cardioStats.durationSeconds && (
+              <Card padding="md" className="text-center">
+                <p className="text-2xl font-bold text-primary">
+                  {Math.floor(summary.cardioStats.durationSeconds / 60)}:{String(summary.cardioStats.durationSeconds % 60).padStart(2, "0")}
+                </p>
+                <p className="text-xs text-primary/50 mt-1">Time</p>
+              </Card>
+            )}
+            {summary.durationSeconds !== null && (
+              <Card padding="md" className="text-center">
+                <p className="text-2xl font-bold text-primary">
+                  {formatDuration(summary.durationSeconds)}
+                </p>
+                <p className="text-xs text-primary/50 mt-1">Session Duration</p>
+              </Card>
+            )}
+            {summary.cardioStats.distanceValue && (
+              <Card padding="md" className="text-center">
+                <p className="text-2xl font-bold text-primary">
+                  {summary.cardioStats.distanceValue}
+                </p>
+                <p className="text-xs text-primary/50 mt-1">{summary.cardioStats.distanceUnit ?? "distance"}</p>
+              </Card>
+            )}
+            {summary.cardioStats.avgHeartRate && (
+              <Card padding="md" className="text-center">
+                <p className="text-2xl font-bold text-primary">
+                  {summary.cardioStats.avgHeartRate}
+                </p>
+                <p className="text-xs text-primary/50 mt-1">Avg HR (bpm)</p>
+              </Card>
+            )}
+            {summary.cardioStats.rpe && (
+              <Card padding="md" className="text-center">
+                <p className="text-2xl font-bold text-primary">
+                  {summary.cardioStats.rpe}/10
+                </p>
+                <p className="text-xs text-primary/50 mt-1">RPE</p>
+              </Card>
+            )}
+          </div>
+        ) : (
         <div className="grid grid-cols-2 gap-3">
           {summary.durationSeconds !== null && (
             <Card padding="md" className="text-center">
@@ -105,6 +149,15 @@ export default async function SummaryPage({ params }: SummaryPageProps) {
             </Card>
           )}
         </div>
+        )}
+
+        {/* Cardio notes */}
+        {summary.templateType === "cardio" && summary.cardioStats?.notes && (
+          <Card padding="md">
+            <p className="text-xs font-semibold text-primary/40 mb-1">Notes</p>
+            <p className="text-sm text-primary">{summary.cardioStats.notes}</p>
+          </Card>
+        )}
 
         {/* Skipped exercises */}
         {summary.skippedExercises.length > 0 && (

@@ -13,6 +13,12 @@ export async function getSessionSummary(
       *,
       workout_template:workout_templates(
         title,
+        type,
+        cardio_modality,
+        cardio_duration_minutes,
+        cardio_distance_target,
+        cardio_distance_unit,
+        cardio_hr_zone,
         exercises:workout_template_exercises(
           id,
           prescribed_sets,
@@ -29,12 +35,20 @@ export async function getSessionSummary(
 
   const template = session.workout_template as {
     title: string;
+    type?: string;
+    cardio_modality?: string | null;
+    cardio_duration_minutes?: number | null;
+    cardio_distance_target?: number | null;
+    cardio_distance_unit?: string | null;
+    cardio_hr_zone?: number | null;
     exercises: {
       id: string;
       prescribed_sets: number | null;
       exercise: { name: string } | null;
     }[];
   } | null;
+
+  const templateType = (template?.type as "strength" | "cardio") ?? "strength";
 
   const program = session.program as { title: string } | null;
   const setLogs = (session.set_logs ?? []) as {
@@ -110,6 +124,27 @@ export async function getSessionSummary(
     previousValue: pr.previous_value,
   }));
 
+  // Fetch cardio stats if this is a cardio session
+  let cardioStats: SessionSummary["cardioStats"];
+  if (templateType === "cardio") {
+    const { data: cardioLog } = await supabase
+      .from("cardio_logs")
+      .select("duration_seconds, distance_value, distance_unit, avg_heart_rate, rpe, notes")
+      .eq("session_id", sessionId)
+      .maybeSingle();
+
+    if (cardioLog) {
+      cardioStats = {
+        durationSeconds: cardioLog.duration_seconds,
+        distanceValue: cardioLog.distance_value,
+        distanceUnit: cardioLog.distance_unit,
+        avgHeartRate: cardioLog.avg_heart_rate,
+        rpe: cardioLog.rpe,
+        notes: cardioLog.notes,
+      };
+    }
+  }
+
   return {
     sessionId,
     templateTitle: template?.title ?? (isFreeWorkout ? "Free Workout" : "Workout"),
@@ -125,5 +160,7 @@ export async function getSessionSummary(
     skippedExercises,
     skippedSetCount,
     prs: prList,
+    templateType,
+    cardioStats,
   };
 }
