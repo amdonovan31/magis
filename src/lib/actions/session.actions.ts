@@ -366,12 +366,31 @@ export async function logSet(data: {
     logged_at: new Date().toISOString(),
   };
 
+  if (isFreeWorkout) {
+    // Partial unique indexes don't work with Supabase's .upsert() onConflict.
+    // Delete-then-insert achieves the same idempotency.
+    await supabase
+      .from("set_logs")
+      .delete()
+      .eq("session_id", data.sessionId)
+      .eq("exercise_id", data.exerciseIdOverride!)
+      .eq("set_number", data.setNumber)
+      .is("template_exercise_id", null);
+
+    const { data: result, error } = await supabase
+      .from("set_logs")
+      .insert(row)
+      .select("id")
+      .single();
+
+    if (error) return { error: error.message };
+    return { success: true, id: result?.id };
+  }
+
   const { data: result, error } = await supabase
     .from("set_logs")
     .upsert(row, {
-      onConflict: isFreeWorkout
-        ? "session_id,exercise_id,set_number"
-        : "session_id,template_exercise_id,set_number",
+      onConflict: "session_id,template_exercise_id,set_number",
     })
     .select("id")
     .single();
