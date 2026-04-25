@@ -3,37 +3,13 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import ProgramDisclaimerFooter from "@/components/disclaimer/ProgramDisclaimerFooter";
+import FreeWorkoutPicker from "./FreeWorkoutPicker";
 import type { TodayWorkout } from "@/types/app.types";
 
 interface TodayWorkoutCardProps {
   todayWorkout: TodayWorkout;
   hasProgram?: boolean;
   activeFreeSessionId?: string | null;
-}
-
-async function startFree() {
-  "use server";
-  const { startFreeWorkout } = await import("@/lib/actions/session.actions");
-  await startFreeWorkout();
-}
-
-function FreeWorkoutCTA({ activeFreeSessionId }: { activeFreeSessionId?: string | null }) {
-  if (activeFreeSessionId) {
-    return (
-      <Link href={`/free-workout/${activeFreeSessionId}`} className="block mt-3">
-        <Button fullWidth variant="secondary" size="lg">
-          Resume Free Workout &rarr;
-        </Button>
-      </Link>
-    );
-  }
-  return (
-    <form action={startFree} className="mt-3">
-      <Button type="submit" fullWidth variant="secondary" size="lg">
-        Free Workout
-      </Button>
-    </form>
-  );
 }
 
 export default function TodayWorkoutCard({ todayWorkout, hasProgram = true, activeFreeSessionId }: TodayWorkoutCardProps) {
@@ -48,7 +24,7 @@ export default function TodayWorkoutCard({ todayWorkout, hasProgram = true, acti
               Your coach is preparing your program — you&apos;ll get a notification when it&apos;s ready.
             </p>
           </Card>
-          <FreeWorkoutCTA activeFreeSessionId={activeFreeSessionId} />
+          <FreeWorkoutPicker activeFreeSessionId={activeFreeSessionId} />
         </>
       );
     }
@@ -61,7 +37,7 @@ export default function TodayWorkoutCard({ todayWorkout, hasProgram = true, acti
             No workout scheduled for today. Rest up!
           </p>
         </Card>
-        <FreeWorkoutCTA activeFreeSessionId={activeFreeSessionId} />
+        <FreeWorkoutPicker activeFreeSessionId={activeFreeSessionId} />
       </>
     );
   }
@@ -150,7 +126,7 @@ export default function TodayWorkoutCard({ todayWorkout, hasProgram = true, acti
       </form>
       <ProgramDisclaimerFooter variant="coached" />
     </Card>
-    <FreeWorkoutCTA activeFreeSessionId={activeFreeSessionId} />
+    <FreeWorkoutPicker activeFreeSessionId={activeFreeSessionId} />
     </>
   );
 }

@@ -119,27 +119,26 @@ export default function CardioWorkoutClient({
         </div>
       </div>
 
-      {/* Prescription / Target */}
-      <Card className="bg-accent/5 border border-accent/20">
-        <p className="text-xs font-semibold uppercase tracking-wide text-accent/60 mb-2">Target</p>
-        <div className="flex flex-col gap-1.5 text-sm text-primary">
-          {prescription.durationMinutes && (
-            <p>{prescription.durationMinutes} minutes</p>
-          )}
-          {prescription.distanceTarget && (
-            <p>{prescription.distanceTarget} {prescription.distanceUnit ?? ""}</p>
-          )}
-          {zoneInfo && (
-            <p>{zoneInfo.label} — {zoneInfo.description}</p>
-          )}
-          {prescription.notes && (
-            <p className="text-xs text-primary/50 mt-1">{prescription.notes}</p>
-          )}
-          {!prescription.durationMinutes && !prescription.distanceTarget && !zoneInfo && !prescription.notes && (
-            <p className="text-primary/40">No specific targets set</p>
-          )}
-        </div>
-      </Card>
+      {/* Prescription / Target (hidden for free cardio with no targets) */}
+      {(prescription.durationMinutes || prescription.distanceTarget || prescription.hrZone || prescription.notes) && (
+        <Card className="bg-accent/5 border border-accent/20">
+          <p className="text-xs font-semibold uppercase tracking-wide text-accent/60 mb-2">Target</p>
+          <div className="flex flex-col gap-1.5 text-sm text-primary">
+            {prescription.durationMinutes && (
+              <p>{prescription.durationMinutes} minutes</p>
+            )}
+            {prescription.distanceTarget && (
+              <p>{prescription.distanceTarget} {prescription.distanceUnit ?? ""}</p>
+            )}
+            {zoneInfo && (
+              <p>{zoneInfo.label} — {zoneInfo.description}</p>
+            )}
+            {prescription.notes && (
+              <p className="text-xs text-primary/50 mt-1">{prescription.notes}</p>
+            )}
+          </div>
+        </Card>
+      )}
 
       {error && (
         <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>

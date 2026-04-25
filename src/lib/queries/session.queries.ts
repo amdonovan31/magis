@@ -526,7 +526,7 @@ export async function getCardioHistory(
       avg_heart_rate,
       rpe,
       session:workout_sessions!inner(
-        id, started_at, client_id, status,
+        id, started_at, client_id, status, free_workout_modality,
         workout_template:workout_templates(title, cardio_modality)
       )
     `)
@@ -545,16 +545,19 @@ export async function getCardioHistory(
     const session = row.session as unknown as {
       id: string;
       started_at: string;
+      free_workout_modality: string | null;
       workout_template: { title: string; cardio_modality: string | null } | null;
     };
 
-    const rowModality = session.workout_template?.cardio_modality ?? "";
+    const rowModality =
+      session.workout_template?.cardio_modality ??
+      session.free_workout_modality ?? "";
     if (rowModality.toLowerCase() !== modality.toLowerCase()) continue;
 
     results.push({
       sessionId: session.id,
       date: session.started_at,
-      templateTitle: session.workout_template?.title ?? null,
+      templateTitle: session.workout_template?.title ?? (session.free_workout_modality ? `Free ${session.free_workout_modality}` : null),
       durationSeconds: row.duration_seconds,
       distanceValue: row.distance_value,
       distanceUnit: row.distance_unit,

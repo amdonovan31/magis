@@ -49,6 +49,8 @@ export async function getSessionSummary(
   } | null;
 
   const templateType = (template?.type as "strength" | "cardio") ?? "strength";
+  const freeWorkoutType = (session as Record<string, unknown>).free_workout_type as string | null;
+  const isCardioSession = templateType === "cardio" || freeWorkoutType === "cardio";
 
   const program = session.program as { title: string } | null;
   const setLogs = (session.set_logs ?? []) as {
@@ -126,7 +128,7 @@ export async function getSessionSummary(
 
   // Fetch cardio stats if this is a cardio session
   let cardioStats: SessionSummary["cardioStats"];
-  if (templateType === "cardio") {
+  if (isCardioSession) {
     const { data: cardioLog } = await supabase
       .from("cardio_logs")
       .select("duration_seconds, distance_value, distance_unit, avg_heart_rate, rpe, notes")
@@ -160,7 +162,7 @@ export async function getSessionSummary(
     skippedExercises,
     skippedSetCount,
     prs: prList,
-    templateType,
+    templateType: isCardioSession ? "cardio" : templateType,
     cardioStats,
   };
 }

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getSavedWorkoutDetail } from "@/lib/queries/saved-workout.queries";
 import FreeWorkoutClient from "@/components/workout/FreeWorkoutClient";
+import CardioWorkoutClient from "@/components/workout/CardioWorkoutClient";
 import type { SetLog } from "@/types/app.types";
 
 interface FreeWorkoutPageProps {
@@ -21,18 +22,12 @@ export default async function FreeWorkoutPage({ params, searchParams }: FreeWork
 
   const { data: session } = await supabase
     .from("workout_sessions")
-    .select("id, client_id, status, started_at")
+    .select("id, client_id, status, started_at, free_workout_type, free_workout_modality")
     .eq("id", sessionId)
     .single();
 
   if (!session || session.client_id !== user.id) redirect("/home");
   if (session.status === "completed") redirect(`/workout/${sessionId}/summary`);
-
-  const { data: setLogs } = await supabase
-    .from("set_logs")
-    .select("*, exercise:exercises!exercise_id(id, name, muscle_group)")
-    .eq("session_id", sessionId)
-    .order("set_number", { ascending: true });
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -40,6 +35,33 @@ export default async function FreeWorkoutPage({ params, searchParams }: FreeWork
     .eq("id", user.id)
     .single();
   const preferredUnit = (profile?.preferred_unit as "kg" | "lbs") ?? "lbs";
+
+  // Cardio free workout → render CardioWorkoutClient
+  if (session.free_workout_type === "cardio" && session.free_workout_modality) {
+    return (
+      <CardioWorkoutClient
+        sessionId={sessionId}
+        startedAt={session.started_at}
+        prescription={{
+          modality: session.free_workout_modality,
+          durationMinutes: null,
+          distanceTarget: null,
+          distanceUnit: null,
+          hrZone: null,
+          notes: null,
+        }}
+        templateTitle={`Free ${session.free_workout_modality}`}
+        preferredUnit={preferredUnit}
+      />
+    );
+  }
+
+  // Strength free workout
+  const { data: setLogs } = await supabase
+    .from("set_logs")
+    .select("*, exercise:exercises!exercise_id(id, name, muscle_group)")
+    .eq("session_id", sessionId)
+    .order("set_number", { ascending: true });
 
   // If started from a saved workout, fetch the template exercises
   let initialExercises: {

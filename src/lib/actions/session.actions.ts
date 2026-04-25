@@ -43,7 +43,10 @@ export async function startWorkoutSession(
   redirect(`/workout/${session.id}`);
 }
 
-export async function startFreeWorkout() {
+export async function startFreeWorkout(
+  type: "strength" | "cardio" = "strength",
+  modality?: string
+) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -70,6 +73,8 @@ export async function startFreeWorkout() {
       workout_template_id: null,
       program_id: null,
       status: "in_progress",
+      free_workout_type: type,
+      free_workout_modality: type === "cardio" ? modality ?? null : null,
     })
     .select("id")
     .single();

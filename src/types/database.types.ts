@@ -1532,6 +1532,8 @@ export type Database = {
           client_id: string
           completed_at: string | null
           duration_seconds: number | null
+          free_workout_modality: string | null
+          free_workout_type: string | null
           id: string
           notes: string | null
           program_id: string | null
@@ -1544,6 +1546,8 @@ export type Database = {
           client_id: string
           completed_at?: string | null
           duration_seconds?: number | null
+          free_workout_modality?: string | null
+          free_workout_type?: string | null
           id?: string
           notes?: string | null
           program_id?: string | null
@@ -1556,6 +1560,8 @@ export type Database = {
           client_id?: string
           completed_at?: string | null
           duration_seconds?: number | null
+          free_workout_modality?: string | null
+          free_workout_type?: string | null
           id?: string
           notes?: string | null
           program_id?: string | null
