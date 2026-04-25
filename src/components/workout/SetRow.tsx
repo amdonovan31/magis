@@ -3,6 +3,7 @@
 import { useState, useTransition, useEffect, useRef, useCallback } from "react";
 import { logSet } from "@/lib/actions/session.actions";
 import { persistSet } from "@/lib/workout-persistence";
+import { addToQueue } from "@/lib/offline/sync-queue";
 import { cn } from "@/lib/utils/cn";
 import type { LastPerformance } from "@/lib/queries/session.queries";
 
@@ -10,6 +11,11 @@ type WeightUnit = "kg" | "lbs";
 
 const KG_TO_LBS = 2.20462;
 const SWIPE_THRESHOLD = 60;
+
+function isNetworkError(error: string): boolean {
+  const patterns = ["fetch", "network", "connection", "timeout", "abort", "econnrefused", "load failed"];
+  return patterns.some((p) => error.toLowerCase().includes(p));
+}
 
 function convertWeight(value: number, from: WeightUnit, to: WeightUnit): number {
   if (from === to) return value;
@@ -127,22 +133,36 @@ export default function SetRow({
     loggedValueRef.current = weight || null;
     loggedUnitRef.current = weightUnit;
 
+    const logSetPayload = {
+      sessionId,
+      templateExerciseId,
+      exerciseIdOverride: exerciseIdOverride ?? undefined,
+      setNumber,
+      repsCompleted: repsNum,
+      weightUsed: weight || null,
+      weightUnit,
+      rpe: null,
+    };
+
     startTransition(async () => {
       setDone(true);
-      const result = await logSet({
-        sessionId,
-        templateExerciseId,
-        exerciseIdOverride: exerciseIdOverride ?? undefined,
-        setNumber,
-        repsCompleted: repsNum,
-        weightUsed: weight || null,
-        weightUnit,
-        rpe: null,
-      });
+
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        await addToQueue({ type: "set_log", payload: logSetPayload as Record<string, unknown> });
+        onSetComplete?.();
+        return;
+      }
+
+      const result = await logSet(logSetPayload);
       if (result.error) {
-        setDone(false);
-        loggedValueRef.current = null;
-        loggedUnitRef.current = null;
+        if (isNetworkError(result.error)) {
+          await addToQueue({ type: "set_log", payload: logSetPayload as Record<string, unknown> });
+          onSetComplete?.();
+        } else {
+          setDone(false);
+          loggedValueRef.current = null;
+          loggedUnitRef.current = null;
+        }
       } else {
         onSetComplete?.();
       }

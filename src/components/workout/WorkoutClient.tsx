@@ -205,7 +205,9 @@ export default function WorkoutClient({
 
   // Re-sync when connectivity is restored
   useEffect(() => {
-    function handleOnline() {
+    async function handleOnline() {
+      const { processQueue } = await import("@/lib/offline/sync-manager");
+      await processQueue();
       syncMissingSets("syncing");
     }
 

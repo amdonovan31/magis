@@ -16,8 +16,14 @@ import {
   clearPersistedSession,
   getPersistedSession,
 } from "@/lib/workout-persistence";
+import { addToQueue } from "@/lib/offline/sync-queue";
 import type { SetLog, Exercise } from "@/types/app.types";
 import { MUSCLE_GROUPS } from "@/types/app.types";
+
+function isNetworkError(error: string): boolean {
+  const patterns = ["fetch", "network", "connection", "timeout", "abort", "econnrefused", "load failed"];
+  return patterns.some((p) => error.toLowerCase().includes(p));
+}
 
 type FreeSet = {
   setNumber: number;
@@ -249,27 +255,46 @@ export default function FreeWorkoutClient({
       weightUsed: set.weight,
     });
 
-    const result = await logSet({
+    const logSetPayload = {
       sessionId,
-      templateExerciseId: null,
+      templateExerciseId: null as string | null,
       exerciseIdOverride: exerciseId,
       setNumber,
       repsCompleted: set.reps,
       weightUsed: set.weight,
       weightUnit: preferredUnit,
       rpe: null,
-    });
+    };
 
-    if (result?.error) {
-      setError(result.error);
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      await addToQueue({ type: "set_log", payload: logSetPayload as Record<string, unknown> });
       setExercises((prev) =>
         prev.map((e) =>
           e.exerciseId !== exerciseId
             ? e
-            : { ...e, sets: e.sets.map((s) => (s.setNumber !== setNumber ? s : { ...s, saving: false })) }
+            : { ...e, sets: e.sets.map((s) => (s.setNumber !== setNumber ? s : { ...s, isCompleted: true, saving: false })) }
         )
       );
+      setRestSeconds(90);
       return;
+    }
+
+    const result = await logSet(logSetPayload);
+
+    if (result?.error) {
+      if (isNetworkError(result.error)) {
+        await addToQueue({ type: "set_log", payload: logSetPayload as Record<string, unknown> });
+      } else {
+        setError(result.error);
+        setExercises((prev) =>
+          prev.map((e) =>
+            e.exerciseId !== exerciseId
+              ? e
+              : { ...e, sets: e.sets.map((s) => (s.setNumber !== setNumber ? s : { ...s, saving: false })) }
+          )
+        );
+        return;
+      }
     }
 
     setExercises((prev) =>
