@@ -1,6 +1,8 @@
-// localStorage-based workout session persistence
+// IndexedDB-based workout session persistence.
 // Safety net for active workout sessions — protects against connectivity loss and page refreshes.
-// All operations are synchronous and wrapped in try/catch to fail silently.
+// All operations are async and wrapped in try/catch to fail silently.
+
+import { getDB } from "@/lib/offline/db";
 
 const KEY_PREFIX = "magis_workout_";
 
@@ -31,30 +33,8 @@ export type PersistedSession = {
   freeExercises?: FreeExerciseEntry[];
 };
 
-function getKey(sessionId: string): string {
-  return `${KEY_PREFIX}${sessionId}`;
-}
-
-function readSession(sessionId: string): PersistedSession | null {
-  try {
-    const raw = localStorage.getItem(getKey(sessionId));
-    if (!raw) return null;
-    return JSON.parse(raw) as PersistedSession;
-  } catch {
-    return null;
-  }
-}
-
-function writeSession(session: PersistedSession): void {
-  try {
-    localStorage.setItem(getKey(session.sessionId), JSON.stringify(session));
-  } catch {
-    // Quota exceeded or localStorage unavailable — fail silently
-  }
-}
-
-function ensureSession(sessionId: string): PersistedSession {
-  return readSession(sessionId) ?? {
+function createEmpty(sessionId: string): PersistedSession {
+  return {
     sessionId,
     lastUpdated: Date.now(),
     sets: {},
@@ -62,101 +42,14 @@ function ensureSession(sessionId: string): PersistedSession {
   };
 }
 
-export function persistSet(sessionId: string, set: PersistedSet): void {
-  const session = ensureSession(sessionId);
-  const key = `${set.templateExerciseId}_${set.setNumber}`;
-  session.sets[key] = set;
-  session.lastUpdated = Date.now();
-  writeSession(session);
-}
+let migrated = false;
 
-export function persistSwap(
-  sessionId: string,
-  templateExerciseId: string,
-  alternateExerciseId: string
-): void {
-  const session = ensureSession(sessionId);
-  session.swappedExercises[templateExerciseId] = alternateExerciseId;
-  session.lastUpdated = Date.now();
-  writeSession(session);
-}
-
-export function removeSwap(
-  sessionId: string,
-  templateExerciseId: string
-): void {
-  const session = ensureSession(sessionId);
-  delete session.swappedExercises[templateExerciseId];
-  session.lastUpdated = Date.now();
-  writeSession(session);
-}
-
-export function persistSkip(
-  sessionId: string,
-  templateExerciseId: string
-): void {
-  const session = ensureSession(sessionId);
-  const skipped = session.skippedExercises ?? [];
-  if (!skipped.includes(templateExerciseId)) {
-    session.skippedExercises = [...skipped, templateExerciseId];
-    session.lastUpdated = Date.now();
-    writeSession(session);
-  }
-}
-
-export function getPersistedSession(
-  sessionId: string
-): PersistedSession | null {
-  return readSession(sessionId);
-}
-
-export function clearPersistedSession(sessionId: string): void {
+async function migrateFromLocalStorage(): Promise<void> {
+  if (migrated) return;
+  migrated = true;
   try {
-    localStorage.removeItem(getKey(sessionId));
-  } catch {
-    // fail silently
-  }
-}
-
-export function persistFreeSet(
-  sessionId: string,
-  exerciseId: string,
-  setNumber: number,
-  data: { repsCompleted: number | null; weightUsed: string | null }
-): void {
-  const session = ensureSession(sessionId);
-  session.mode = "free";
-  const key = `${exerciseId}_${setNumber}`;
-  session.sets[key] = {
-    templateExerciseId: "",
-    exerciseIdOverride: null,
-    exerciseId,
-    setNumber,
-    repsCompleted: data.repsCompleted,
-    weightUsed: data.weightUsed,
-    completed: true,
-    completedAt: Date.now(),
-  };
-  session.lastUpdated = Date.now();
-  writeSession(session);
-}
-
-export function persistFreeExerciseList(
-  sessionId: string,
-  exercises: FreeExerciseEntry[]
-): void {
-  const session = ensureSession(sessionId);
-  session.mode = "free";
-  session.freeExercises = exercises;
-  session.lastUpdated = Date.now();
-  writeSession(session);
-}
-
-export function pruneOldSessions(
-  maxAgeMs: number = 48 * 60 * 60 * 1000
-): void {
-  try {
-    const now = Date.now();
+    if (typeof localStorage === "undefined") return;
+    const db = await getDB();
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const key = localStorage.key(i);
       if (!key?.startsWith(KEY_PREFIX)) continue;
@@ -164,15 +57,148 @@ export function pruneOldSessions(
         const raw = localStorage.getItem(key);
         if (!raw) continue;
         const session = JSON.parse(raw) as PersistedSession;
-        if (now - session.lastUpdated > maxAgeMs) {
-          localStorage.removeItem(key);
-        }
+        await db.put("sessions", session);
+        localStorage.removeItem(key);
       } catch {
-        // Corrupt entry — remove it
         localStorage.removeItem(key!);
       }
     }
   } catch {
-    // localStorage unavailable — fail silently
+    // localStorage or IndexedDB unavailable
   }
+}
+
+async function ensureSession(sessionId: string): Promise<PersistedSession> {
+  await migrateFromLocalStorage();
+  const db = await getDB();
+  return (await db.get("sessions", sessionId)) ?? createEmpty(sessionId);
+}
+
+export async function persistSet(sessionId: string, set: PersistedSet): Promise<void> {
+  try {
+    const session = await ensureSession(sessionId);
+    const key = `${set.templateExerciseId}_${set.setNumber}`;
+    session.sets[key] = set;
+    session.lastUpdated = Date.now();
+    const db = await getDB();
+    await db.put("sessions", session);
+  } catch { /* silent */ }
+}
+
+export async function persistSwap(
+  sessionId: string,
+  templateExerciseId: string,
+  alternateExerciseId: string
+): Promise<void> {
+  try {
+    const session = await ensureSession(sessionId);
+    session.swappedExercises[templateExerciseId] = alternateExerciseId;
+    session.lastUpdated = Date.now();
+    const db = await getDB();
+    await db.put("sessions", session);
+  } catch { /* silent */ }
+}
+
+export async function removeSwap(
+  sessionId: string,
+  templateExerciseId: string
+): Promise<void> {
+  try {
+    const session = await ensureSession(sessionId);
+    delete session.swappedExercises[templateExerciseId];
+    session.lastUpdated = Date.now();
+    const db = await getDB();
+    await db.put("sessions", session);
+  } catch { /* silent */ }
+}
+
+export async function persistSkip(
+  sessionId: string,
+  templateExerciseId: string
+): Promise<void> {
+  try {
+    const session = await ensureSession(sessionId);
+    const skipped = session.skippedExercises ?? [];
+    if (!skipped.includes(templateExerciseId)) {
+      session.skippedExercises = [...skipped, templateExerciseId];
+      session.lastUpdated = Date.now();
+      const db = await getDB();
+      await db.put("sessions", session);
+    }
+  } catch { /* silent */ }
+}
+
+export async function getPersistedSession(
+  sessionId: string
+): Promise<PersistedSession | null> {
+  try {
+    await migrateFromLocalStorage();
+    const db = await getDB();
+    return (await db.get("sessions", sessionId)) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function clearPersistedSession(sessionId: string): Promise<void> {
+  try {
+    const db = await getDB();
+    await db.delete("sessions", sessionId);
+  } catch { /* silent */ }
+}
+
+export async function persistFreeSet(
+  sessionId: string,
+  exerciseId: string,
+  setNumber: number,
+  data: { repsCompleted: number | null; weightUsed: string | null }
+): Promise<void> {
+  try {
+    const session = await ensureSession(sessionId);
+    session.mode = "free";
+    const key = `${exerciseId}_${setNumber}`;
+    session.sets[key] = {
+      templateExerciseId: "",
+      exerciseIdOverride: null,
+      exerciseId,
+      setNumber,
+      repsCompleted: data.repsCompleted,
+      weightUsed: data.weightUsed,
+      completed: true,
+      completedAt: Date.now(),
+    };
+    session.lastUpdated = Date.now();
+    const db = await getDB();
+    await db.put("sessions", session);
+  } catch { /* silent */ }
+}
+
+export async function persistFreeExerciseList(
+  sessionId: string,
+  exercises: FreeExerciseEntry[]
+): Promise<void> {
+  try {
+    const session = await ensureSession(sessionId);
+    session.mode = "free";
+    session.freeExercises = exercises;
+    session.lastUpdated = Date.now();
+    const db = await getDB();
+    await db.put("sessions", session);
+  } catch { /* silent */ }
+}
+
+export async function pruneOldSessions(
+  maxAgeMs: number = 48 * 60 * 60 * 1000
+): Promise<void> {
+  try {
+    await migrateFromLocalStorage();
+    const db = await getDB();
+    const now = Date.now();
+    const allSessions = await db.getAll("sessions");
+    for (const session of allSessions) {
+      if (now - session.lastUpdated > maxAgeMs) {
+        await db.delete("sessions", session.sessionId);
+      }
+    }
+  } catch { /* silent */ }
 }

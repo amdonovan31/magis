@@ -89,7 +89,7 @@ export default function WorkoutClient({
   const handleSkipExercise = useCallback(
     async (templateExerciseId: string) => {
       // Persist locally first
-      persistSkip(sessionId, templateExerciseId);
+      await persistSkip(sessionId, templateExerciseId);
       setSkippedExercises((prev) => new Set([...Array.from(prev), templateExerciseId]));
 
       // Save to DB (fire and forget)
@@ -116,7 +116,7 @@ export default function WorkoutClient({
   // Shared sync helper — used by both mount restore and online event
   const syncMissingSets = useCallback(
     async (label: SyncBannerState) => {
-      const persisted = getPersistedSession(sessionId);
+      const persisted = await getPersistedSession(sessionId);
       if (!persisted) return;
 
       const serverSetKeys = new Set(
@@ -167,7 +167,8 @@ export default function WorkoutClient({
     if (syncAttempted.current) return;
     syncAttempted.current = true;
 
-    const persisted = getPersistedSession(sessionId);
+    (async () => {
+    const persisted = await getPersistedSession(sessionId);
     if (!persisted) return;
 
     // Ignore persisted data older than 24 hours
@@ -199,6 +200,7 @@ export default function WorkoutClient({
 
     // Sync missing sets
     syncMissingSets("restoring");
+    })();
   }, [sessionId, syncMissingSets]);
 
   // Re-sync when connectivity is restored

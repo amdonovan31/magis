@@ -74,7 +74,7 @@ export default function FreeWorkoutClient({
   const [error, setError] = useState<string | null>(null);
   const [historyExerciseId, setHistoryExerciseId] = useState<string | null>(null);
 
-  // Hydrate from initial exercises (saved workout), existing logs (resume), or localStorage
+  // Hydrate from initial exercises (saved workout), existing logs (resume), or IndexedDB
   useEffect(() => {
     if (existingLogs.length === 0) {
       // Priority 1: initial exercises from saved workout
@@ -103,17 +103,19 @@ export default function FreeWorkoutClient({
         return;
       }
 
-      // Priority 2: localStorage persistence
-      const persisted = getPersistedSession(sessionId);
-      if (persisted?.mode === "free" && persisted.freeExercises?.length) {
-        const restored: FreeExercise[] = persisted.freeExercises.map((fe) => ({
-          exerciseId: fe.exerciseId,
-          exerciseName: fe.exerciseName,
-          muscleGroup: fe.muscleGroup,
-          sets: [{ setNumber: 1, reps: null, weight: null, isCompleted: false, saving: false }],
-        }));
-        setExercises(restored);
-      }
+      // Priority 2: IndexedDB persistence
+      (async () => {
+        const persisted = await getPersistedSession(sessionId);
+        if (persisted?.mode === "free" && persisted.freeExercises?.length) {
+          const restored: FreeExercise[] = persisted.freeExercises.map((fe) => ({
+            exerciseId: fe.exerciseId,
+            exerciseName: fe.exerciseName,
+            muscleGroup: fe.muscleGroup,
+            sets: [{ setNumber: 1, reps: null, weight: null, isCompleted: false, saving: false }],
+          }));
+          setExercises(restored);
+        }
+      })();
       return;
     }
 
