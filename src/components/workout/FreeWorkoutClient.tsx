@@ -7,9 +7,10 @@ import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import RestTimer from "@/components/workout/RestTimer";
 import ExerciseHistoryModal from "@/components/workout/ExerciseHistoryModal";
+import ExerciseDemoModal from "@/components/workout/ExerciseDemoModal";
 import { logSet } from "@/lib/actions/session.actions";
 import { completeSession, deleteSession } from "@/lib/actions/session.actions";
-import { searchExercises } from "@/lib/actions/exercise.actions";
+import { searchExercises, fetchExerciseById } from "@/lib/actions/exercise.actions";
 import {
   persistFreeSet,
   persistFreeExerciseList,
@@ -79,6 +80,7 @@ export default function FreeWorkoutClient({
   const [discarding, setDiscarding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [historyExerciseId, setHistoryExerciseId] = useState<string | null>(null);
+  const [demoExercise, setDemoExercise] = useState<Exercise | null>(null);
 
   // Hydrate from initial exercises (saved workout), existing logs (resume), or IndexedDB
   useEffect(() => {
@@ -369,7 +371,13 @@ export default function FreeWorkoutClient({
               {/* Exercise header */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <p className="font-semibold text-primary">{ex.exerciseName}</p>
+                  <button
+                    type="button"
+                    onClick={() => fetchExerciseById(ex.exerciseId).then((data) => { if (data) setDemoExercise(data); })}
+                    className="font-semibold text-primary text-left hover:text-accent transition-colors"
+                  >
+                    {ex.exerciseName}
+                  </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); setHistoryExerciseId(ex.exerciseId); }}
                     className="shrink-0 flex items-center justify-center h-7 w-7 rounded-full text-primary/30 hover:text-primary hover:bg-primary/5 transition-colors"
@@ -378,6 +386,16 @@ export default function FreeWorkoutClient({
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
                       <circle cx="12" cy="12" r="10" />
                       <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fetchExerciseById(ex.exerciseId).then((data) => { if (data) setDemoExercise(data); })}
+                    className="flex h-7 w-7 items-center justify-center rounded-full text-primary/30 hover:bg-primary/10 hover:text-primary transition-colors"
+                    aria-label="Exercise info"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </button>
                   {ex.muscleGroup && (
@@ -493,6 +511,15 @@ export default function FreeWorkoutClient({
           excludeSessionId={sessionId}
           weightUnit={preferredUnit}
           onClose={() => setHistoryExerciseId(null)}
+        />
+      )}
+
+      {/* Exercise Demo Modal */}
+      {demoExercise && (
+        <ExerciseDemoModal
+          exercise={demoExercise}
+          isOpen={!!demoExercise}
+          onClose={() => setDemoExercise(null)}
         />
       )}
     </div>

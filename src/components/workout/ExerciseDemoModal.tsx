@@ -4,6 +4,13 @@ import Modal from "@/components/ui/Modal";
 import Badge from "@/components/ui/Badge";
 import type { Exercise } from "@/types/app.types";
 
+function getYouTubeId(url: string): string | null {
+  const match = url.match(
+    /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|shorts\/))([a-zA-Z0-9_-]{11})/
+  );
+  return match?.[1] ?? null;
+}
+
 interface ExerciseDemoModalProps {
   exercise: Exercise;
   isOpen: boolean;
@@ -15,9 +22,24 @@ export default function ExerciseDemoModal({
   isOpen,
   onClose,
 }: ExerciseDemoModalProps) {
+  const videoId = exercise.video_url ? getYouTubeId(exercise.video_url) : null;
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={exercise.name}>
       <div className="flex flex-col gap-4 pb-4">
+        {/* YouTube embed */}
+        {videoId && (
+          <div className="relative w-full overflow-hidden rounded-xl" style={{ paddingBottom: "56.25%" }}>
+            <iframe
+              className="absolute inset-0 h-full w-full"
+              src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`}
+              title={`${exercise.name} demo`}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        )}
+
         {/* Muscle group badge */}
         {exercise.muscle_group && (
           <div className="flex flex-wrap gap-2">
@@ -52,8 +74,8 @@ export default function ExerciseDemoModal({
           </div>
         )}
 
-        {/* Video link */}
-        {exercise.video_url && (
+        {/* Non-YouTube video link fallback */}
+        {exercise.video_url && !videoId && (
           <a
             href={exercise.video_url}
             target="_blank"

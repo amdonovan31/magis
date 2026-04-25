@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { getExercises, getExercisesByIds } from "@/lib/queries/exercise.queries";
+import { getExercises, getExercisesByIds, getExercise } from "@/lib/queries/exercise.queries";
 import type { Exercise } from "@/types/app.types";
 
 export async function searchExercises(
@@ -17,6 +17,10 @@ export async function searchExercises(
 
 export async function fetchExercisesByIds(ids: string[]): Promise<Exercise[]> {
   return getExercisesByIds(ids);
+}
+
+export async function fetchExerciseById(id: string): Promise<Exercise | null> {
+  return getExercise(id);
 }
 
 export async function createExercise(formData: FormData) {
