@@ -83,7 +83,7 @@ The solo tier is not just a product — it is a top-of-funnel for coached conver
 | Rest Timer | Auto-starts between sets | Must Have |
 | Exercise Demo | Text instructions and form cues for every exercise; muscle diagrams and media planned for Phase 2 | Must Have |
 | Pre-Generated Exercise Alternates | One alternate per exercise generated at program creation — swap with a single tap, no API call, works offline | Must Have |
-| AI Concierge | In-workout agent: swap exercise, shorten session, explain why — instant Claude response. Phase 2. | Must Have |
+| AI Concierge | In-workout agent: swap exercise, shorten session, explain why — instant Claude response. Deferred — pre-generated alternates and existing swap/skip UI cover the core use cases today. Revisit when real user demand signals justify the complexity. | Nice to Have |
 | Personal Records | Auto-detected PRs with history chart and celebration moment | Must Have |
 | Volume Charts | Weekly and monthly volume by muscle group | Must Have |
 | Body Measurements | Log and track weight, body fat %, and custom measurements | Must Have |
@@ -121,7 +121,7 @@ A coach managing 20 clients today spends roughly 10 hours a week on programming.
 | Program Draft/Publish Workflow | Programs start in draft. Coaches review and edit before publishing. Published programs become active for the client. | Must Have |
 | One-Click Assign | Assign any program to a client with a start date | Must Have |
 | Coach Guidelines Config | Set per-client intensity, periodization style, program length, exercises to include/avoid, and free-text instructions — the AI follows these during generation | Must Have |
-| Agent Guardrail Config | Per-client rules for what the client-side AI concierge can and cannot change autonomously. Introduced with Phase 2 concierge agent. | Must Have |
+| Agent Guardrail Config | Per-client rules for what the client-side AI concierge can and cannot change autonomously. Deferred until concierge is built. | Nice to Have |
 | Agent Activity Log | See every AI substitution or session change made on behalf of each client | Must Have |
 | Client List Dashboard | All clients with status, current program, last active date and streak | Must Have |
 | Client Profile | Individual view with intake data, PAR-Q flags, body metrics, progress charts and coaching notes | Must Have |
@@ -156,17 +156,15 @@ Coaches provide a client brief — goals, fitness level, available equipment, da
 - Identify patterns across clients — e.g. high exercise swap rate signals poor programming fit (Phase 2)
 - Auto-progress workouts week-over-week based on logged client performance (Phase 2)
 
-### Client-Side Agent: The Workout Concierge
+### Client-Side Agent: The Workout Concierge (Deferred)
 
-Phase 2. Clients hit friction constantly — wrong equipment, short on time, something hurts. Without an agent they skip the workout or message their coach and wait. With Magis they get an instant answer, within the parameters the coach has set.
+Originally planned for Phase 2, the client-side concierge has been deferred. The core friction points it was designed to solve — exercise swaps, session shortening, and injury routing — are already addressed by existing features:
 
-Until the full concierge is built, exercise swapping is handled via pre-generated alternates (see below). The concierge will extend this to real-time, conversational interactions.
+- **Exercise swaps:** Pre-generated alternates provide one-tap swaps with no API call and full offline support. The full exercise search modal covers any remaining cases.
+- **Session shortening:** Clients can skip exercises and complete workouts early. Most users naturally drop the last exercise or two when short on time.
+- **Injury routing:** Pre-generated alternates often use different equipment and movement patterns. For anything beyond minor soreness, users should consult a professional — not an AI.
 
-**Planned capabilities:**
-- "Swap this exercise" — substitutes an appropriate alternative based on equipment and muscle group
-- "I only have 30 minutes" — condenses the session intelligently, preserving training stimulus
-- "My shoulder is bothering me" — routes around the issue within coach-defined guardrails
-- Explains why an exercise is in the program — building trust and adherence
+The concierge remains a potential future addition if real user feedback signals demand for conversational in-workout AI. It would use Claude API (Haiku) for low-latency responses within coach-defined guardrails. Building it before validating demand with paying users is premature.
 
 ### Pre-Generated Exercise Alternates
 
@@ -180,7 +178,7 @@ Clients can swap to an alternate during a workout with one tap. No API call. No 
 |---|---|---|
 | Program Generation — Coach | Claude API (Sonnet) | Generates full training programs from intake data and coach guidelines. Sonnet's reasoning quality produces meaningfully better programs than faster models. |
 | Program Generation — Solo | Claude API (Sonnet) | Same model for parity. Both user types deserve the same programming quality. |
-| Client Concierge (Phase 2) | Claude API (Haiku) | Low-latency, cost-efficient model for real-time in-workout interactions. Not yet implemented. |
+| Client Concierge (Deferred) | Claude API (Haiku) | Low-latency, cost-efficient model for real-time in-workout interactions. Deferred — pre-generated alternates and existing UI cover the core use cases. |
 
 ### The Feedback Loop
 
@@ -199,7 +197,7 @@ Every client agent action is logged and surfaced in the coach dashboard. This cr
 | Rest Timer | Built-in rest timer that starts automatically between sets | Must Have |
 | Exercise Demo | Text instructions and form cues for each exercise. Muscle diagrams and media planned for Phase 2. | Must Have |
 | Pre-Generated Alternates | Swap any exercise with a pre-generated alternate — one tap, no wait, works offline | Must Have |
-| AI Concierge Agent | In-workout chat: swap exercise, shorten session, flag injury — instant AI response. Phase 2. | Must Have |
+| AI Concierge Agent | In-workout chat: swap exercise, shorten session, flag injury — instant AI response. Deferred — existing swap/skip features cover the core use cases. | Nice to Have |
 | Add Notes | Leave a note on any set or session for the coach to see | Should Have |
 | Session Summary | End-of-workout recap showing volume, PRs hit, duration and option to share to feed | Must Have |
 
@@ -417,7 +415,7 @@ Database schema includes `sync_status` fields (pending/synced/conflict) on `work
 | View exercise demos | Cached on first load — available offline after first visit | Must Have |
 | Session summary | Generated from local data — displayed immediately after session ends | Must Have |
 | Pre-generated exercise alternates | Stored locally at program download — swap works fully offline | Must Have |
-| AI concierge agent | Requires connection. Fails gracefully: 'You're offline. Your request will send when you reconnect.' | Must Have |
+| AI concierge agent | Deferred. Would require connection. If built, fails gracefully: 'You're offline. Your request will send when you reconnect.' | Nice to Have |
 | Social feed posting | Post queued locally and sent on reconnect — user sees: 'Your post will go live when you're back online.' | Should Have |
 
 ### Sync & Conflict Resolution
@@ -434,15 +432,15 @@ Four focused stages. Get real feedback from coaches and clients before building 
 
 User type branching, coach dashboard, client management, 6-step intake wizard with PAR-Q, AI program generation with Sonnet, regeneration feedback loop, program draft/publish workflow, pre-generated alternates, live set logging, rest timer, session summary, coach notes, intake request flow, multi-role support, deload week support.
 
-### Stage 2: Progress, Offline & AI Concierge — In Progress
+### Stage 2: Progress & Offline — In Progress
 
-- Client-side AI concierge agent (exercise swap, session shortening, injury routing via Haiku)
-- Agent guardrail configuration for coaches
+- ~~Personal records history chart~~ ✅ Complete
+- ~~Volume over time charts (weekly + monthly by muscle group)~~ ✅ Complete
+- ~~Workout streaks UI and milestone badges~~ ✅ Complete
+- ~~Body measurements UI~~ ✅ Complete
+- ~~Free workout with cardio support~~ ✅ Complete
+- ~~Client program overview~~ ✅ Complete
 - Offline-first architecture (IndexedDB, service worker, sync queue)
-- Body measurements UI
-- Personal records history chart
-- Volume over time charts (weekly + monthly by muscle group)
-- Workout streaks UI and milestone badges
 - Exercise muscle diagrams and media
 - Auto-progression logic (agent adjusts load week-over-week)
 - Check-in draft generation for coaches
@@ -460,6 +458,8 @@ User type branching, coach dashboard, client management, 6-step intake wizard wi
 
 ### Stage 4: Polish & Scale — Planned
 
+- Client-side AI concierge agent (exercise swap, session shortening, injury routing via Haiku) — deferred from Stage 2, build only if real user demand signals justify it
+- Agent guardrail configuration for coaches — depends on concierge
 - Coach-client matching and discovery layer
 - Program Library and template reuse
 - Onboarding A/B testing — optimise time-to-first-logged-set for solo users
@@ -481,7 +481,7 @@ Well-supported by Claude Code, cheap to run at beta scale, grows comfortably fro
 | Database & Auth | Supabase | Free tier handles authentication and real-time updates for the social feed; row-level security for multi-tenant coach data |
 | Hosting | Vercel | Free tier, automatic deployments, fast globally — zero DevOps overhead at launch |
 | AI — Program Generation | Claude API (Sonnet) | Generates training programs from intake data and coach guidelines. Used for both coach and solo flows. |
-| AI — Client Concierge (Phase 2) | Claude API (Haiku) | Low-latency, cost-efficient model for real-time in-workout substitutions and concierge responses |
+| AI — Client Concierge (Deferred) | Claude API (Haiku) | Low-latency, cost-efficient model for real-time in-workout substitutions and concierge responses. Deferred — not needed at launch. |
 | Media Storage | Supabase Storage | Photo and video uploads for the social feed, integrated with the same project |
 | Push Notifications | Expo (Phase 3) | Native app wrapper for true push notifications when the product is proven |
 
@@ -506,8 +506,8 @@ Because Magis generates personalised workout programs using AI — and accepts h
 | Feature | Description | Priority |
 |---|---|---|
 | Health Disclaimer Screen | Shown once during onboarding — users explicitly acknowledge that Magis provides fitness suggestions, not medical advice. Requires a tap to confirm. | Must Have |
-| AI Response Disclaimer | A short, non-intrusive line appended to any AI concierge response that touches injuries or health: 'This is a fitness suggestion, not medical advice. If you have concerns, consult a healthcare professional.' | Must Have |
-| Injury Routing Caveat | When the client agent routes around an injury, the response must include a prompt to seek professional assessment for anything beyond minor muscle soreness. | Must Have |
+| AI Response Disclaimer | A short, non-intrusive line appended to any AI concierge response that touches injuries or health: 'This is a fitness suggestion, not medical advice. If you have concerns, consult a healthcare professional.' Required if concierge is built. | Nice to Have |
+| Injury Routing Caveat | When the client agent routes around an injury, the response must include a prompt to seek professional assessment for anything beyond minor muscle soreness. Required if concierge is built. | Nice to Have |
 | Program Disclaimer Footer | Every AI-generated program includes a one-line footer: 'Generated by AI based on the information you provided. Always train within your limits and consult a professional if unsure.' | Must Have |
 | PAR-Q Acknowledgement | Users confirm PAR-Q responses are accurate and understand that flagged conditions should be reviewed with a healthcare professional before beginning a training program. | Must Have |
 | Privacy Disclosure for Health Data | Fitness level, PAR-Q responses, injury history, and body measurements are sensitive health data under GDPR and Apple's privacy nutrition labels. These must be declared in your privacy policy and App Store privacy disclosures. | Must Have |
@@ -532,7 +532,7 @@ Free to run while testing. Scales proportionally and stays minimal even at 100+ 
 | Vercel (hosting) | Free | ~$20/month | Pro plan at scale |
 | Supabase (database + auth + storage) | Free | ~$25/month | Pro plan at scale |
 | Claude API — Coach (Sonnet) | ~$3–6/month | ~$25–45/month | Per program generation + regeneration |
-| Claude API — Client (Haiku, Phase 2) | ~$0/month | ~$10–20/month | Per concierge interaction when built |
+| Claude API — Client (Haiku, Deferred) | ~$0/month | ~$10–20/month | Per concierge interaction if built |
 | Domain name | $12/year | $12/year | One-time annual |
 | **Total** | **~$0–8/month** | **~$60–100/month** | |
 
@@ -540,13 +540,11 @@ Free to run while testing. Scales proportionally and stays minimal even at 100+ 
 
 ## Next Steps
 
-1. **Complete Stage 2 with Claude Code.** Priority order:
+1. **Complete Stage 2 with Claude Code.** Progress charts, volume, streaks, body measurements, free workout cardio, and client program overview are done. Remaining priority order:
    - Offline-first architecture — IndexedDB, service worker, sync queue. The `sync_status` infrastructure in the schema is ready; build the client-side layer.
-   - Body measurements UI — schema is complete, build the logging and display components.
-   - Progress charts — PR history chart, volume over time (weekly + monthly by muscle group). Data is available in `set_logs`.
-   - Workout streaks and milestone badges — calculate from session data, display on client home and coach dashboard.
    - Exercise media — muscle diagrams and GIFs for each exercise. Source or create assets, attach to exercise records.
-   - Client-side AI concierge agent — in-workout chat using Haiku. Build the interface, connect to guardrail config.
+   - Auto-progression logic — agent adjusts load/reps week-over-week based on logged performance.
+   - Check-in draft generation — AI-drafted weekly summaries for coaches based on client activity data.
 
 2. **Get one real coach and their clients logging workouts before building Stage 3.** Real feedback beats assumed requirements every time.
 
