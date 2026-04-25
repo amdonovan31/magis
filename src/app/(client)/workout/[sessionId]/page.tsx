@@ -77,21 +77,21 @@ export default async function WorkoutPage({ params }: WorkoutPageProps) {
     };
     return (
       <>
-      <ConnectivityBanner />
-      <CardioWorkoutClient
-        sessionId={sessionId}
-        startedAt={session.started_at}
-        templateTitle={t.title}
-        preferredUnit={preferredUnit}
-        prescription={{
-          modality: t.cardio_modality ?? "Cardio",
-          durationMinutes: t.cardio_duration_minutes ?? null,
-          distanceTarget: t.cardio_distance_target ?? null,
-          distanceUnit: t.cardio_distance_unit ?? null,
-          hrZone: t.cardio_hr_zone ?? null,
-          notes: t.cardio_notes ?? null,
-        }}
-      />
+        <ConnectivityBanner />
+        <CardioWorkoutClient
+          sessionId={sessionId}
+          startedAt={session.started_at}
+          templateTitle={t.title}
+          preferredUnit={preferredUnit}
+          prescription={{
+            modality: t.cardio_modality ?? "Cardio",
+            durationMinutes: t.cardio_duration_minutes ?? null,
+            distanceTarget: t.cardio_distance_target ?? null,
+            distanceUnit: t.cardio_distance_unit ?? null,
+            hrZone: t.cardio_hr_zone ?? null,
+            notes: t.cardio_notes ?? null,
+          }}
+        />
       </>
     );
   }
