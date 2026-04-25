@@ -76,6 +76,8 @@ export default async function WorkoutPage({ params }: WorkoutPageProps) {
       cardio_notes?: string | null;
     };
     return (
+      <>
+      <ConnectivityBanner />
       <CardioWorkoutClient
         sessionId={sessionId}
         startedAt={session.started_at}
@@ -90,6 +92,7 @@ export default async function WorkoutPage({ params }: WorkoutPageProps) {
           notes: t.cardio_notes ?? null,
         }}
       />
+      </>
     );
   }
 

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSavedWorkoutDetail } from "@/lib/queries/saved-workout.queries";
 import FreeWorkoutClient from "@/components/workout/FreeWorkoutClient";
 import CardioWorkoutClient from "@/components/workout/CardioWorkoutClient";
+import ConnectivityBanner from "@/components/workout/ConnectivityBanner";
 import type { SetLog } from "@/types/app.types";
 
 interface FreeWorkoutPageProps {
@@ -39,20 +40,23 @@ export default async function FreeWorkoutPage({ params, searchParams }: FreeWork
   // Cardio free workout → render CardioWorkoutClient
   if (session.free_workout_type === "cardio" && session.free_workout_modality) {
     return (
-      <CardioWorkoutClient
-        sessionId={sessionId}
-        startedAt={session.started_at}
-        prescription={{
-          modality: session.free_workout_modality,
-          durationMinutes: null,
-          distanceTarget: null,
-          distanceUnit: null,
-          hrZone: null,
-          notes: null,
-        }}
-        templateTitle={`Free ${session.free_workout_modality}`}
-        preferredUnit={preferredUnit}
-      />
+      <>
+        <ConnectivityBanner />
+        <CardioWorkoutClient
+          sessionId={sessionId}
+          startedAt={session.started_at}
+          prescription={{
+            modality: session.free_workout_modality,
+            durationMinutes: null,
+            distanceTarget: null,
+            distanceUnit: null,
+            hrZone: null,
+            notes: null,
+          }}
+          templateTitle={`Free ${session.free_workout_modality}`}
+          preferredUnit={preferredUnit}
+        />
+      </>
     );
   }
 
@@ -88,12 +92,15 @@ export default async function FreeWorkoutPage({ params, searchParams }: FreeWork
   }
 
   return (
-    <FreeWorkoutClient
-      sessionId={sessionId}
-      startedAt={session.started_at}
-      existingLogs={(setLogs ?? []) as SetLog[]}
-      preferredUnit={preferredUnit}
-      initialExercises={initialExercises}
-    />
+    <>
+      <ConnectivityBanner />
+      <FreeWorkoutClient
+        sessionId={sessionId}
+        startedAt={session.started_at}
+        existingLogs={(setLogs ?? []) as SetLog[]}
+        preferredUnit={preferredUnit}
+        initialExercises={initialExercises}
+      />
+    </>
   );
 }

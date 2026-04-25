@@ -203,11 +203,10 @@ export default function WorkoutClient({
     })();
   }, [sessionId, syncMissingSets]);
 
-  // Re-sync when connectivity is restored
+  // Re-sync session data when connectivity is restored
+  // (queue processing is handled by ConnectivityBanner's useSyncStatus hook)
   useEffect(() => {
-    async function handleOnline() {
-      const { processQueue } = await import("@/lib/offline/sync-manager");
-      await processQueue();
+    function handleOnline() {
       syncMissingSets("syncing");
     }
 

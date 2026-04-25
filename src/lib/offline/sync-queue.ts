@@ -22,6 +22,9 @@ export async function addToQueue(
       status: "pending",
       retryCount: 0,
     });
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("sync-queue-changed"));
+    }
   } catch { /* silent */ }
 }
 
