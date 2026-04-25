@@ -74,7 +74,12 @@ export default function ExerciseLogger({
   const [noteContent, setNoteContent] = useState(initialNote);
   const [showHistory, setShowHistory] = useState(false);
 
-  const setCount = templateExercise.prescribed_sets ?? 3;
+  const prescribedSets = templateExercise.prescribed_sets ?? 3;
+  const existingBonusSets = existingLogs.filter(
+    (l) => l.template_exercise_id === templateExercise.id && l.set_number > prescribedSets
+  ).length;
+  const [bonusSets, setBonusSets] = useState(existingBonusSets);
+  const setCount = prescribedSets + bonusSets;
   const displayExercise = swappedExercise ?? templateExercise.exercise;
   const exerciseIdOverride = swappedExercise?.id ?? null;
 
@@ -325,9 +330,13 @@ export default function ExerciseLogger({
           <>
             {/* Normal header */}
             <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-primary flex-1">
+              <button
+                type="button"
+                onClick={() => setShowDemo(true)}
+                className="font-semibold text-primary text-left flex-1 hover:text-accent transition-colors"
+              >
                 {displayExercise.name}
-              </h3>
+              </button>
               <button
                 onClick={() => setShowHistory(true)}
                 className="shrink-0 flex items-center justify-center h-7 w-7 rounded-full text-primary/30 hover:text-primary hover:bg-primary/5 transition-colors"
@@ -364,7 +373,10 @@ export default function ExerciseLogger({
               </button>
             </div>
             <p className="text-xs text-primary/50 mt-0.5">
-              {setCount} sets &times; {templateExercise.prescribed_reps ?? "\u2014"}
+              {prescribedSets} sets &times; {templateExercise.prescribed_reps ?? "\u2014"}
+              {bonusSets > 0 && (
+                <span className="text-accent/60"> +{bonusSets}</span>
+              )}
               {templateExercise.prescribed_weight
                 ? ` @ ${templateExercise.prescribed_weight}`
                 : ""}
@@ -437,6 +449,18 @@ export default function ExerciseLogger({
             );
           });
         })()}
+
+        {!isSkipped && (
+          <div className="px-3 pb-2">
+            <button
+              type="button"
+              onClick={() => setBonusSets((prev) => prev + 1)}
+              className="w-full rounded-lg border border-dashed border-primary/20 py-2 text-xs font-medium text-primary/40 hover:border-primary/30 hover:text-primary/60 transition-colors"
+            >
+              + Add Set
+            </button>
+          </div>
+        )}
       </div>
 
       {templateExercise.notes && (
