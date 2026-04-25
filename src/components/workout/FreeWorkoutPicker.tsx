@@ -6,17 +6,23 @@ import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import { CARDIO_MODALITIES } from "@/types/app.types";
 import { cn } from "@/lib/utils/cn";
+import { startFreeWorkout } from "@/lib/actions/session.actions";
 
 interface FreeWorkoutPickerProps {
   activeFreeSessionId?: string | null;
 }
 
-import { startFreeWorkout } from "@/lib/actions/session.actions";
+type ConflictInfo = {
+  existingSessionId: string;
+  existingType: string;
+  existingModality: string | null;
+};
 
 export default function FreeWorkoutPicker({ activeFreeSessionId }: FreeWorkoutPickerProps) {
   const [showModal, setShowModal] = useState(false);
   const [step, setStep] = useState<"type" | "modality">("type");
   const [isPending, startTransition] = useTransition();
+  const [conflict, setConflict] = useState<ConflictInfo | null>(null);
 
   if (activeFreeSessionId) {
     return (
@@ -28,16 +34,31 @@ export default function FreeWorkoutPicker({ activeFreeSessionId }: FreeWorkoutPi
     );
   }
 
+  function handleResult(result: unknown) {
+    if (result && typeof result === "object" && "conflict" in result) {
+      const r = result as unknown as { existingSessionId: string; existingType: string; existingModality: string | null };
+      setConflict(r);
+    }
+  }
+
   function handleStrength() {
     startTransition(async () => {
-      await startFreeWorkout("strength");
+      const result = await startFreeWorkout("strength");
+      handleResult(result);
     });
   }
 
   function handleCardio(modality: string) {
     startTransition(async () => {
-      await startFreeWorkout("cardio", modality);
+      const result = await startFreeWorkout("cardio", modality);
+      handleResult(result);
     });
+  }
+
+  function closeModal() {
+    setShowModal(false);
+    setConflict(null);
+    setStep("type");
   }
 
   return (
@@ -47,14 +68,36 @@ export default function FreeWorkoutPicker({ activeFreeSessionId }: FreeWorkoutPi
           fullWidth
           variant="secondary"
           size="lg"
-          onClick={() => { setStep("type"); setShowModal(true); }}
+          onClick={() => { setStep("type"); setConflict(null); setShowModal(true); }}
         >
           Free Workout
         </Button>
       </div>
 
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={step === "type" ? "Choose Workout Type" : "Choose Activity"}>
-        {step === "type" && (
+      <Modal
+        isOpen={showModal}
+        onClose={closeModal}
+        title={conflict ? "Workout In Progress" : step === "type" ? "Choose Workout Type" : "Choose Activity"}
+      >
+        {conflict ? (
+          <div className="flex flex-col items-center gap-4 py-4 text-center">
+            <p className="text-sm text-primary">
+              You have a free{" "}
+              {conflict.existingType === "cardio"
+                ? conflict.existingModality ?? "cardio"
+                : "strength"}{" "}
+              workout in progress.
+            </p>
+            <p className="text-xs text-muted">
+              Complete or discard it before starting a new one.
+            </p>
+            <Link href={`/free-workout/${conflict.existingSessionId}`}>
+              <Button size="lg">
+                Resume Workout &rarr;
+              </Button>
+            </Link>
+          </div>
+        ) : step === "type" ? (
           <div className="flex flex-col gap-3 py-2">
             <button
               onClick={handleStrength}
@@ -79,9 +122,7 @@ export default function FreeWorkoutPicker({ activeFreeSessionId }: FreeWorkoutPi
               </div>
             </button>
           </div>
-        )}
-
-        {step === "modality" && (
+        ) : (
           <div className="flex flex-col gap-2 py-2">
             <button
               onClick={() => setStep("type")}

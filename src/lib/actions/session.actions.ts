@@ -56,14 +56,23 @@ export async function startFreeWorkout(
   // Check for existing in-progress free workout
   const { data: existing } = await supabase
     .from("workout_sessions")
-    .select("id")
+    .select("id, free_workout_type, free_workout_modality")
     .eq("client_id", user.id)
     .is("workout_template_id", null)
     .eq("status", "in_progress")
     .maybeSingle();
 
   if (existing) {
-    redirect(`/free-workout/${existing.id}`);
+    const existingType = existing.free_workout_type ?? "strength";
+    if (existingType === type || (!existing.free_workout_type && type === "strength")) {
+      redirect(`/free-workout/${existing.id}`);
+    }
+    return {
+      conflict: true as const,
+      existingSessionId: existing.id,
+      existingType,
+      existingModality: existing.free_workout_modality,
+    };
   }
 
   const { data: session, error } = await supabase
