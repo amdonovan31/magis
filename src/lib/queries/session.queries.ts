@@ -187,6 +187,7 @@ export async function getSession(sessionId: string) {
   const wt = data.workout_template as any;
   if (wt?.exercises) {
     wt.exercises = await resolveAlternateExercises(wt.exercises);
+    wt.exercises.sort((a: { position: number }, b: { position: number }) => a.position - b.position);
   }
 
   return data;
