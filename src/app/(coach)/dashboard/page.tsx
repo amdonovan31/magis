@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import ClientCard from "@/components/coach/ClientCard";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
+import TopBar from "@/components/layout/TopBar";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,9 @@ export default async function DashboardPage() {
   const { coach, clients } = data;
 
   return (
-    <div className="flex flex-col gap-6 px-4 pt-6">
+    <>
+    <TopBar showLogo />
+    <div className="flex flex-col gap-6 px-4 pt-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -59,5 +62,6 @@ export default async function DashboardPage() {
         )}
       </div>
     </div>
+    </>
   );
 }

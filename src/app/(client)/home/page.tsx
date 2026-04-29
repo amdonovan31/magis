@@ -8,6 +8,7 @@ import TodayWorkoutCard from "@/components/workout/TodayWorkoutCard";
 import WeightCheckInCard from "@/components/measurements/WeightCheckInCard";
 import StreakCard from "@/components/streaks/StreakCard";
 import Card from "@/components/ui/Card";
+import TopBar from "@/components/layout/TopBar";
 import { formatDate } from "@/lib/utils/date";
 import type { Profile } from "@/types/app.types";
 
@@ -51,7 +52,9 @@ export default async function ClientHomePage() {
   const showIntakeBanner = profile?.intake_requested && (intakeCount ?? 0) === 0;
 
   return (
-    <div className="flex flex-col gap-6 px-4 pt-6">
+    <>
+    <TopBar showLogo />
+    <div className="flex flex-col gap-6 px-4 pt-4">
       {/* Header */}
       <div>
         <p className="text-sm text-primary/60">{formatDate(new Date())}</p>
@@ -109,5 +112,6 @@ export default async function ClientHomePage() {
         </div>
       )}
     </div>
+    </>
   );
 }
