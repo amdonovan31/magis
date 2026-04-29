@@ -29,7 +29,7 @@ export default async function NewProgramPage() {
           </Link>
         }
       />
-      <div className="px-4 pt-4 pb-8">
+      <div className="px-4 pt-4 pb-24">
         <ProgramBuilder clients={clientsList} exercises={exercises} currentUserId={user?.id} />
       </div>
     </>

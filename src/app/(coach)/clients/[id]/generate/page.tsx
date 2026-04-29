@@ -64,7 +64,7 @@ export default async function GenerateProgramPage({
           </Link>
         }
       />
-      <div className="flex flex-col gap-5 px-4 pt-4 pb-8">
+      <div className="flex flex-col gap-5 px-4 pt-4 pb-24">
         <div>
           <p className="text-sm text-muted">
             Creating program for

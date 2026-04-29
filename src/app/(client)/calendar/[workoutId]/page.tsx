@@ -112,7 +112,7 @@ export default async function WorkoutDetailPage({
         }
       />
 
-      <div className="flex flex-col gap-4 px-4 pt-4 pb-8">
+      <div className="flex flex-col gap-4 px-4 pt-4 pb-24">
         {/* Date + Program */}
         <div>
           <p className="font-body text-xs uppercase tracking-widest text-muted">

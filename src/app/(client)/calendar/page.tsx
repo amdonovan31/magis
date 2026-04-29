@@ -40,7 +40,7 @@ export default async function CalendarPage() {
   ]);
 
   return (
-    <div className="flex flex-col gap-0 pb-8">
+    <div className="flex flex-col gap-0 pb-24">
       <div className="px-5 pt-6 pb-4">
         <h1 className="font-heading text-2xl font-bold text-primary">
           My Schedule

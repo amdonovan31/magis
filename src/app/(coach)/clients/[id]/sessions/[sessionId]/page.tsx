@@ -98,7 +98,7 @@ export default async function CoachSessionDetailPage({ params }: SessionDetailPa
           </Link>
         }
       />
-      <div className="flex flex-col gap-4 px-4 pt-4 pb-8">
+      <div className="flex flex-col gap-4 px-4 pt-4 pb-24">
         {/* Session header */}
         <Card>
           <div className="flex items-center justify-between">

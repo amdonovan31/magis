@@ -232,7 +232,7 @@ export default async function ClientDetailPage({
           </Link>
         }
       />
-      <div className="flex flex-col gap-4 px-4 pt-4 pb-8">
+      <div className="flex flex-col gap-4 px-4 pt-4 pb-24">
         {/* 1. Header */}
         <Card>
           <div className="flex items-center gap-4">

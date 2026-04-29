@@ -75,7 +75,7 @@ export default async function ClientProfilePage({
           </Link>
         }
       />
-      <div className="flex flex-col gap-4 px-4 pt-4 pb-8">
+      <div className="flex flex-col gap-4 px-4 pt-4 pb-24">
         {/* Biometrics */}
         <h3 className="text-sm font-semibold uppercase tracking-wide text-primary/50">
           Biometrics
