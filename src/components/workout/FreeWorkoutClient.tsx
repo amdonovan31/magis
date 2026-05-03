@@ -32,6 +32,9 @@ type FreeSet = {
   weight: string | null;
   isCompleted: boolean;
   saving: boolean;
+  editing?: boolean;
+  preEditReps?: number | null;
+  preEditWeight?: string | null;
 };
 
 type FreeExercise = {
@@ -260,6 +263,128 @@ export default function FreeWorkoutClient({
     );
   }
 
+  function enterEditMode(exerciseId: string, setNumber: number) {
+    setExercises((prev) =>
+      prev.map((ex) => {
+        if (ex.exerciseId !== exerciseId) return ex;
+        return {
+          ...ex,
+          sets: ex.sets.map((s) =>
+            s.setNumber !== setNumber
+              ? s
+              : { ...s, editing: true, preEditReps: s.reps, preEditWeight: s.weight }
+          ),
+        };
+      })
+    );
+  }
+
+  function cancelEdit(exerciseId: string, setNumber: number) {
+    setExercises((prev) =>
+      prev.map((ex) => {
+        if (ex.exerciseId !== exerciseId) return ex;
+        return {
+          ...ex,
+          sets: ex.sets.map((s) =>
+            s.setNumber !== setNumber
+              ? s
+              : {
+                  ...s,
+                  editing: false,
+                  reps: s.preEditReps ?? s.reps,
+                  weight: s.preEditWeight ?? s.weight,
+                  preEditReps: undefined,
+                  preEditWeight: undefined,
+                }
+          ),
+        };
+      })
+    );
+  }
+
+  async function saveEdit(exerciseId: string, setNumber: number) {
+    const ex = exercises.find((e) => e.exerciseId === exerciseId);
+    const set = ex?.sets.find((s) => s.setNumber === setNumber);
+    if (!ex || !set) return;
+
+    setExercises((prev) =>
+      prev.map((e) =>
+        e.exerciseId !== exerciseId
+          ? e
+          : { ...e, sets: e.sets.map((s) => (s.setNumber !== setNumber ? s : { ...s, saving: true })) }
+      )
+    );
+
+    persistFreeSet(sessionId, exerciseId, setNumber, {
+      repsCompleted: set.reps,
+      weightUsed: set.weight,
+    });
+
+    const logSetPayload = {
+      sessionId,
+      templateExerciseId: null as string | null,
+      exerciseIdOverride: exerciseId,
+      setNumber,
+      repsCompleted: set.reps,
+      weightUsed: set.weight,
+      weightUnit: preferredUnit,
+      rpe: null,
+    };
+
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      await addToQueue({ type: "set_log", payload: logSetPayload as Record<string, unknown> });
+      setExercises((prev) =>
+        prev.map((e) =>
+          e.exerciseId !== exerciseId
+            ? e
+            : {
+                ...e,
+                sets: e.sets.map((s) =>
+                  s.setNumber !== setNumber
+                    ? s
+                    : { ...s, saving: false, editing: false, preEditReps: undefined, preEditWeight: undefined }
+                ),
+              }
+        )
+      );
+      return;
+    }
+
+    const result = await logSet(logSetPayload);
+
+    if (result?.error) {
+      if (isNetworkError(result.error)) {
+        await addToQueue({ type: "set_log", payload: logSetPayload as Record<string, unknown> });
+      } else {
+        // Hard error: stay in editing mode so user can retry. Local persistence already saved.
+        setError(result.error);
+        setExercises((prev) =>
+          prev.map((e) =>
+            e.exerciseId !== exerciseId
+              ? e
+              : { ...e, sets: e.sets.map((s) => (s.setNumber !== setNumber ? s : { ...s, saving: false })) }
+          )
+        );
+        return;
+      }
+    }
+
+    setExercises((prev) =>
+      prev.map((e) =>
+        e.exerciseId !== exerciseId
+          ? e
+          : {
+              ...e,
+              sets: e.sets.map((s) =>
+                s.setNumber !== setNumber
+                  ? s
+                  : { ...s, saving: false, editing: false, preEditReps: undefined, preEditWeight: undefined }
+              ),
+            }
+      )
+    );
+  }
+
   async function completeSet(exerciseId: string, setNumber: number) {
     const ex = exercises.find((e) => e.exerciseId === exerciseId);
     const set = ex?.sets.find((s) => s.setNumber === setNumber);
@@ -471,7 +596,7 @@ export default function FreeWorkoutClient({
                         value={set.reps ?? ""}
                         onChange={(e) => updateSet(ex.exerciseId, set.setNumber, "reps", e.target.value)}
                         onFocus={() => ghost && autofillSet(ex.exerciseId, set.setNumber, ghost)}
-                        disabled={set.isCompleted}
+                        disabled={set.isCompleted && !set.editing}
                         className={`h-9 w-full rounded-lg border border-primary/15 bg-surface px-2 text-sm text-primary text-center disabled:opacity-50 ${
                           ghost && repsEmpty ? "placeholder:text-primary/40" : ""
                         }`}
@@ -483,13 +608,42 @@ export default function FreeWorkoutClient({
                         value={set.weight ?? ""}
                         onChange={(e) => updateSet(ex.exerciseId, set.setNumber, "weight", e.target.value)}
                         onFocus={() => ghost && autofillSet(ex.exerciseId, set.setNumber, ghost)}
-                        disabled={set.isCompleted}
+                        disabled={set.isCompleted && !set.editing}
                         className={`h-9 w-full rounded-lg border border-primary/15 bg-surface px-2 text-sm text-primary text-center disabled:opacity-50 ${
                           ghost && weightEmpty ? "placeholder:text-primary/40" : ""
                         }`}
                       />
-                      {set.isCompleted ? (
-                        <span className="text-center text-green-600 text-sm">&#x2713;</span>
+                      {set.editing ? (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => saveEdit(ex.exerciseId, set.setNumber)}
+                            disabled={set.saving}
+                            className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-white disabled:opacity-50"
+                            aria-label="Save edit"
+                          >
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => cancelEdit(ex.exerciseId, set.setNumber)}
+                            disabled={set.saving}
+                            className="text-primary/40 hover:text-primary/60 text-xs disabled:opacity-50"
+                            aria-label="Cancel edit"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ) : set.isCompleted ? (
+                        <button
+                          onClick={() => enterEditMode(ex.exerciseId, set.setNumber)}
+                          className="flex h-9 items-center justify-center rounded-lg bg-primary text-white text-xs font-semibold hover:opacity-90 transition-opacity"
+                          aria-label="Edit set"
+                        >
+                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                        </button>
                       ) : (
                         <button
                           onClick={() => completeSet(ex.exerciseId, set.setNumber)}

@@ -94,7 +94,9 @@ export default function SetRow({
   const [reps, setReps] = useState(initialReps?.toString() ?? "");
   const [weight, setWeight] = useState(getInitialWeight);
   const [done, setDone] = useState(initialCompleted);
-  const [, startTransition] = useTransition();
+  const [editing, setEditing] = useState(false);
+  const [preEditValues, setPreEditValues] = useState<{ reps: string; weight: string } | null>(null);
+  const [pending, startTransition] = useTransition();
   const prevUnitRef = useRef(weightUnit);
 
   // Swipe state
@@ -125,6 +127,73 @@ export default function SetRow({
     if (!previousSetValues) return;
     if (reps === "" && previousSetValues.reps) setReps(previousSetValues.reps);
     if (weight === "" && previousSetValues.weight) setWeight(previousSetValues.weight);
+  }
+
+  function handleEnterEdit() {
+    setPreEditValues({ reps, weight });
+    setEditing(true);
+  }
+
+  function handleCancelEdit() {
+    if (preEditValues) {
+      setReps(preEditValues.reps);
+      setWeight(preEditValues.weight);
+    }
+    setEditing(false);
+    setPreEditValues(null);
+  }
+
+  function handleSaveEdit() {
+    const repsNum = reps ? parseInt(reps, 10) : null;
+
+    persistSet(sessionId, {
+      templateExerciseId,
+      exerciseIdOverride: exerciseIdOverride ?? null,
+      setNumber,
+      repsCompleted: repsNum,
+      weightUsed: weight || null,
+      completed: true,
+      completedAt: Date.now(),
+    });
+
+    loggedValueRef.current = weight || null;
+    loggedUnitRef.current = weightUnit;
+
+    onSetLogged?.(reps, weight);
+
+    const logSetPayload = {
+      sessionId,
+      templateExerciseId,
+      exerciseIdOverride: exerciseIdOverride ?? undefined,
+      setNumber,
+      repsCompleted: repsNum,
+      weightUsed: weight || null,
+      weightUnit,
+      rpe: null,
+    };
+
+    startTransition(async () => {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        await addToQueue({ type: "set_log", payload: logSetPayload as Record<string, unknown> });
+        setEditing(false);
+        setPreEditValues(null);
+        return;
+      }
+
+      const result = await logSet(logSetPayload);
+      if (result.error) {
+        if (isNetworkError(result.error)) {
+          await addToQueue({ type: "set_log", payload: logSetPayload as Record<string, unknown> });
+          setEditing(false);
+          setPreEditValues(null);
+        }
+        // Hard error: stay in editing mode so user can retry. Local persistence already saved.
+        return;
+      }
+
+      setEditing(false);
+      setPreEditValues(null);
+    });
   }
 
   function handleComplete() {
@@ -183,11 +252,11 @@ export default function SetRow({
 
   // Touch handlers for swipe
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (done) return; // completed sets can't be swiped
+    if (done || editing) return; // completed/editing sets can't be swiped
     const touch = e.touches[0];
     touchStartRef.current = { x: touch.clientX, y: touch.clientY };
     isSwipingRef.current = false;
-  }, [done]);
+  }, [done, editing]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     if (!touchStartRef.current) return;
@@ -293,11 +362,13 @@ export default function SetRow({
       <div
         className={cn(
           "relative rounded-xl px-3 py-2 transition-colors",
-          done
-            ? "bg-green-50"
-            : isActive
-              ? "border-l-4 border-primary bg-surface"
-              : "bg-surface"
+          done && editing
+            ? "bg-green-50 ring-2 ring-primary/20"
+            : done
+              ? "bg-green-50"
+              : isActive
+                ? "border-l-4 border-primary bg-surface"
+                : "bg-surface"
         )}
         style={swipeX !== 0 ? { transform: `translateX(${swipeX}px)`, transition: "none" } : undefined}
       >
@@ -331,14 +402,14 @@ export default function SetRow({
             onChange={(e) => setReps(e.target.value)}
             onFocus={handleAutofill}
             placeholder={previousSetValues?.reps || prescribedReps || "\u2014"}
-            disabled={done}
+            disabled={done && !editing}
             className={cn(
               "h-14 w-full rounded-xl border text-xl text-center font-semibold text-primary",
               "focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors",
               !done && previousSetValues && reps === ""
                 ? "placeholder:text-primary/40"
                 : "placeholder:text-primary/25",
-              done
+              done && !editing
                 ? "border-transparent bg-transparent"
                 : "border-primary/20 bg-surface"
             )}
@@ -355,43 +426,69 @@ export default function SetRow({
             onChange={(e) => setWeight(e.target.value)}
             onFocus={handleAutofill}
             placeholder={previousSetValues?.weight || prescribedInUnit || "\u2014"}
-            disabled={done}
+            disabled={done && !editing}
             className={cn(
               "h-14 w-full rounded-xl border text-xl text-center font-semibold text-primary",
               "focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors",
               !done && previousSetValues && weight === ""
                 ? "placeholder:text-primary/40"
                 : "placeholder:text-primary/25",
-              done
+              done && !editing
                 ? "border-transparent bg-transparent"
                 : "border-primary/20 bg-surface"
             )}
           />
         </div>
 
-        {/* Complete button */}
-        <button
-          type="button"
-          onClick={handleComplete}
-          disabled={done}
-          className={cn(
-            "flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full transition-colors",
-            done
-              ? "bg-primary text-white"
-              : "bg-primary/10 text-primary hover:bg-primary/20"
-          )}
-          aria-label={done ? "Completed" : "Mark complete"}
-        >
-          {done ? (
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+        {/* Right slot: complete / pencil / save+cancel */}
+        {editing ? (
+          <div className="flex flex-col gap-1 flex-shrink-0">
+            <button
+              type="button"
+              onClick={handleSaveEdit}
+              disabled={pending}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-white disabled:opacity-50"
+              aria-label="Save edit"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={handleCancelEdit}
+              disabled={pending}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-primary/40 hover:text-primary/60 hover:bg-primary/5 transition-colors disabled:opacity-50"
+              aria-label="Cancel edit"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        ) : done ? (
+          <button
+            type="button"
+            onClick={handleEnterEdit}
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-primary text-white hover:opacity-90 transition-opacity"
+            aria-label="Edit set"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
             </svg>
-          ) : (
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleComplete}
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+            aria-label="Mark complete"
+          >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
-          )}
-        </button>
+          </button>
+        )}
         </div>
       </div>
     </div>
