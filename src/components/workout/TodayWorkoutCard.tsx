@@ -4,15 +4,17 @@ import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import ProgramDisclaimerFooter from "@/components/disclaimer/ProgramDisclaimerFooter";
 import FreeWorkoutPicker from "./FreeWorkoutPicker";
+import ResumeWorkoutButton from "./ResumeWorkoutButton";
 import type { TodayWorkout } from "@/types/app.types";
 
 interface TodayWorkoutCardProps {
   todayWorkout: TodayWorkout;
   hasProgram?: boolean;
   activeFreeSessionId?: string | null;
+  canResume?: boolean;
 }
 
-export default function TodayWorkoutCard({ todayWorkout, hasProgram = true, activeFreeSessionId }: TodayWorkoutCardProps) {
+export default function TodayWorkoutCard({ todayWorkout, hasProgram = true, activeFreeSessionId, canResume = false }: TodayWorkoutCardProps) {
   if (!todayWorkout) {
     if (!hasProgram) {
       return (
@@ -59,6 +61,11 @@ export default function TodayWorkoutCard({ todayWorkout, hasProgram = true, acti
             View Summary →
           </Button>
         </Link>
+        {canResume && (
+          <div className="mt-2">
+            <ResumeWorkoutButton sessionId={completedSessionId} />
+          </div>
+        )}
       </Card>
     );
   }

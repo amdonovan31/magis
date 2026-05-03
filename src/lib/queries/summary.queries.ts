@@ -152,6 +152,8 @@ export async function getSessionSummary(
     templateTitle: template?.title ?? (isFreeWorkout ? "Free Workout" : "Workout"),
     programTitle: program?.title ?? "",
     date: session.started_at,
+    completedAt: session.completed_at,
+    workoutTemplateId: session.workout_template_id,
     durationSeconds: session.duration_seconds,
     exercisesCompleted: exercisesWithSets.size,
     totalExercises: isFreeWorkout ? exercisesWithSets.size : exercises.length,

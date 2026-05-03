@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
+const REOPEN_WINDOW_MS = 30 * 60 * 1000;
+
 export async function startWorkoutSession(
   workoutTemplateId: string,
   programId: string
@@ -727,6 +729,67 @@ export async function completeSession(sessionId: string) {
   revalidatePath("/home");
   revalidatePath("/history");
   redirect(`/workout/${sessionId}/summary`);
+}
+
+export async function reopenSession(sessionId: string): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const { data: session, error: fetchError } = await supabase
+    .from("workout_sessions")
+    .select("id, client_id, status, workout_template_id, completed_at")
+    .eq("id", sessionId)
+    .single();
+
+  if (fetchError || !session) return { error: "Session not found" };
+  if (session.client_id !== user.id) return { error: "Not authorized" };
+  if (session.status !== "completed") return { error: "Session is not completed" };
+  if (!session.completed_at) return { error: "Session has no completion timestamp" };
+
+  const completedAt = new Date(session.completed_at);
+  if (Date.now() - completedAt.getTime() >= REOPEN_WINDOW_MS) {
+    return { error: "Can only resume workouts completed within the last 30 minutes" };
+  }
+
+  const { error: updateError } = await supabase
+    .from("workout_sessions")
+    .update({
+      status: "in_progress",
+      completed_at: null,
+      duration_seconds: null,
+    })
+    .eq("id", sessionId)
+    .eq("client_id", user.id);
+
+  if (updateError) return { error: updateError.message };
+
+  if (session.workout_template_id) {
+    const { getTodayISO } = await import("@/lib/utils/date");
+    const today = getTodayISO();
+    await supabase
+      .from("scheduled_workouts")
+      .update({ status: "scheduled", session_id: null })
+      .eq("session_id", sessionId)
+      .eq("client_id", user.id)
+      .eq("scheduled_date", today);
+  }
+
+  await supabase
+    .from("personal_records")
+    .delete()
+    .eq("session_id", sessionId);
+
+  await supabase
+    .from("client_exercise_feedback")
+    .delete()
+    .eq("session_id", sessionId);
+
+  revalidatePath("/home");
+  revalidatePath("/history");
+  redirect(`/workout/${sessionId}`);
 }
 
 export async function logExtraWork(data: {

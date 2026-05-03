@@ -77,6 +77,7 @@ export type TodayWorkout = {
   template: WorkoutTemplateWithExercises;
   activeSession: WorkoutSession | null;
   completedSessionId: string | null;
+  completedAt: string | null;
   program: Program;
   coachName: string | null;
 } | null;
@@ -87,6 +88,8 @@ export type SessionSummary = {
   templateTitle: string;
   programTitle: string;
   date: string;
+  completedAt: string | null;
+  workoutTemplateId: string | null;
   durationSeconds: number | null;
   exercisesCompleted: number;
   totalExercises: number;

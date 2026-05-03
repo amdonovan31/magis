@@ -13,6 +13,9 @@ import StreakMilestoneBanner from "@/components/streaks/StreakMilestoneBanner";
 import ProgramDisclaimerFooter from "@/components/disclaimer/ProgramDisclaimerFooter";
 import ConfettiBurst from "@/components/workout/ConfettiBurst";
 import SaveWorkoutButton from "@/components/library/SaveWorkoutButton";
+import ResumeWorkoutButton from "@/components/workout/ResumeWorkoutButton";
+
+const REOPEN_WINDOW_MS = 30 * 60 * 1000;
 
 interface SummaryPageProps {
   params: Promise<{ sessionId: string }>;
@@ -60,6 +63,11 @@ export default async function SummaryPage({ params }: SummaryPageProps) {
   const isFreeWorkout = !templateId;
   const alreadySaved = templateId ? await isTemplateSaved(templateId) : false;
   const showSavePrompt = isFreeWorkout || !alreadySaved;
+
+  const canResume =
+    !!summary.workoutTemplateId &&
+    !!summary.completedAt &&
+    Date.now() - new Date(summary.completedAt).getTime() < REOPEN_WINDOW_MS;
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -260,6 +268,11 @@ export default async function SummaryPage({ params }: SummaryPageProps) {
 
       {/* Done button */}
       <div className="fixed bottom-0 left-1/2 z-10 w-full max-w-md -translate-x-1/2 bg-surface p-4 pb-safe border-t border-primary/10">
+        {canResume && (
+          <div className="mb-2">
+            <ResumeWorkoutButton sessionId={sessionId} />
+          </div>
+        )}
         <Link href="/home">
           <Button fullWidth size="lg">
             Done

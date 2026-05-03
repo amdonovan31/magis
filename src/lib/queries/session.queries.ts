@@ -46,6 +46,7 @@ export async function getTodayWorkout(): Promise<TodayWorkout> {
       session_id,
       program_id,
       workout_template_id,
+      session:workout_sessions(completed_at),
       program:programs!inner(
         *
       ),
@@ -82,10 +83,16 @@ export async function getTodayWorkout(): Promise<TodayWorkout> {
       coachName = coachProfile?.full_name ?? null;
     }
 
+    const sessionRel = completedRow.session as { completed_at: string | null } | { completed_at: string | null }[] | null;
+    const completedAt = Array.isArray(sessionRel)
+      ? sessionRel[0]?.completed_at ?? null
+      : sessionRel?.completed_at ?? null;
+
     return {
       template: { ...template, exercises: exercisesWithAlternates } as unknown as import("@/types/app.types").WorkoutTemplateWithExercises,
       activeSession: null,
       completedSessionId: completedRow.session_id,
+      completedAt,
       program,
       coachName,
     };
@@ -154,6 +161,7 @@ export async function getTodayWorkout(): Promise<TodayWorkout> {
     template: templateWithSortedExercises as unknown as import("@/types/app.types").WorkoutTemplateWithExercises,
     activeSession: activeSession as WorkoutSession | null,
     completedSessionId: null,
+    completedAt: null,
     program,
     coachName,
   };

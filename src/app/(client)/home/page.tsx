@@ -51,6 +51,10 @@ export default async function ClientHomePage() {
   const profile = rawProfile as Pick<Profile, "full_name" | "intake_requested"> | null;
   const showIntakeBanner = profile?.intake_requested && (intakeCount ?? 0) === 0;
 
+  const canResumeWorkout = todayWorkout?.completedAt
+    ? Date.now() - new Date(todayWorkout.completedAt).getTime() < 30 * 60 * 1000
+    : false;
+
   return (
     <>
     <TopBar showLogo />
@@ -82,7 +86,7 @@ export default async function ClientHomePage() {
       <WeightCheckInCard todayEntry={todayWeight.entry} preferredUnit={todayWeight.preferredUnit} />
 
       {/* Today's workout card */}
-      <TodayWorkoutCard todayWorkout={todayWorkout} hasProgram={(programCount ?? 0) > 0} activeFreeSessionId={activeFreeSession?.id ?? null} />
+      <TodayWorkoutCard todayWorkout={todayWorkout} hasProgram={(programCount ?? 0) > 0} activeFreeSessionId={activeFreeSession?.id ?? null} canResume={canResumeWorkout} />
 
       {/* Streak card */}
       <StreakCard streakData={streakData} />
