@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { ArrowLeftRight } from "lucide-react";
-import SetRow from "./SetRow";
+import SetRow, { convertWeight } from "./SetRow";
 import ExerciseDemoModal from "./ExerciseDemoModal";
 import { persistSwap, removeSwap } from "@/lib/workout-persistence";
 import { searchExercises } from "@/lib/actions/exercise.actions";
@@ -80,6 +80,35 @@ export default function ExerciseLogger({
   ).length;
   const [bonusSets, setBonusSets] = useState(existingBonusSets);
   const setCount = prescribedSets + bonusSets;
+
+  const [completedSetValues, setCompletedSetValues] = useState<Map<number, { reps: string; weight: string }>>(() => {
+    const initial = new Map<number, { reps: string; weight: string }>();
+    for (const log of existingLogs) {
+      if (
+        log.template_exercise_id !== templateExercise.id ||
+        !log.is_completed ||
+        (log as { is_skipped?: boolean }).is_skipped
+      ) {
+        continue;
+      }
+      const repsStr = log.reps_completed?.toString() ?? "";
+      const fromUnit = (log.weight_unit as "kg" | "lbs") ?? "lbs";
+      const weightNum = log.weight_used ? parseFloat(log.weight_used) : NaN;
+      const weightStr = !isNaN(weightNum)
+        ? convertWeight(weightNum, fromUnit, weightUnit).toString()
+        : "";
+      initial.set(log.set_number, { reps: repsStr, weight: weightStr });
+    }
+    return initial;
+  });
+
+  function handleSetLogged(setNumber: number, reps: string, weight: string) {
+    setCompletedSetValues((prev) => {
+      const next = new Map(prev);
+      next.set(setNumber, { reps, weight });
+      return next;
+    });
+  }
   const displayExercise = swappedExercise ?? templateExercise.exercise;
   const exerciseIdOverride = swappedExercise?.id ?? null;
 
@@ -425,6 +454,13 @@ export default function ExerciseLogger({
             const isCompleted = existingLog?.is_completed ?? false;
             const isActive = !isCompleted && !firstIncompleteFound;
             if (isActive) firstIncompleteFound = true;
+
+            let prevValues: { reps: string; weight: string } | null = null;
+            for (let n = setNum - 1; n >= 1; n--) {
+              const v = completedSetValues.get(n);
+              if (v) { prevValues = v; break; }
+            }
+
             return (
               <SetRow
                 key={`${setNum}_${exerciseIdOverride ?? "original"}`}
@@ -445,6 +481,8 @@ export default function ExerciseLogger({
                 onSkip={() => handleSetSkip(setNum)}
                 onUnskip={() => handleSetUnskip(setNum)}
                 lastPerformance={lastPerformance}
+                previousSetValues={prevValues}
+                onSetLogged={(reps, weight) => handleSetLogged(setNum, reps, weight)}
               />
             );
           });

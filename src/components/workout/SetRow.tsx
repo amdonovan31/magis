@@ -17,7 +17,7 @@ function isNetworkError(error: string): boolean {
   return patterns.some((p) => error.toLowerCase().includes(p));
 }
 
-function convertWeight(value: number, from: WeightUnit, to: WeightUnit): number {
+export function convertWeight(value: number, from: WeightUnit, to: WeightUnit): number {
   if (from === to) return value;
   return from === "kg"
     ? Math.round(value * KG_TO_LBS * 10) / 10
@@ -42,6 +42,8 @@ interface SetRowProps {
   onSkip?: () => void;
   onUnskip?: () => void;
   lastPerformance?: LastPerformance | null;
+  previousSetValues?: { reps: string; weight: string } | null;
+  onSetLogged?: (reps: string, weight: string) => void;
 }
 
 export default function SetRow({
@@ -62,6 +64,8 @@ export default function SetRow({
   onSkip,
   onUnskip,
   lastPerformance = null,
+  previousSetValues = null,
+  onSetLogged,
 }: SetRowProps) {
   const prescribedNum = prescribedWeight ? parseFloat(prescribedWeight) : null;
   const prescribedInUnit = prescribedNum != null && !isNaN(prescribedNum)
@@ -117,6 +121,12 @@ export default function SetRow({
     }
   }, [weightUnit]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  function handleAutofill() {
+    if (!previousSetValues) return;
+    if (reps === "" && previousSetValues.reps) setReps(previousSetValues.reps);
+    if (weight === "" && previousSetValues.weight) setWeight(previousSetValues.weight);
+  }
+
   function handleComplete() {
     const repsNum = reps ? parseInt(reps, 10) : null;
 
@@ -132,6 +142,8 @@ export default function SetRow({
 
     loggedValueRef.current = weight || null;
     loggedUnitRef.current = weightUnit;
+
+    onSetLogged?.(reps, weight);
 
     const logSetPayload = {
       sessionId,
@@ -317,12 +329,15 @@ export default function SetRow({
             inputMode="numeric"
             value={reps}
             onChange={(e) => setReps(e.target.value)}
-            placeholder={prescribedReps ?? "\u2014"}
+            onFocus={handleAutofill}
+            placeholder={previousSetValues?.reps || prescribedReps || "\u2014"}
             disabled={done}
             className={cn(
               "h-14 w-full rounded-xl border text-xl text-center font-semibold text-primary",
               "focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors",
-              "placeholder:text-primary/25",
+              !done && previousSetValues && reps === ""
+                ? "placeholder:text-primary/40"
+                : "placeholder:text-primary/25",
               done
                 ? "border-transparent bg-transparent"
                 : "border-primary/20 bg-surface"
@@ -338,12 +353,15 @@ export default function SetRow({
             inputMode="decimal"
             value={weight}
             onChange={(e) => setWeight(e.target.value)}
-            placeholder={prescribedInUnit ?? "\u2014"}
+            onFocus={handleAutofill}
+            placeholder={previousSetValues?.weight || prescribedInUnit || "\u2014"}
             disabled={done}
             className={cn(
               "h-14 w-full rounded-xl border text-xl text-center font-semibold text-primary",
               "focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors",
-              "placeholder:text-primary/25",
+              !done && previousSetValues && weight === ""
+                ? "placeholder:text-primary/40"
+                : "placeholder:text-primary/25",
               done
                 ? "border-transparent bg-transparent"
                 : "border-primary/20 bg-surface"

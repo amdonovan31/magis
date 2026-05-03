@@ -239,6 +239,27 @@ export default function FreeWorkoutClient({
     );
   }
 
+  function autofillSet(exerciseId: string, setNumber: number, ghost: { reps: string; weight: string }) {
+    setExercises((prev) =>
+      prev.map((ex) => {
+        if (ex.exerciseId !== exerciseId) return ex;
+        return {
+          ...ex,
+          sets: ex.sets.map((s) => {
+            if (s.setNumber !== setNumber) return s;
+            const next = { ...s };
+            if (s.reps == null && ghost.reps) {
+              const n = parseInt(ghost.reps);
+              next.reps = isNaN(n) ? null : n;
+            }
+            if (!s.weight && ghost.weight) next.weight = ghost.weight;
+            return next;
+          }),
+        };
+      })
+    );
+  }
+
   async function completeSet(exerciseId: string, setNumber: number) {
     const ex = exercises.find((e) => e.exerciseId === exerciseId);
     const set = ex?.sets.find((s) => s.setNumber === setNumber);
@@ -421,45 +442,66 @@ export default function FreeWorkoutClient({
                   <span />
                 </div>
 
-                {ex.sets.map((set) => (
-                  <div
-                    key={set.setNumber}
-                    className={`grid grid-cols-[2rem_1fr_1fr_3rem] gap-2 items-center px-1 py-1.5 rounded-lg ${
-                      set.isCompleted ? "bg-green-50" : ""
-                    }`}
-                  >
-                    <span className="text-xs font-semibold text-primary/50">{set.setNumber}</span>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      placeholder="—"
-                      value={set.reps ?? ""}
-                      onChange={(e) => updateSet(ex.exerciseId, set.setNumber, "reps", e.target.value)}
-                      disabled={set.isCompleted}
-                      className="h-9 w-full rounded-lg border border-primary/15 bg-surface px-2 text-sm text-primary text-center disabled:opacity-50"
-                    />
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      placeholder="—"
-                      value={set.weight ?? ""}
-                      onChange={(e) => updateSet(ex.exerciseId, set.setNumber, "weight", e.target.value)}
-                      disabled={set.isCompleted}
-                      className="h-9 w-full rounded-lg border border-primary/15 bg-surface px-2 text-sm text-primary text-center disabled:opacity-50"
-                    />
-                    {set.isCompleted ? (
-                      <span className="text-center text-green-600 text-sm">&#x2713;</span>
-                    ) : (
-                      <button
-                        onClick={() => completeSet(ex.exerciseId, set.setNumber)}
-                        disabled={set.saving}
-                        className="flex h-9 items-center justify-center rounded-lg bg-primary text-white text-xs font-semibold disabled:opacity-50"
-                      >
-                        {set.saving ? "..." : "Log"}
-                      </button>
-                    )}
-                  </div>
-                ))}
+                {ex.sets.map((set) => {
+                  let ghost: { reps: string; weight: string } | null = null;
+                  for (let n = set.setNumber - 1; n >= 1; n--) {
+                    const prev = ex.sets.find((s) => s.setNumber === n);
+                    if (prev?.isCompleted) {
+                      ghost = {
+                        reps: prev.reps?.toString() ?? "",
+                        weight: prev.weight ?? "",
+                      };
+                      break;
+                    }
+                  }
+                  const repsEmpty = set.reps == null;
+                  const weightEmpty = !set.weight;
+                  return (
+                    <div
+                      key={set.setNumber}
+                      className={`grid grid-cols-[2rem_1fr_1fr_3rem] gap-2 items-center px-1 py-1.5 rounded-lg ${
+                        set.isCompleted ? "bg-green-50" : ""
+                      }`}
+                    >
+                      <span className="text-xs font-semibold text-primary/50">{set.setNumber}</span>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        placeholder={ghost?.reps || "—"}
+                        value={set.reps ?? ""}
+                        onChange={(e) => updateSet(ex.exerciseId, set.setNumber, "reps", e.target.value)}
+                        onFocus={() => ghost && autofillSet(ex.exerciseId, set.setNumber, ghost)}
+                        disabled={set.isCompleted}
+                        className={`h-9 w-full rounded-lg border border-primary/15 bg-surface px-2 text-sm text-primary text-center disabled:opacity-50 ${
+                          ghost && repsEmpty ? "placeholder:text-primary/40" : ""
+                        }`}
+                      />
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        placeholder={ghost?.weight || "—"}
+                        value={set.weight ?? ""}
+                        onChange={(e) => updateSet(ex.exerciseId, set.setNumber, "weight", e.target.value)}
+                        onFocus={() => ghost && autofillSet(ex.exerciseId, set.setNumber, ghost)}
+                        disabled={set.isCompleted}
+                        className={`h-9 w-full rounded-lg border border-primary/15 bg-surface px-2 text-sm text-primary text-center disabled:opacity-50 ${
+                          ghost && weightEmpty ? "placeholder:text-primary/40" : ""
+                        }`}
+                      />
+                      {set.isCompleted ? (
+                        <span className="text-center text-green-600 text-sm">&#x2713;</span>
+                      ) : (
+                        <button
+                          onClick={() => completeSet(ex.exerciseId, set.setNumber)}
+                          disabled={set.saving}
+                          className="flex h-9 items-center justify-center rounded-lg bg-primary text-white text-xs font-semibold disabled:opacity-50"
+                        >
+                          {set.saving ? "..." : "Log"}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
 
               <button
