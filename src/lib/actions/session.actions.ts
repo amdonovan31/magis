@@ -806,11 +806,12 @@ export async function deleteSetLog(
   if (!user) return { error: "Unauthorized" };
 
   // Atomic delete + renumber via plpgsql function. See migration 052.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error: rpcError } = await (supabase as any).rpc("delete_set_log_with_renumber", {
+  // The RPC accepts NULL for either id (its IF/ELSE branches require it), but
+  // the Supabase type generator infers non-null params — cast to satisfy TS.
+  const { error: rpcError } = await supabase.rpc("delete_set_log_with_renumber", {
     p_session_id: sessionId,
-    p_template_exercise_id: templateExerciseId,
-    p_exercise_id: exerciseId,
+    p_template_exercise_id: templateExerciseId as string,
+    p_exercise_id: exerciseId as string,
     p_set_number: setNumber,
   });
   if (rpcError) return { error: rpcError.message };
@@ -825,8 +826,7 @@ export async function deleteSetLog(
       .single();
     if (!session) return { error: "Session not found" };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: row } = await (supabase as any)
+    const { data: row } = await supabase
       .from("workout_sessions")
       .select("removed_sets")
       .eq("id", sessionId)
@@ -835,8 +835,7 @@ export async function deleteSetLog(
       (row?.removed_sets as Array<{ templateExerciseId: string; setNumber: number }> | null) ?? [];
     existing.push({ templateExerciseId, setNumber });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any)
+    await supabase
       .from("workout_sessions")
       .update({ removed_sets: existing })
       .eq("id", sessionId)

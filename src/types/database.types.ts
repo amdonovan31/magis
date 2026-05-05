@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       agent_activity_log: {
@@ -1537,6 +1562,7 @@ export type Database = {
           id: string
           notes: string | null
           program_id: string | null
+          removed_sets: Json | null
           skipped_exercises: string[]
           started_at: string
           status: string
@@ -1551,6 +1577,7 @@ export type Database = {
           id?: string
           notes?: string | null
           program_id?: string | null
+          removed_sets?: Json | null
           skipped_exercises?: string[]
           started_at?: string
           status?: string
@@ -1565,6 +1592,7 @@ export type Database = {
           id?: string
           notes?: string | null
           program_id?: string | null
+          removed_sets?: Json | null
           skipped_exercises?: string[]
           started_at?: string
           status?: string
@@ -1733,6 +1761,15 @@ export type Database = {
         }
         Returns: Json
       }
+      delete_set_log_with_renumber: {
+        Args: {
+          p_exercise_id: string
+          p_session_id: string
+          p_set_number: number
+          p_template_exercise_id: string
+        }
+        Returns: undefined
+      }
       ensure_coach_code: { Args: { target_id: string }; Returns: string }
       get_my_role: { Args: never; Returns: string }
     }
@@ -1863,6 +1900,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

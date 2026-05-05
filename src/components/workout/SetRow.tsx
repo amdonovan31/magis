@@ -38,9 +38,6 @@ interface SetRowProps {
   onSetComplete?: () => void;
   weightUnit: WeightUnit;
   isActive?: boolean;
-  isSkipped?: boolean;
-  onSkip?: () => void;
-  onUnskip?: () => void;
   lastPerformance?: LastPerformance | null;
   previousSetValues?: { reps: string; weight: string } | null;
   onSetLogged?: (reps: string, weight: string) => void;
@@ -61,9 +58,6 @@ export default function SetRow({
   onSetComplete,
   weightUnit,
   isActive = false,
-  isSkipped = false,
-  onSkip,
-  onUnskip,
   lastPerformance = null,
   previousSetValues = null,
   onSetLogged,
@@ -309,14 +303,9 @@ export default function SetRow({
     if (!isSwipingRef.current) return;
     e.preventDefault();
 
-    if (isSkipped) {
-      // Skipped rows: only allow swipe right (positive deltaX)
-      setSwipeX(Math.max(0, Math.min(deltaX, 80)));
-    } else {
-      // Normal rows: only allow swipe left (negative deltaX)
-      setSwipeX(Math.min(0, Math.max(deltaX, -80)));
-    }
-  }, [isSkipped]);
+    // Only swipe left (negative deltaX) — reveals Remove
+    setSwipeX(Math.min(0, Math.max(deltaX, -80)));
+  }, []);
 
   const handleTouchEnd = useCallback(() => {
     if (!isSwipingRef.current) {
@@ -324,59 +313,14 @@ export default function SetRow({
       return;
     }
 
-    if (isSkipped && swipeX > SWIPE_THRESHOLD) {
-      onUnskip?.();
-    } else if (!isSkipped && swipeX < -SWIPE_THRESHOLD) {
-      onSkip?.();
+    if (swipeX < -SWIPE_THRESHOLD) {
+      onRemove?.();
     }
 
     setSwipeX(0);
     touchStartRef.current = null;
     isSwipingRef.current = false;
-  }, [swipeX, isSkipped, onSkip, onUnskip]);
-
-  // Skipped state render
-  if (isSkipped) {
-    return (
-      <div
-        className="relative overflow-hidden rounded-xl"
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-      >
-        {/* Behind: Undo + Remove buttons */}
-        <div className="absolute inset-y-0 left-0 flex items-center gap-2 pl-4">
-          <button
-            type="button"
-            onClick={() => onUnskip?.()}
-            className="rounded-lg bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent"
-          >
-            Undo
-          </button>
-          {onRemove && (
-            <button
-              type="button"
-              onClick={() => onRemove?.()}
-              className="rounded-lg bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700"
-            >
-              Remove
-            </button>
-          )}
-        </div>
-
-        {/* Foreground: skipped row */}
-        <div
-          className="relative flex items-center gap-3 rounded-xl bg-primary/5 px-3 py-2 transition-transform"
-          style={{ transform: `translateX(${swipeX}px)` }}
-        >
-          <span className="w-6 text-center text-sm font-semibold text-primary/30">
-            {setNumber}
-          </span>
-          <span className="flex-1 text-sm text-primary/30 italic">Skipped</span>
-        </div>
-      </div>
-    );
-  }
+  }, [swipeX, onRemove]);
 
   // Normal / completed state render
   return (
@@ -386,24 +330,15 @@ export default function SetRow({
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Behind: Skip + Remove buttons (revealed on swipe left) */}
-      {!done && (
-        <div className="absolute inset-y-0 right-0 flex items-center gap-2 pr-4">
-          {onRemove && (
-            <button
-              type="button"
-              onClick={() => onRemove?.()}
-              className="rounded-lg bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700"
-            >
-              Remove
-            </button>
-          )}
+      {/* Behind: Remove button (revealed on swipe left) */}
+      {!done && onRemove && (
+        <div className="absolute inset-y-0 right-0 flex items-center pr-4">
           <button
             type="button"
-            onClick={() => onSkip?.()}
-            className="rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-700"
+            onClick={() => onRemove?.()}
+            className="rounded-lg bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700"
           >
-            Skip
+            Remove
           </button>
         </div>
       )}
@@ -422,8 +357,8 @@ export default function SetRow({
         )}
         style={swipeX !== 0 ? { transform: `translateX(${swipeX}px)`, transition: "none" } : undefined}
       >
-        {/* Last performance hint — only on the active incomplete, non-skipped set */}
-        {isActive && !done && !isSkipped && lastPerformance && (
+        {/* Last performance hint — only on the active incomplete set */}
+        {isActive && !done && lastPerformance && (
           <p className="mb-1 pl-9 text-[10px] text-primary/40">
             Last:{" "}
             {lastPerformance.reps} reps ×{" "}
