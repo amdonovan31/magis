@@ -792,6 +792,61 @@ export async function reopenSession(sessionId: string): Promise<{ error?: string
   redirect(`/workout/${sessionId}`);
 }
 
+export async function deleteSetLog(
+  sessionId: string,
+  templateExerciseId: string | null,
+  exerciseId: string | null,
+  setNumber: number,
+  isPrescribedRemoval: boolean
+): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
+  // Atomic delete + renumber via plpgsql function. See migration 052.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: rpcError } = await (supabase as any).rpc("delete_set_log_with_renumber", {
+    p_session_id: sessionId,
+    p_template_exercise_id: templateExerciseId,
+    p_exercise_id: exerciseId,
+    p_set_number: setNumber,
+  });
+  if (rpcError) return { error: rpcError.message };
+
+  // Flag for the coach when a prescribed set is removed (bonus sets aren't tracked).
+  if (templateExerciseId && isPrescribedRemoval) {
+    const { data: session } = await supabase
+      .from("workout_sessions")
+      .select("id")
+      .eq("id", sessionId)
+      .eq("client_id", user.id)
+      .single();
+    if (!session) return { error: "Session not found" };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: row } = await (supabase as any)
+      .from("workout_sessions")
+      .select("removed_sets")
+      .eq("id", sessionId)
+      .single();
+    const existing: Array<{ templateExerciseId: string; setNumber: number }> =
+      (row?.removed_sets as Array<{ templateExerciseId: string; setNumber: number }> | null) ?? [];
+    existing.push({ templateExerciseId, setNumber });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any)
+      .from("workout_sessions")
+      .update({ removed_sets: existing })
+      .eq("id", sessionId)
+      .eq("client_id", user.id);
+  }
+
+  revalidatePath("/home");
+  return {};
+}
+
 export async function logExtraWork(data: {
   sessionId: string;
   groupId: string;

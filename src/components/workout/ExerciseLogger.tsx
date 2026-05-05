@@ -6,7 +6,7 @@ import SetRow, { convertWeight } from "./SetRow";
 import ExerciseDemoModal from "./ExerciseDemoModal";
 import { persistSwap, removeSwap } from "@/lib/workout-persistence";
 import { searchExercises } from "@/lib/actions/exercise.actions";
-import { saveExerciseNote, skipSet, unskipSet } from "@/lib/actions/session.actions";
+import { saveExerciseNote, skipSet, unskipSet, deleteSetLog } from "@/lib/actions/session.actions";
 import ExerciseHistoryModal from "./ExerciseHistoryModal";
 import type { WorkoutTemplateExerciseWithExercise, SetLog, Exercise } from "@/types/app.types";
 
@@ -79,7 +79,10 @@ export default function ExerciseLogger({
     (l) => l.template_exercise_id === templateExercise.id && l.set_number > prescribedSets
   ).length;
   const [bonusSets, setBonusSets] = useState(existingBonusSets);
-  const setCount = prescribedSets + bonusSets;
+  const [removedCount, setRemovedCount] = useState(0);
+  const [logs, setLogs] = useState<SetLog[]>(existingLogs);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+  const setCount = Math.max(0, prescribedSets + bonusSets - removedCount);
 
   const [completedSetValues, setCompletedSetValues] = useState<Map<number, { reps: string; weight: string }>>(() => {
     const initial = new Map<number, { reps: string; weight: string }>();
@@ -163,6 +166,60 @@ export default function ExerciseLogger({
     });
     unskipSet(sessionId, templateExercise.id, setNumber);
     onSetUnresolved?.();
+  }
+
+  async function handleRemoveSet(setNumber: number) {
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setRemoveError("Must be online to remove sets");
+      setTimeout(() => setRemoveError(null), 4000);
+      return;
+    }
+
+    const isPrescribed = setNumber <= prescribedSets;
+
+    // Optimistic local updates
+    if (isPrescribed) {
+      setRemovedCount((c) => c + 1);
+    } else {
+      setBonusSets((b) => Math.max(0, b - 1));
+    }
+
+    setSkippedSets((prev) => {
+      const shifted = new Set<number>();
+      for (const n of Array.from(prev)) {
+        if (n === setNumber) continue;
+        shifted.add(n > setNumber ? n - 1 : n);
+      }
+      return shifted;
+    });
+
+    setCompletedSetValues((prev) => {
+      const next = new Map<number, { reps: string; weight: string }>();
+      for (const [n, v] of Array.from(prev.entries())) {
+        if (n === setNumber) continue;
+        next.set(n > setNumber ? n - 1 : n, v);
+      }
+      return next;
+    });
+
+    setLogs((prev) =>
+      prev
+        .filter(
+          (l) =>
+            !(l.template_exercise_id === templateExercise.id && l.set_number === setNumber)
+        )
+        .map((l) =>
+          l.template_exercise_id === templateExercise.id && l.set_number > setNumber
+            ? { ...l, set_number: l.set_number - 1 }
+            : l
+        )
+    );
+
+    const result = await deleteSetLog(sessionId, templateExercise.id, null, setNumber, isPrescribed);
+    if (result.error) {
+      setRemoveError(result.error);
+      setTimeout(() => setRemoveError(null), 4000);
+    }
   }
 
   // Debounced note save
@@ -446,7 +503,7 @@ export default function ExerciseLogger({
             const setNum = i + 1;
             const existingLog = hideLoggedSets
               ? undefined
-              : existingLogs.find(
+              : logs.find(
                   (l) =>
                     l.template_exercise_id === templateExercise.id &&
                     l.set_number === setNum
@@ -483,10 +540,15 @@ export default function ExerciseLogger({
                 lastPerformance={lastPerformance}
                 previousSetValues={prevValues}
                 onSetLogged={(reps, weight) => handleSetLogged(setNum, reps, weight)}
+                onRemove={() => handleRemoveSet(setNum)}
               />
             );
           });
         })()}
+
+        {removeError && (
+          <p className="px-3 pb-1 text-center text-xs text-red-600">{removeError}</p>
+        )}
 
         {!isSkipped && (
           <div className="px-3 pb-2">

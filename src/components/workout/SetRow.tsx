@@ -44,6 +44,7 @@ interface SetRowProps {
   lastPerformance?: LastPerformance | null;
   previousSetValues?: { reps: string; weight: string } | null;
   onSetLogged?: (reps: string, weight: string) => void;
+  onRemove?: () => void;
 }
 
 export default function SetRow({
@@ -66,6 +67,7 @@ export default function SetRow({
   lastPerformance = null,
   previousSetValues = null,
   onSetLogged,
+  onRemove,
 }: SetRowProps) {
   const prescribedNum = prescribedWeight ? parseFloat(prescribedWeight) : null;
   const prescribedInUnit = prescribedNum != null && !isNaN(prescribedNum)
@@ -144,22 +146,37 @@ export default function SetRow({
   }
 
   function handleSaveEdit() {
-    const repsNum = reps ? parseInt(reps, 10) : null;
+    // Same ghost-fallback as handleComplete: clearing both fields and tapping Save
+    // should apply the previous-set values rather than wipe the row.
+    let effectiveReps = reps;
+    let effectiveWeight = weight;
+    if (previousSetValues) {
+      if (effectiveReps === "" && previousSetValues.reps) {
+        effectiveReps = previousSetValues.reps;
+        setReps(effectiveReps);
+      }
+      if (effectiveWeight === "" && previousSetValues.weight) {
+        effectiveWeight = previousSetValues.weight;
+        setWeight(effectiveWeight);
+      }
+    }
+
+    const repsNum = effectiveReps ? parseInt(effectiveReps, 10) : null;
 
     persistSet(sessionId, {
       templateExerciseId,
       exerciseIdOverride: exerciseIdOverride ?? null,
       setNumber,
       repsCompleted: repsNum,
-      weightUsed: weight || null,
+      weightUsed: effectiveWeight || null,
       completed: true,
       completedAt: Date.now(),
     });
 
-    loggedValueRef.current = weight || null;
+    loggedValueRef.current = effectiveWeight || null;
     loggedUnitRef.current = weightUnit;
 
-    onSetLogged?.(reps, weight);
+    onSetLogged?.(effectiveReps, effectiveWeight);
 
     const logSetPayload = {
       sessionId,
@@ -167,7 +184,7 @@ export default function SetRow({
       exerciseIdOverride: exerciseIdOverride ?? undefined,
       setNumber,
       repsCompleted: repsNum,
-      weightUsed: weight || null,
+      weightUsed: effectiveWeight || null,
       weightUnit,
       rpe: null,
     };
@@ -197,22 +214,37 @@ export default function SetRow({
   }
 
   function handleComplete() {
-    const repsNum = reps ? parseInt(reps, 10) : null;
+    // Apply ghost values when fields are empty: tapping Complete with placeholders
+    // visible should log those values (handleAutofill only fires on focus).
+    let effectiveReps = reps;
+    let effectiveWeight = weight;
+    if (previousSetValues) {
+      if (effectiveReps === "" && previousSetValues.reps) {
+        effectiveReps = previousSetValues.reps;
+        setReps(effectiveReps);
+      }
+      if (effectiveWeight === "" && previousSetValues.weight) {
+        effectiveWeight = previousSetValues.weight;
+        setWeight(effectiveWeight);
+      }
+    }
+
+    const repsNum = effectiveReps ? parseInt(effectiveReps, 10) : null;
 
     persistSet(sessionId, {
       templateExerciseId,
       exerciseIdOverride: exerciseIdOverride ?? null,
       setNumber,
       repsCompleted: repsNum,
-      weightUsed: weight || null,
+      weightUsed: effectiveWeight || null,
       completed: true,
       completedAt: Date.now(),
     });
 
-    loggedValueRef.current = weight || null;
+    loggedValueRef.current = effectiveWeight || null;
     loggedUnitRef.current = weightUnit;
 
-    onSetLogged?.(reps, weight);
+    onSetLogged?.(effectiveReps, effectiveWeight);
 
     const logSetPayload = {
       sessionId,
@@ -220,7 +252,7 @@ export default function SetRow({
       exerciseIdOverride: exerciseIdOverride ?? undefined,
       setNumber,
       repsCompleted: repsNum,
-      weightUsed: weight || null,
+      weightUsed: effectiveWeight || null,
       weightUnit,
       rpe: null,
     };
@@ -312,8 +344,8 @@ export default function SetRow({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Behind: Undo button */}
-        <div className="absolute inset-y-0 left-0 flex items-center pl-4">
+        {/* Behind: Undo + Remove buttons */}
+        <div className="absolute inset-y-0 left-0 flex items-center gap-2 pl-4">
           <button
             type="button"
             onClick={() => onUnskip?.()}
@@ -321,6 +353,15 @@ export default function SetRow({
           >
             Undo
           </button>
+          {onRemove && (
+            <button
+              type="button"
+              onClick={() => onRemove?.()}
+              className="rounded-lg bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700"
+            >
+              Remove
+            </button>
+          )}
         </div>
 
         {/* Foreground: skipped row */}
@@ -345,9 +386,18 @@ export default function SetRow({
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Behind: Skip button (revealed on swipe left) */}
+      {/* Behind: Skip + Remove buttons (revealed on swipe left) */}
       {!done && (
-        <div className="absolute inset-y-0 right-0 flex items-center pr-4">
+        <div className="absolute inset-y-0 right-0 flex items-center gap-2 pr-4">
+          {onRemove && (
+            <button
+              type="button"
+              onClick={() => onRemove?.()}
+              className="rounded-lg bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700"
+            >
+              Remove
+            </button>
+          )}
           <button
             type="button"
             onClick={() => onSkip?.()}
@@ -465,6 +515,19 @@ export default function SetRow({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
+            {onRemove && (
+              <button
+                type="button"
+                onClick={() => onRemove?.()}
+                disabled={pending}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                aria-label="Remove set"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            )}
           </div>
         ) : done ? (
           <button

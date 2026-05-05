@@ -8,7 +8,7 @@ import Badge from "@/components/ui/Badge";
 import RestTimer from "@/components/workout/RestTimer";
 import ExerciseHistoryModal from "@/components/workout/ExerciseHistoryModal";
 import ExerciseDemoModal from "@/components/workout/ExerciseDemoModal";
-import { logSet } from "@/lib/actions/session.actions";
+import { logSet, deleteSetLog } from "@/lib/actions/session.actions";
 import { completeSession, deleteSession } from "@/lib/actions/session.actions";
 import { searchExercises, fetchExerciseById } from "@/lib/actions/exercise.actions";
 import {
@@ -302,6 +302,30 @@ export default function FreeWorkoutClient({
     );
   }
 
+  async function removeSet(exerciseId: string, setNumber: number) {
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setError("Must be online to remove sets");
+      setTimeout(() => setError(null), 4000);
+      return;
+    }
+
+    setExercises((prev) =>
+      prev.map((ex) => {
+        if (ex.exerciseId !== exerciseId) return ex;
+        const filtered = ex.sets
+          .filter((s) => s.setNumber !== setNumber)
+          .map((s, i) => ({ ...s, setNumber: i + 1 }));
+        return { ...ex, sets: filtered };
+      })
+    );
+
+    const result = await deleteSetLog(sessionId, null, exerciseId, setNumber, false);
+    if (result.error) {
+      setError(result.error);
+      setTimeout(() => setError(null), 4000);
+    }
+  }
+
   async function saveEdit(exerciseId: string, setNumber: number) {
     const ex = exercises.find((e) => e.exerciseId === exerciseId);
     const set = ex?.sets.find((s) => s.setNumber === setNumber);
@@ -390,17 +414,40 @@ export default function FreeWorkoutClient({
     const set = ex?.sets.find((s) => s.setNumber === setNumber);
     if (!ex || !set) return;
 
+    // Apply ghost values when fields are empty (mirrors handleAutofill from SetRow):
+    // tapping Log with placeholders showing should log those values.
+    let effectiveReps = set.reps;
+    let effectiveWeight = set.weight;
+    for (let n = setNumber - 1; n >= 1; n--) {
+      const prev = ex.sets.find((s) => s.setNumber === n);
+      if (prev?.isCompleted) {
+        if (effectiveReps == null && prev.reps != null) effectiveReps = prev.reps;
+        if (!effectiveWeight && prev.weight) effectiveWeight = prev.weight;
+        break;
+      }
+    }
+    const ghostApplied = effectiveReps !== set.reps || effectiveWeight !== set.weight;
+
     setExercises((prev) =>
       prev.map((e) =>
         e.exerciseId !== exerciseId
           ? e
-          : { ...e, sets: e.sets.map((s) => (s.setNumber !== setNumber ? s : { ...s, saving: true })) }
+          : {
+              ...e,
+              sets: e.sets.map((s) =>
+                s.setNumber !== setNumber
+                  ? s
+                  : ghostApplied
+                    ? { ...s, saving: true, reps: effectiveReps, weight: effectiveWeight }
+                    : { ...s, saving: true }
+              ),
+            }
       )
     );
 
     persistFreeSet(sessionId, exerciseId, setNumber, {
-      repsCompleted: set.reps,
-      weightUsed: set.weight,
+      repsCompleted: effectiveReps,
+      weightUsed: effectiveWeight,
     });
 
     const logSetPayload = {
@@ -408,8 +455,8 @@ export default function FreeWorkoutClient({
       templateExerciseId: null as string | null,
       exerciseIdOverride: exerciseId,
       setNumber,
-      repsCompleted: set.reps,
-      weightUsed: set.weight,
+      repsCompleted: effectiveReps,
+      weightUsed: effectiveWeight,
       weightUnit: preferredUnit,
       rpe: null,
     };
@@ -560,7 +607,7 @@ export default function FreeWorkoutClient({
 
               {/* Set rows */}
               <div className="flex flex-col gap-1">
-                <div className="grid grid-cols-[2rem_1fr_1fr_3rem] gap-2 text-[10px] font-semibold uppercase tracking-wide text-primary/40 px-1">
+                <div className="grid grid-cols-[2rem_1fr_1fr_auto] gap-2 text-[10px] font-semibold uppercase tracking-wide text-primary/40 px-1">
                   <span>Set</span>
                   <span>Reps</span>
                   <span>{preferredUnit}</span>
@@ -584,7 +631,7 @@ export default function FreeWorkoutClient({
                   return (
                     <div
                       key={set.setNumber}
-                      className={`grid grid-cols-[2rem_1fr_1fr_3rem] gap-2 items-center px-1 py-1.5 rounded-lg ${
+                      className={`grid grid-cols-[2rem_1fr_1fr_auto] gap-2 items-center px-1 py-1.5 rounded-lg ${
                         set.isCompleted ? "bg-green-50" : ""
                       }`}
                     >
@@ -628,16 +675,26 @@ export default function FreeWorkoutClient({
                           <button
                             onClick={() => cancelEdit(ex.exerciseId, set.setNumber)}
                             disabled={set.saving}
-                            className="text-primary/40 hover:text-primary/60 text-xs disabled:opacity-50"
+                            className="text-primary/40 hover:text-primary/60 text-xs disabled:opacity-50 px-1"
                             aria-label="Cancel edit"
                           >
                             ✕
+                          </button>
+                          <button
+                            onClick={() => removeSet(ex.exerciseId, set.setNumber)}
+                            disabled={set.saving}
+                            className="flex h-7 w-7 items-center justify-center text-red-400 hover:text-red-600 disabled:opacity-50"
+                            aria-label="Remove set"
+                          >
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
                           </button>
                         </div>
                       ) : set.isCompleted ? (
                         <button
                           onClick={() => enterEditMode(ex.exerciseId, set.setNumber)}
-                          className="flex h-9 items-center justify-center rounded-lg bg-primary text-white text-xs font-semibold hover:opacity-90 transition-opacity"
+                          className="flex h-9 items-center justify-center rounded-lg bg-primary text-white text-xs font-semibold hover:opacity-90 transition-opacity px-3"
                           aria-label="Edit set"
                         >
                           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -645,13 +702,25 @@ export default function FreeWorkoutClient({
                           </svg>
                         </button>
                       ) : (
-                        <button
-                          onClick={() => completeSet(ex.exerciseId, set.setNumber)}
-                          disabled={set.saving}
-                          className="flex h-9 items-center justify-center rounded-lg bg-primary text-white text-xs font-semibold disabled:opacity-50"
-                        >
-                          {set.saving ? "..." : "Log"}
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => removeSet(ex.exerciseId, set.setNumber)}
+                            disabled={set.saving}
+                            className="flex h-9 w-7 items-center justify-center text-primary/30 hover:text-red-500 disabled:opacity-50"
+                            aria-label="Remove set"
+                          >
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => completeSet(ex.exerciseId, set.setNumber)}
+                            disabled={set.saving}
+                            className="flex h-9 items-center justify-center rounded-lg bg-primary text-white text-xs font-semibold disabled:opacity-50 px-3"
+                          >
+                            {set.saving ? "..." : "Log"}
+                          </button>
+                        </div>
                       )}
                     </div>
                   );
