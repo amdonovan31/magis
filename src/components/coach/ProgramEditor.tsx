@@ -609,8 +609,8 @@ export default function ProgramEditor({
                 </div>
               </div>
 
-              {/* Scheduled date (edit mode only, published programs) */}
-              {inEditMode && swForTemplate && (
+              {/* Scheduled date (editable in edit mode, plain text otherwise) */}
+              {swForTemplate && (inEditMode ? (
                 <div className="mb-3">
                   <Input
                     type="date"
@@ -619,7 +619,11 @@ export default function ProgramEditor({
                     onChange={(e) => handleDateChange(swForTemplate.id, template.id, e.target.value)}
                   />
                 </div>
-              )}
+              ) : (
+                <p className="mb-2 text-xs text-primary/40">
+                  {new Date(swForTemplate.scheduled_date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                </p>
+              ))}
 
               {/* Cardio prescription (cardio days) */}
               {(template as unknown as { type?: string }).type === "cardio" ? (() => {
