@@ -319,6 +319,24 @@ export async function signOut() {
   redirect("/login");
 }
 
+export async function setUserTimezone(tz: string): Promise<{ error?: string }> {
+  if (!tz || typeof tz !== "string" || tz.length > 64) {
+    return { error: "Invalid timezone" };
+  }
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ timezone: tz })
+    .eq("id", user.id)
+    .is("timezone", null);
+
+  if (error) return { error: error.message };
+  return {};
+}
+
 export async function inviteClient(formData: FormData) {
   const email = (formData.get("email") as string)?.trim();
 

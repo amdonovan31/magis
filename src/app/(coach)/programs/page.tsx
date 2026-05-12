@@ -1,18 +1,33 @@
 import { getCoachPrograms } from "@/lib/queries/program.queries";
+import { createClient } from "@/lib/supabase/server";
 import TopBar from "@/components/layout/TopBar";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Link from "next/link";
 import type { Program } from "@/types/app.types";
+import { getTodayISO } from "@/lib/utils/date";
+import {
+  formatDateRange,
+  getProgramLifecycle,
+  lifecyclePillLabel,
+} from "@/lib/utils/program-lifecycle";
 
 type ProgramWithClient = Program & {
   client: { id: string; full_name: string | null } | null;
 };
 
 export default async function ProgramsPage() {
-  const rawPrograms = await getCoachPrograms();
+  const supabase = await createClient();
+  const [{ data: { user } }, rawPrograms] = await Promise.all([
+    supabase.auth.getUser(),
+    getCoachPrograms(),
+  ]);
   const programs = rawPrograms as unknown as ProgramWithClient[];
+  const { data: viewerProfile } = user
+    ? await supabase.from("profiles").select("timezone").eq("id", user.id).single()
+    : { data: null };
+  const todayISO = getTodayISO(viewerProfile?.timezone);
 
   return (
     <>
@@ -33,35 +48,40 @@ export default async function ProgramsPage() {
             </Link>
           </div>
         ) : (
-          programs.map((program) => (
-            <Link key={program.id} href={`/programs/${program.id}`}>
-              <Card className="active:scale-[0.98] transition-transform">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-primary truncate">{program.title}</p>
-                    {program.client ? (
-                      <p className="text-sm text-primary/60">{program.client.full_name}</p>
-                    ) : (
-                      <p className="text-sm text-primary/40 italic">Unassigned</p>
-                    )}
+          programs.map((program) => {
+            const lifecycle = getProgramLifecycle(program, todayISO);
+            const lifecycleVariant: "success" | "warning" | "default" =
+              lifecycle === "active" ? "success" : lifecycle === "draft" ? "warning" : "default";
+            return (
+              <Link key={program.id} href={`/programs/${program.id}`}>
+                <Card className="active:scale-[0.98] transition-transform">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-primary truncate">{program.title}</p>
+                      {program.client ? (
+                        <p className="text-sm text-primary/60">{program.client.full_name}</p>
+                      ) : (
+                        <p className="text-sm text-primary/40 italic">Unassigned</p>
+                      )}
+                      {program.status !== "draft" && (
+                        <p className="text-xs text-primary/40 mt-0.5">
+                          {formatDateRange(program.starts_on, program.ends_on)}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <Badge variant={lifecycleVariant}>{lifecyclePillLabel(lifecycle)}</Badge>
+                    </div>
                   </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <Badge variant={program.status === "published" ? "success" : "warning"}>
-                      {program.status === "published" ? "Published" : "Draft"}
-                    </Badge>
-                    {program.is_active && (
-                      <Badge variant="success">Active</Badge>
-                    )}
-                  </div>
-                </div>
-                {program.description && (
-                  <p className="mt-2 text-sm text-primary/60 line-clamp-2">
-                    {program.description}
-                  </p>
-                )}
-              </Card>
-            </Link>
-          ))
+                  {program.description && (
+                    <p className="mt-2 text-sm text-primary/60 line-clamp-2">
+                      {program.description}
+                    </p>
+                  )}
+                </Card>
+              </Link>
+            );
+          })
         )}
       </div>
     </>

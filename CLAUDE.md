@@ -32,12 +32,12 @@ src/
 │   ├── actions/         # Server actions (writes/mutations)
 │   ├── queries/         # Read-only data fetching
 │   ├── supabase/        # Supabase client creation (server.ts, client.ts)
-│   └── utils/           # Utilities (cn.ts, date.ts, logger.ts)
+│   └── utils/           # Utilities (cn.ts, date.ts, logger.ts, program-lifecycle.ts)
 ├── types/
 │   ├── app.types.ts     # App-level composite types, constants, enums
 │   └── database.types.ts # Auto-generated Supabase types (do not edit manually)
 supabase/
-└── migrations/          # Numbered SQL migrations (currently 001–050)
+└── migrations/          # Numbered SQL migrations (currently 001–056)
 Architecture Patterns
 Server vs Client Components
 
@@ -111,18 +111,18 @@ Active/tap feedback: active:scale-[0.98] transition-transform.
 Database Conventions
 Migrations
 
-One migration file per schema change, numbered sequentially: 051_description.sql.
-Current highest migration: 050_fix_apply_program_edits_date_conflict.sql.
-After adding a migration, regenerate types: npx supabase gen types typescript --local > src/types/database.types.ts.
-Never edit database.types.ts manually.
+One migration file per schema change, numbered sequentially: 057_description.sql.
+Current highest migration: 056_programs_ends_on_constraints.sql.
+After adding a migration, regenerate types: npx supabase gen types typescript --local > src/types/database.types.ts (or --linked if no Docker).
+Never edit database.types.ts manually except as a temporary stub when the regen pipeline is unavailable; overwrite with a real regen at the next opportunity.
 
 Key Tables
 
-profiles — user profiles, extends Supabase auth (role, preferred_unit, onboarding_complete)
-programs — coach-created training programs (status: draft → published → archived)
+profiles — user profiles, extends Supabase auth (role, preferred_unit, onboarding_complete, timezone)
+programs — coach-created training programs (status: draft → published → archived; starts_on and ends_on are date-typed and NOT NULL)
 workout_templates — days within a program (title, week_number, day_number, type: strength/cardio)
 workout_template_exercises — exercises within a template (position, sets, reps, weight, rest, notes, alternate_exercise_ids)
-scheduled_workouts — generated on publish, one row per client workout date (status: scheduled/completed/missed/skipped)
+scheduled_workouts — generated on publish, one row per client workout date (status: scheduled/completed/skipped/rescheduled). Mutations to this table fire a trigger that recomputes programs.ends_on from MAX(scheduled_date).
 workout_sessions — active/completed workout instances
 set_logs — individual set records (reps, weight, per session)
 cardio_logs — cardio session records (duration, distance, HR, RPE, per session)
@@ -133,13 +133,22 @@ agent_activity_log — all AI-generated content gets logged here
 
 Row Level Security
 All tables use RLS policies. Queries run as the authenticated user — never bypass RLS unless using createAdminClient() for a specific reason.
-Program Lifecycle
 
-Coach creates program → status: draft, is_active: true
-Coach publishes → status: published, generates scheduled_workouts from templates
-Publishing archives other published programs for the same client
-Editing a published program uses the apply_program_edits RPC for atomic batched changes
-Programs can also be pending_review or archived
+Program Lifecycle (date-based)
+
+Coach creates program → status: draft, is_active: true, starts_on placeholder = today (overwritten at publish).
+Solo users get the same flow but generateSoloProgram (src/lib/actions/ai.actions.ts) auto-publishes immediately so they have a live program on /home.
+Coach publishes via publishProgram (src/lib/actions/program.actions.ts), which is a thin wrapper around the publish_program Postgres RPC. The RPC atomically: archives prior published programs (status='archived', is_active=false), replaces this program's scheduled_workouts (computed in TS by buildScheduledWorkoutRows and passed in as JSONB), then flips status='published'. The trigger sets ends_on inside the same transaction.
+Editing a published program still uses the apply_program_edits RPC for atomic batched changes; date changes there fire the same ends_on trigger.
+The lifecycle status is date-based: use getProgramLifecycle() from src/lib/utils/program-lifecycle.ts (states: not_started | active | ended | draft | archived) instead of hand-rolling status comparisons. The utility also anticipates a future scheduled status (PR 1).
+A program does NOT auto-archive when ends_on passes — it stays status='published' until a new program is published. "Ended" is a display state derived from today > ends_on, not a stored status.
+Programs can also be pending_review or archived (the latter exists; the former is whitelisted but not actively used).
+
+Timezone & "today" computation
+
+profiles.timezone is captured one-shot from Intl.DateTimeFormat().resolvedOptions().timeZone on first authenticated load by src/components/auth/TimezoneCapture.tsx. The capture component is mounted in both client and coach layouts and only writes when timezone is null — never auto-overwrites.
+Compute today's date server-side: const todayISO = getTodayISO(profile.timezone) and pass todayISO down as a prop. Never call getTodayISO inside client components — it would cause a hydration mismatch around midnight in the user's TZ.
+getTodayISO falls back to America/New_York when timezone is null/empty.
 
 Workout Types
 
@@ -156,6 +165,8 @@ programs.is_active can be true on multiple programs (including stale drafts). Wh
 Date calculations: always construct dates with "T00:00:00" suffix to avoid timezone-induced off-by-one errors (e.g., new Date(dateStr + "T00:00:00")).
 The alternate_exercise_ids field on workout_template_exercises is a JSONB array of UUIDs. It needs post-fetch resolution via getExercisesByIds() to get full exercise objects.
 Week count for programs: use distinct week_number values from workout_templates, not date arithmetic on scheduled_workouts.
+"Missed" workouts are not a stored status — they're computed at display time from scheduled_date < todayISO && status !== 'completed'. The scheduled_workouts CHECK only allows scheduled / completed / skipped / rescheduled.
+RPCs that gate on auth.uid() (publish_program, apply_program_edits) cannot be tested with raw psql — auth.uid() returns NULL outside an authenticated session. Test through the app UI or set up a test JWT.
 
 Development
 bashnpm run dev     # Start dev server

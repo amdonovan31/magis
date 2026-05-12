@@ -4,6 +4,7 @@ import ClientCard from "@/components/coach/ClientCard";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
 import TopBar from "@/components/layout/TopBar";
+import { getTodayISO } from "@/lib/utils/date";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ export default async function DashboardPage() {
   if (!data) redirect("/login");
 
   const { coach, clients } = data;
+  const todayISO = getTodayISO(coach.timezone);
 
   return (
     <>
@@ -57,7 +59,7 @@ export default async function DashboardPage() {
           </div>
         ) : (
           clients.map((client) => (
-            <ClientCard key={client.profile.id} client={client} />
+            <ClientCard key={client.profile.id} client={client} todayISO={todayISO} />
           ))
         )}
       </div>

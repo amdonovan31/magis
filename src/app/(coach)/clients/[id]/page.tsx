@@ -4,7 +4,13 @@ import TopBar from "@/components/layout/TopBar";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Link from "next/link";
-import { formatRelativeTime } from "@/lib/utils/date";
+import { formatRelativeTime, getTodayISO } from "@/lib/utils/date";
+import {
+  daysRemaining,
+  formatDateRange,
+  formatShort,
+  getProgramLifecycle,
+} from "@/lib/utils/program-lifecycle";
 import ClientNotes from "@/components/notes/ClientNotes";
 import { getClientNotes } from "@/lib/queries/notes.queries";
 import { recordClientView } from "@/lib/actions/notes.actions";
@@ -89,14 +95,18 @@ export default async function ClientDetailPage({
   const activeProgram =
     programs?.find((p) => p.is_active && p.status === "published") ??
     programs?.find((p) => p.is_active);
-  let programWeekInfo: { currentWeek: number; totalWeeks: number; completedSessions: number; totalSessions: number } | null = null;
+
+  const todayISO = getTodayISO(profile.timezone);
+
+  let programInfo: {
+    lifecycle: ReturnType<typeof getProgramLifecycle>;
+    daysLeft: number;
+    completedSessions: number;
+    totalSessions: number;
+  } | null = null;
 
   if (activeProgram) {
-    const [{ data: templateWeeks }, { count: totalScheduled }, { count: completedScheduled }] = await Promise.all([
-      supabase
-        .from("workout_templates")
-        .select("week_number")
-        .eq("program_id", activeProgram.id),
+    const [{ count: totalScheduled }, { count: completedScheduled }] = await Promise.all([
       supabase
         .from("scheduled_workouts")
         .select("*", { count: "exact", head: true })
@@ -110,20 +120,9 @@ export default async function ClientDetailPage({
         .eq("status", "completed"),
     ]);
 
-    const distinctWeeks = new Set((templateWeeks ?? []).map((t) => t.week_number ?? 1));
-    const totalWeeks = distinctWeeks.size || 1;
-
-    let currentWeek = 1;
-    if (activeProgram.starts_on) {
-      const startDate = new Date(activeProgram.starts_on + "T00:00:00");
-      const now = new Date();
-      const daysDiff = Math.floor((now.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000));
-      currentWeek = Math.max(1, Math.min(totalWeeks, Math.floor(daysDiff / 7) + 1));
-    }
-
-    programWeekInfo = {
-      currentWeek,
-      totalWeeks,
+    programInfo = {
+      lifecycle: getProgramLifecycle(activeProgram, todayISO),
+      daysLeft: daysRemaining(activeProgram.ends_on, todayISO),
       completedSessions: completedScheduled ?? 0,
       totalSessions: totalScheduled ?? 0,
     };
@@ -148,10 +147,13 @@ export default async function ClientDetailPage({
     }));
 
   const completedDates = new Set(calendarSessions.map((s) => s.date));
+  // Past-dated scheduled workouts that weren't completed read as "missed" at
+  // display time (no DB status, pure rule).
   const missedScheduled = scheduledWorkouts
     .filter(
       (sw) =>
-        (sw.status === "missed" || sw.status === "skipped") &&
+        sw.scheduled_date < todayISO &&
+        sw.status !== "completed" &&
         !completedDates.has(sw.scheduled_date)
     )
     .map((sw) => ({
@@ -198,7 +200,8 @@ export default async function ClientDetailPage({
   scheduledWorkouts
     .filter(
       (sw) =>
-        (sw.status === "missed" || sw.status === "skipped") &&
+        sw.scheduled_date < todayISO &&
+        sw.status !== "completed" &&
         sw.scheduled_date < calendarEnd
     )
     .forEach((sw) => {
@@ -249,7 +252,7 @@ export default async function ClientDetailPage({
         </Card>
 
         {/* 1b. Active Program */}
-        {activeProgram && programWeekInfo ? (
+        {activeProgram && programInfo ? (
           <Link href={`/programs/${activeProgram.id}/edit`}>
             <Card className="active:scale-[0.98] transition-transform border border-accent/20">
               <div className="flex items-center justify-between">
@@ -261,15 +264,20 @@ export default async function ClientDetailPage({
                     {activeProgram.title}
                   </p>
                   <p className="text-xs text-primary/50 mt-0.5">
-                    Week {programWeekInfo.currentWeek} of {programWeekInfo.totalWeeks}
-                    {" \u00B7 "}
-                    {programWeekInfo.completedSessions}/{programWeekInfo.totalSessions} sessions
+                    {programInfo.lifecycle === "ended"
+                      ? `Ended ${formatShort(activeProgram.ends_on)}`
+                      : programInfo.lifecycle === "not_started"
+                      ? `Starts ${formatShort(activeProgram.starts_on)} \u00B7 ${formatDateRange(activeProgram.starts_on, activeProgram.ends_on)}`
+                      : `${formatDateRange(activeProgram.starts_on, activeProgram.ends_on)} \u00B7 ${programInfo.daysLeft} day${programInfo.daysLeft === 1 ? "" : "s"} remaining`}
+                  </p>
+                  <p className="text-[11px] text-primary/40 mt-0.5">
+                    {programInfo.completedSessions}/{programInfo.totalSessions} sessions logged
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1.5 shrink-0 ml-3">
                   <span className="text-sm font-semibold text-accent">
-                    {programWeekInfo.totalSessions > 0
-                      ? Math.round((programWeekInfo.completedSessions / programWeekInfo.totalSessions) * 100)
+                    {programInfo.totalSessions > 0
+                      ? Math.round((programInfo.completedSessions / programInfo.totalSessions) * 100)
                       : 0}%
                   </span>
                   <span className="text-primary/30 text-lg">&rsaquo;</span>
@@ -279,8 +287,8 @@ export default async function ClientDetailPage({
                 <div
                   className="h-full rounded-full bg-accent transition-all"
                   style={{
-                    width: `${programWeekInfo.totalSessions > 0
-                      ? Math.round((programWeekInfo.completedSessions / programWeekInfo.totalSessions) * 100)
+                    width: `${programInfo.totalSessions > 0
+                      ? Math.round((programInfo.completedSessions / programInfo.totalSessions) * 100)
                       : 0}%`,
                   }}
                 />

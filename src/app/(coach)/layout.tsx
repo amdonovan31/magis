@@ -3,6 +3,7 @@ import PageWrapper from "@/components/layout/PageWrapper";
 import RoleSwitcher from "@/components/layout/RoleSwitcher";
 import DisclaimerGate from "@/components/disclaimer/DisclaimerGate";
 import BetaShell from "@/components/error/BetaShell";
+import TimezoneCapture from "@/components/auth/TimezoneCapture";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function CoachLayout({ children }: { children: React.ReactNode }) {
@@ -13,14 +14,16 @@ export default async function CoachLayout({ children }: { children: React.ReactN
 
   let roles: string[] = [];
   let disclaimerAcceptedAt: string | null = null;
+  let needsTimezoneCapture = false;
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("roles, disclaimer_accepted_at")
+      .select("roles, disclaimer_accepted_at, timezone")
       .eq("id", user.id)
       .single();
     roles = profile?.roles ?? [];
     disclaimerAcceptedAt = profile?.disclaimer_accepted_at ?? null;
+    needsTimezoneCapture = !profile?.timezone;
   }
 
   return (
@@ -32,6 +35,7 @@ export default async function CoachLayout({ children }: { children: React.ReactN
         </BetaShell>
       </DisclaimerGate>
       <RoleSwitcher currentRole="coach" availableRoles={roles} />
+      <TimezoneCapture shouldCapture={needsTimezoneCapture} />
     </>
   );
 }

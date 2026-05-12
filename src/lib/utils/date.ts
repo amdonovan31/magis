@@ -2,12 +2,13 @@ const DEFAULT_TZ = "America/New_York";
 
 /**
  * Returns today's date in YYYY-MM-DD format in the given timezone.
- * Defaults to America/New_York so server-side calls (Vercel/UTC) return
- * the correct local date for US East Coast users.
+ * Pass `profile.timezone` from a server component when available; falls back
+ * to America/New_York when null/empty so server-side calls (Vercel/UTC)
+ * still return a sensible local date for US East Coast users.
  */
-export function getTodayISO(tz: string = DEFAULT_TZ): string {
+export function getTodayISO(tz?: string | null): string {
   return new Intl.DateTimeFormat("en-CA", {
-    timeZone: tz,
+    timeZone: tz || DEFAULT_TZ,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -17,9 +18,9 @@ export function getTodayISO(tz: string = DEFAULT_TZ): string {
 /**
  * Returns the current day of week (0=Sun, 1=Mon, ..., 6=Sat) in the given timezone.
  */
-export function getTodayDayOfWeek(tz: string = DEFAULT_TZ): number {
+export function getTodayDayOfWeek(tz?: string | null): number {
   const dayStr = new Intl.DateTimeFormat("en-US", {
-    timeZone: tz,
+    timeZone: tz || DEFAULT_TZ,
     weekday: "short",
   }).format(new Date());
   const map: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };

@@ -2,15 +2,35 @@ import Link from "next/link";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import { formatRelativeTime } from "@/lib/utils/date";
+import {
+  daysRemaining,
+  formatDateRange,
+  formatShort,
+  getProgramLifecycle,
+} from "@/lib/utils/program-lifecycle";
 import type { ClientWithProgram } from "@/types/app.types";
 
 interface ClientCardProps {
   client: ClientWithProgram;
   currentUserId?: string;
+  todayISO: string;
 }
 
-export default function ClientCard({ client, currentUserId }: ClientCardProps) {
+export default function ClientCard({ client, currentUserId, todayISO }: ClientCardProps) {
   const { profile, activeProgram, lastSessionDate, streak, unreadNotes, intakeComplete, intakeRequested } = client;
+
+  const lifecycle = activeProgram ? getProgramLifecycle(activeProgram, todayISO) : null;
+  let programDateLine: string | null = null;
+  if (activeProgram && lifecycle) {
+    if (lifecycle === "ended") {
+      programDateLine = `Ended ${formatShort(activeProgram.ends_on)}`;
+    } else if (lifecycle === "not_started") {
+      programDateLine = `Starts ${formatShort(activeProgram.starts_on)}`;
+    } else if (lifecycle === "active") {
+      const left = daysRemaining(activeProgram.ends_on, todayISO);
+      programDateLine = `${formatDateRange(activeProgram.starts_on, activeProgram.ends_on)} · ${left} day${left === 1 ? "" : "s"} left`;
+    }
+  }
 
   return (
     <Link href={`/clients/${profile.id}`}>
@@ -34,7 +54,12 @@ export default function ClientCard({ client, currentUserId }: ClientCardProps) {
             )}
           </p>
           {activeProgram ? (
-            <p className="text-sm text-primary/60 truncate">{activeProgram.title}</p>
+            <>
+              <p className="text-sm text-primary/60 truncate">{activeProgram.title}</p>
+              {programDateLine && (
+                <p className="text-xs text-primary/40 mt-0.5 truncate">{programDateLine}</p>
+              )}
+            </>
           ) : (
             <p className="text-sm text-primary/40 italic">No active program</p>
           )}

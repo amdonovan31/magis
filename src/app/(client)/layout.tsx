@@ -3,6 +3,7 @@ import PageWrapper from "@/components/layout/PageWrapper";
 import RoleSwitcher from "@/components/layout/RoleSwitcher";
 import DisclaimerGate from "@/components/disclaimer/DisclaimerGate";
 import BetaShell from "@/components/error/BetaShell";
+import TimezoneCapture from "@/components/auth/TimezoneCapture";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function ClientLayout({ children }: { children: React.ReactNode }) {
@@ -14,15 +15,17 @@ export default async function ClientLayout({ children }: { children: React.React
   let roles: string[] = [];
   let currentRole: "client" | "solo" = "client";
   let disclaimerAcceptedAt: string | null = null;
+  let needsTimezoneCapture = false;
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("roles, role, disclaimer_accepted_at")
+      .select("roles, role, disclaimer_accepted_at, timezone")
       .eq("id", user.id)
       .single();
     roles = profile?.roles ?? [];
     if (profile?.role === "solo") currentRole = "solo";
     disclaimerAcceptedAt = profile?.disclaimer_accepted_at ?? null;
+    needsTimezoneCapture = !profile?.timezone;
   }
 
   return (
@@ -34,6 +37,7 @@ export default async function ClientLayout({ children }: { children: React.React
         </BetaShell>
       </DisclaimerGate>
       <RoleSwitcher currentRole={currentRole} availableRoles={roles} />
+      <TimezoneCapture shouldCapture={needsTimezoneCapture} />
     </>
   );
 }

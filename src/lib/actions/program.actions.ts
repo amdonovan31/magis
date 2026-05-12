@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/utils/logger";
+import { getTodayISO } from "@/lib/utils/date";
 import type { ProgramBuilderState } from "@/types/app.types";
+import type { Json } from "@/types/database.types";
 
 /**
  * Creates a full program with all workout templates and exercises.
@@ -22,7 +24,10 @@ export async function createProgram(state: ProgramBuilderState) {
 
   const { details, weeks } = state;
 
-  // 1. Insert program
+  // 1. Insert program. starts_on/ends_on are required by the schema; use today
+  //    as a placeholder for drafts. publish_program overwrites starts_on, and
+  //    the scheduled_workouts trigger overwrites ends_on once workouts exist.
+  const startsOn = details.startsOn || getTodayISO();
   const { data: program, error: programError } = await supabase
     .from("programs")
     .insert({
@@ -30,7 +35,8 @@ export async function createProgram(state: ProgramBuilderState) {
       client_id: details.clientId || null,
       title: details.title,
       description: details.description || null,
-      starts_on: details.startsOn || null,
+      starts_on: startsOn,
+      ends_on: startsOn,
       is_active: true,
     })
     .select("id")
@@ -325,82 +331,58 @@ export async function publishProgram(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Unauthorized" };
 
-  // Get the program to find the client
+  const built = await buildScheduledWorkoutRows(programId, startsOn);
+  if ("error" in built) return { error: built.error };
+
+  const { data, error } = await supabase.rpc("publish_program", {
+    p_program_id: programId,
+    p_starts_on: startsOn,
+    p_scheduled_workouts: built.rows as unknown as Json,
+  });
+
+  if (error) {
+    logger.error("publish_program RPC failed", { error });
+    return { error: error.message };
+  }
+
+  revalidatePath("/programs");
+  revalidatePath("/calendar");
+
+  const archivedProgramName =
+    (data as { archived_program_title?: string | null } | null)?.archived_program_title ?? undefined;
+
+  return { archivedProgramName };
+}
+
+interface ScheduledWorkoutRow {
+  client_id: string;
+  program_id: string;
+  workout_template_id: string;
+  scheduled_date: string;
+  status: "scheduled";
+}
+
+/**
+ * Read a program's workout_templates and compute the scheduled_workouts rows
+ * for a given starts_on date. Pure with respect to the DB — no writes.
+ * Caller (publish_program RPC) handles the atomic delete+insert.
+ */
+export async function buildScheduledWorkoutRows(
+  programId: string,
+  startsOn: string,
+): Promise<{ error: string } | { rows: ScheduledWorkoutRow[] }> {
+  const supabase = await createClient();
+
   const { data: program } = await supabase
     .from("programs")
     .select("client_id")
     .eq("id", programId)
-    .eq("coach_id", user.id)
     .single();
 
-  if (!program) return { error: "Program not found" };
-
-  // Archive any other published programs for the same client
-  let archivedProgramName: string | undefined;
-  if (program.client_id) {
-    const { data: previousPublished } = await supabase
-      .from("programs")
-      .select("id, title")
-      .eq("client_id", program.client_id)
-      .eq("status", "published")
-      .neq("id", programId);
-
-    if (previousPublished && previousPublished.length > 0) {
-      archivedProgramName = previousPublished[0].title;
-      await supabase
-        .from("programs")
-        .update({ status: "archived" })
-        .eq("client_id", program.client_id)
-        .eq("status", "published")
-        .neq("id", programId);
-    }
-
-    // Deactivate stale drafts for the same client
-    await supabase
-      .from("programs")
-      .update({ is_active: false })
-      .eq("client_id", program.client_id)
-      .eq("status", "draft")
-      .neq("id", programId);
+  if (!program || !program.client_id) {
+    return { error: "Program missing client" };
   }
 
-  const { error } = await supabase
-    .from("programs")
-    .update({ status: "published", starts_on: startsOn })
-    .eq("id", programId)
-    .eq("coach_id", user.id);
-
-  if (error) return { error: error.message };
-
-  // Generate scheduled_workouts rows from templates
-  await generateScheduledWorkouts(programId);
-
-  revalidatePath("/programs");
-  revalidatePath("/calendar");
-  return { archivedProgramName };
-}
-
-/**
- * Generate scheduled_workouts rows from a program's workout templates.
- * Idempotent — deletes existing rows for this program before inserting.
- */
-export async function generateScheduledWorkouts(
-  programId: string
-): Promise<{ error?: string; count?: number }> {
-  const supabase = await createClient();
-
-  // Fetch the program
-  const { data: program } = await supabase
-    .from("programs")
-    .select("client_id, starts_on")
-    .eq("id", programId)
-    .single();
-
-  if (!program || !program.client_id || !program.starts_on) {
-    return { error: "Program missing client or start date" };
-  }
-
-  // Fetch all workout templates
   const { data: templates } = await supabase
     .from("workout_templates")
     .select("id, week_number, scheduled_days")
@@ -412,22 +394,23 @@ export async function generateScheduledWorkouts(
     return { error: "No workout templates found" };
   }
 
-  const startsOn = new Date(program.starts_on + "T00:00:00");
+  const start = new Date(startsOn + "T00:00:00");
+  const clientId = program.client_id;
 
-  const rows = templates.flatMap((t) => {
+  const rows: ScheduledWorkoutRow[] = templates.flatMap((t) => {
     const days = (t.scheduled_days as number[] | null) ?? [];
     return days.map((scheduledDay) => {
       // starts_on is Monday (day 1). Compute offset from Monday.
       // 0=Sun→6, 1=Mon→0, 2=Tue→1, ..., 6=Sat→5
       const offset = scheduledDay === 0 ? 6 : scheduledDay - 1;
       const weekOffset = ((t.week_number ?? 1) - 1) * 7;
-      const date = new Date(startsOn);
-      date.setDate(startsOn.getDate() + weekOffset + offset);
+      const date = new Date(start);
+      date.setDate(start.getDate() + weekOffset + offset);
 
       const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 
       return {
-        client_id: program.client_id!,
+        client_id: clientId,
         program_id: programId,
         workout_template_id: t.id,
         scheduled_date: dateStr,
@@ -436,22 +419,7 @@ export async function generateScheduledWorkouts(
     });
   });
 
-  // Delete existing rows for idempotency
-  await supabase
-    .from("scheduled_workouts")
-    .delete()
-    .eq("program_id", programId);
-
-  const { error } = await supabase
-    .from("scheduled_workouts")
-    .insert(rows);
-
-  if (error) {
-    logger.error("Failed to generate scheduled workouts", { error });
-    return { error: error.message };
-  }
-
-  return { count: rows.length };
+  return { rows };
 }
 
 export async function unpublishProgram(

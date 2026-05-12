@@ -9,7 +9,12 @@ import WeightCheckInCard from "@/components/measurements/WeightCheckInCard";
 import StreakCard from "@/components/streaks/StreakCard";
 import Card from "@/components/ui/Card";
 import TopBar from "@/components/layout/TopBar";
-import { formatDate } from "@/lib/utils/date";
+import { formatDate, getTodayISO } from "@/lib/utils/date";
+import {
+  daysRemaining,
+  getProgramLifecycle,
+  type ProgramLifecycle,
+} from "@/lib/utils/program-lifecycle";
 import type { Profile } from "@/types/app.types";
 
 export default async function ClientHomePage() {
@@ -20,10 +25,18 @@ export default async function ClientHomePage() {
 
   if (!user) redirect("/login");
 
-  const [{ data: rawProfile }, { count: intakeCount }, todayWorkout, streakData, { count: programCount }, todayWeight, { data: activeFreeSession }] = await Promise.all([
+  const [
+    { data: rawProfile },
+    { count: intakeCount },
+    todayWorkout,
+    streakData,
+    { data: activeProgram },
+    todayWeight,
+    { data: activeFreeSession },
+  ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("full_name, intake_requested")
+      .select("full_name, intake_requested, timezone")
       .eq("id", user.id)
       .single(),
     supabase
@@ -34,10 +47,11 @@ export default async function ClientHomePage() {
     getStreakData(),
     supabase
       .from("programs")
-      .select("id", { count: "exact", head: true })
+      .select("id, status, starts_on, ends_on")
       .eq("client_id", user.id)
       .eq("is_active", true)
-      .eq("status", "published"),
+      .eq("status", "published")
+      .maybeSingle(),
     getTodayWeight(),
     supabase
       .from("workout_sessions")
@@ -48,8 +62,27 @@ export default async function ClientHomePage() {
       .maybeSingle(),
   ]);
 
-  const profile = rawProfile as Pick<Profile, "full_name" | "intake_requested"> | null;
+  const profile = rawProfile as Pick<Profile, "full_name" | "intake_requested" | "timezone"> | null;
   const showIntakeBanner = profile?.intake_requested && (intakeCount ?? 0) === 0;
+  const todayISO = getTodayISO(profile?.timezone);
+
+  let programLifecycle: ProgramLifecycle | null = null;
+  let endsOn: string | null = null;
+  let daysLeft = 0;
+  let allCompleted = false;
+  if (activeProgram) {
+    programLifecycle = getProgramLifecycle(activeProgram, todayISO);
+    endsOn = activeProgram.ends_on;
+    daysLeft = daysRemaining(activeProgram.ends_on, todayISO);
+
+    const { count: notCompletedCount } = await supabase
+      .from("scheduled_workouts")
+      .select("*", { count: "exact", head: true })
+      .eq("program_id", activeProgram.id)
+      .eq("client_id", user.id)
+      .neq("status", "completed");
+    allCompleted = (notCompletedCount ?? 0) === 0;
+  }
 
   const canResumeWorkout = todayWorkout?.completedAt
     ? Date.now() - new Date(todayWorkout.completedAt).getTime() < 30 * 60 * 1000
@@ -86,7 +119,16 @@ export default async function ClientHomePage() {
       <WeightCheckInCard todayEntry={todayWeight.entry} preferredUnit={todayWeight.preferredUnit} />
 
       {/* Today's workout card */}
-      <TodayWorkoutCard todayWorkout={todayWorkout} hasProgram={(programCount ?? 0) > 0} activeFreeSessionId={activeFreeSession?.id ?? null} canResume={canResumeWorkout} />
+      <TodayWorkoutCard
+        todayWorkout={todayWorkout}
+        hasProgram={!!activeProgram}
+        activeFreeSessionId={activeFreeSession?.id ?? null}
+        canResume={canResumeWorkout}
+        programLifecycle={programLifecycle}
+        endsOn={endsOn}
+        daysLeft={daysLeft}
+        allCompleted={allCompleted}
+      />
 
       {/* Streak card */}
       <StreakCard streakData={streakData} />

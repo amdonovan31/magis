@@ -1079,6 +1079,7 @@ export type Database = {
           preferred_unit: string
           role: string
           roles: string[]
+          timezone: string | null
           training_age_years: number | null
           updated_at: string
           weight_kg: number | null
@@ -1098,6 +1099,7 @@ export type Database = {
           preferred_unit?: string
           role: string
           roles?: string[]
+          timezone?: string | null
           training_age_years?: number | null
           updated_at?: string
           weight_kg?: number | null
@@ -1117,6 +1119,7 @@ export type Database = {
           preferred_unit?: string
           role?: string
           roles?: string[]
+          timezone?: string | null
           training_age_years?: number | null
           updated_at?: string
           weight_kg?: number | null
@@ -1129,10 +1132,11 @@ export type Database = {
           coach_id: string
           created_at: string
           description: string | null
+          ends_on: string
           id: string
           is_active: boolean
           pending_json: Json | null
-          starts_on: string | null
+          starts_on: string
           status: string
           title: string
         }
@@ -1141,10 +1145,11 @@ export type Database = {
           coach_id: string
           created_at?: string
           description?: string | null
+          ends_on?: string
           id?: string
           is_active?: boolean
           pending_json?: Json | null
-          starts_on?: string | null
+          starts_on: string
           status?: string
           title: string
         }
@@ -1153,10 +1158,11 @@ export type Database = {
           coach_id?: string
           created_at?: string
           description?: string | null
+          ends_on?: string
           id?: string
           is_active?: boolean
           pending_json?: Json | null
-          starts_on?: string | null
+          starts_on?: string
           status?: string
           title?: string
         }
@@ -1772,6 +1778,18 @@ export type Database = {
       }
       ensure_coach_code: { Args: { target_id: string }; Returns: string }
       get_my_role: { Args: never; Returns: string }
+      publish_program: {
+        Args: {
+          p_program_id: string
+          p_scheduled_workouts: Json
+          p_starts_on: string
+        }
+        Returns: Json
+      }
+      recompute_program_ends_on: {
+        Args: { p_program_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

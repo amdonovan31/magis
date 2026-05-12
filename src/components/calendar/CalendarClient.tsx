@@ -15,6 +15,13 @@ interface CalendarClientProps {
   workouts: ScheduledWorkoutWithDetails[];
   weekStart: string;
   programOverview: ProgramOverview;
+  todayISO: string;
+}
+
+// Past-dated, not-completed scheduled workouts read as "missed" at display
+// time. No DB column — pure rendering rule.
+function isMissedAtDisplay(scheduledDate: string, status: string, todayISO: string): boolean {
+  return scheduledDate < todayISO && status !== "completed";
 }
 
 function toLocalDateString(d: Date): string {
@@ -41,8 +48,8 @@ function formatWeekRange(weekStart: string): string {
   return `${monStr} – ${sunStr}`;
 }
 
-export default function CalendarClient({ workouts: initialWorkouts, weekStart: initialWeekStart, programOverview }: CalendarClientProps) {
-  const todayStr = toLocalDateString(new Date());
+export default function CalendarClient({ workouts: initialWorkouts, weekStart: initialWeekStart, programOverview, todayISO }: CalendarClientProps) {
+  const todayStr = todayISO;
   const [currentWeekStart, setCurrentWeekStart] = useState(initialWeekStart);
   const [workouts, setWorkouts] = useState(initialWorkouts);
   const [selectedDate, setSelectedDate] = useState(todayStr);
@@ -120,7 +127,7 @@ export default function CalendarClient({ workouts: initialWorkouts, weekStart: i
       </div>
 
       {activeTab === "program" && (
-        <ProgramOverviewView overview={programOverview} />
+        <ProgramOverviewView overview={programOverview} todayISO={todayISO} />
       )}
 
       {activeTab === "calendar" && <>
@@ -219,7 +226,7 @@ export default function CalendarClient({ workouts: initialWorkouts, weekStart: i
         ) : (
           <div className="flex flex-col gap-3">
             {dayWorkouts.map((w) => (
-              <WorkoutCard key={w.id} workout={w} />
+              <WorkoutCard key={w.id} workout={w} todayISO={todayISO} />
             ))}
           </div>
         )}
@@ -229,7 +236,7 @@ export default function CalendarClient({ workouts: initialWorkouts, weekStart: i
   );
 }
 
-function ProgramOverviewView({ overview }: { overview: ProgramOverview }) {
+function ProgramOverviewView({ overview, todayISO }: { overview: ProgramOverview; todayISO: string }) {
   const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(() => {
     if (!overview) return new Set();
     return new Set([overview.currentWeek]);
@@ -297,7 +304,7 @@ function ProgramOverviewView({ overview }: { overview: ProgramOverview }) {
                 <div className="flex flex-col gap-3 pb-4">
                   {weekWorkouts.map((workout) => {
                     const isCompleted = workout.status === "completed" && workout.session_id;
-                    const isMissed = workout.status === "missed";
+                    const isMissed = isMissedAtDisplay(workout.scheduled_date, workout.status, todayISO);
                     const isSkipped = workout.status === "skipped";
                     const href = isCompleted
                       ? `/workout/${workout.session_id}/summary`
@@ -316,16 +323,19 @@ function ProgramOverviewView({ overview }: { overview: ProgramOverview }) {
                         )}>
                           <div className="flex items-center justify-between mb-2">
                             <div>
-                              <h3 className="text-sm font-semibold text-primary">{workout.template.title}</h3>
+                              <h3 className={cn(
+                                "text-sm font-semibold text-primary",
+                                isMissed && "line-through text-primary/40"
+                              )}>{workout.template.title}</h3>
                               <p className="text-xs text-muted">{dateLabel}</p>
                             </div>
                             {isCompleted && <Badge variant="success">Completed</Badge>}
                             {isMissed && (
-                              <span className="rounded-full bg-red-500/10 px-2.5 py-0.5 text-xs font-medium text-red-400">
+                              <span className="rounded-full bg-primary/5 px-2.5 py-0.5 text-xs font-medium text-primary/40">
                                 Missed
                               </span>
                             )}
-                            {isSkipped && (
+                            {!isMissed && isSkipped && (
                               <span className="rounded-full bg-primary/5 px-2.5 py-0.5 text-xs font-medium text-primary/40">
                                 Skipped
                               </span>
@@ -362,7 +372,7 @@ function ProgramOverviewView({ overview }: { overview: ProgramOverview }) {
   );
 }
 
-function WorkoutCard({ workout }: { workout: ScheduledWorkoutWithDetails }) {
+function WorkoutCard({ workout, todayISO }: { workout: ScheduledWorkoutWithDetails; todayISO: string }) {
   const muscleGroups = Array.from(
     new Set(
       workout.template.exercises
@@ -372,17 +382,25 @@ function WorkoutCard({ workout }: { workout: ScheduledWorkoutWithDetails }) {
   );
 
   const isCompleted = workout.status === "completed" && workout.session_id;
+  const isMissed = isMissedAtDisplay(workout.scheduled_date, workout.status, todayISO);
 
   return (
     <Link href={isCompleted ? `/workout/${workout.session_id}/summary` : `/calendar/${workout.id}`}>
-      <Card className="active:scale-[0.98] transition-transform">
+      <Card className={cn("active:scale-[0.98] transition-transform", isMissed && "opacity-50")}>
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <h3 className="font-heading text-base font-semibold text-primary">
+            <h3 className={cn(
+              "font-heading text-base font-semibold text-primary",
+              isMissed && "line-through text-primary/40"
+            )}>
               {workout.template.title}
             </h3>
             {isCompleted ? (
               <Badge variant="success">Completed</Badge>
+            ) : isMissed ? (
+              <span className="inline-flex items-center rounded-full bg-primary/5 px-2.5 py-0.5 text-xs font-medium text-primary/40">
+                Missed
+              </span>
             ) : workout.status === "skipped" ? (
               <span className="inline-flex items-center rounded-full bg-primary/5 px-2.5 py-0.5 text-xs font-medium text-primary/40">
                 Skipped

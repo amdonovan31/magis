@@ -8,9 +8,9 @@ import CalendarClient from "@/components/calendar/CalendarClient";
  * Returns the Monday and Sunday bounding the current week,
  * using the timezone-aware date utilities.
  */
-function getCurrentWeekRange(): { start: string; end: string } {
-  const today = getTodayISO();
-  const dow = getTodayDayOfWeek(); // 0=Sun
+function getCurrentWeekRange(tz?: string | null): { start: string; end: string } {
+  const today = getTodayISO(tz);
+  const dow = getTodayDayOfWeek(tz); // 0=Sun
   const diffToMon = dow === 0 ? -6 : 1 - dow;
 
   const todayDate = new Date(today + "T12:00:00"); // noon avoids DST edge
@@ -33,7 +33,14 @@ export default async function CalendarPage() {
 
   if (!user) redirect("/login");
 
-  const { start, end } = getCurrentWeekRange();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("timezone")
+    .eq("id", user.id)
+    .single();
+
+  const todayISO = getTodayISO(profile?.timezone);
+  const { start, end } = getCurrentWeekRange(profile?.timezone);
   const [workouts, programOverview] = await Promise.all([
     getScheduledWorkouts(start, end),
     getClientProgramOverview(),
@@ -46,7 +53,7 @@ export default async function CalendarPage() {
           My Schedule
         </h1>
       </div>
-      <CalendarClient workouts={workouts} weekStart={start} programOverview={programOverview} />
+      <CalendarClient workouts={workouts} weekStart={start} programOverview={programOverview} todayISO={todayISO} />
     </div>
   );
 }

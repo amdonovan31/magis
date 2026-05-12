@@ -462,7 +462,11 @@ CARDIO PROGRAMMING (only when cardio guidelines are provided):
       thursday: 4, friday: 5, saturday: 6,
     };
 
-    // 1. Insert program row as draft
+    // 1. Insert program row as draft. starts_on/ends_on are placeholders
+    //    (today) and get overwritten when the coach publishes via publish_program
+    //    (starts_on) and when scheduled_workouts are created (ends_on, via trigger).
+    const { getTodayISO } = await import("@/lib/utils/date");
+    const today = getTodayISO();
     const { data: programRow, error: programError } = await supabase
       .from("programs")
       .insert({
@@ -472,6 +476,8 @@ CARDIO PROGRAMMING (only when cardio guidelines are provided):
         description: program.program_description,
         is_active: true,
         status: "draft",
+        starts_on: today,
+        ends_on: today,
       })
       .select("id")
       .single();

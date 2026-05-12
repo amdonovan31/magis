@@ -4,12 +4,14 @@ import ClientCard from "@/components/coach/ClientCard";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
 import TopBar from "@/components/layout/TopBar";
+import { getTodayISO } from "@/lib/utils/date";
 
 export default async function ClientsPage() {
   const data = await getCoachDashboard();
   if (!data) redirect("/login");
 
   const { clients } = data;
+  const todayISO = getTodayISO(data.coach.timezone);
 
   return (
     <>
@@ -31,7 +33,7 @@ export default async function ClientsPage() {
           </div>
         ) : (
           clients.map((client) => (
-            <ClientCard key={client.profile.id} client={client} currentUserId={data.coach.id} />
+            <ClientCard key={client.profile.id} client={client} currentUserId={data.coach.id} todayISO={todayISO} />
           ))
         )}
       </div>

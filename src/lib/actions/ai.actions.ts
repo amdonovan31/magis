@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getAllExerciseNames } from "@/lib/queries/exercise.queries";
 import { revalidatePath } from "next/cache";
 import { logger } from "@/lib/utils/logger";
+import { getTodayISO } from "@/lib/utils/date";
+import { publishProgram } from "@/lib/actions/program.actions";
 import type { IntakeData } from "@/lib/actions/intake.actions";
 
 interface GenerateProgramInput {
@@ -65,7 +67,7 @@ export async function generateSoloProgram(input: GenerateProgramInput): Promise<
     getAllExerciseNames(),
     supabase
       .from("profiles")
-      .select("birthdate, gender, height_cm, weight_kg, training_age_years")
+      .select("birthdate, gender, height_cm, weight_kg, training_age_years, timezone")
       .eq("id", user.id)
       .single(),
   ]);
@@ -215,7 +217,9 @@ Rules:
       exercises.map((e) => [e.name.toLowerCase(), e.id])
     );
 
-    // Insert the program
+    // Insert the program as a draft; publish_program below promotes it.
+    // ends_on placeholder = starts_on; trigger overwrites once scheduled_workouts exist.
+    const today = getTodayISO(profileData?.timezone);
     const { data: programRow, error: programError } = await supabase
       .from("programs")
       .insert({
@@ -224,6 +228,8 @@ Rules:
         title: program.title,
         description: program.description,
         is_active: true,
+        starts_on: today,
+        ends_on: today,
       })
       .select("id")
       .single();
@@ -305,6 +311,13 @@ Rules:
       },
       ai_model: "claude-sonnet-4-6",
     });
+
+    // Publish so the solo user has a live program waiting on /home rather
+    // than the "Program Coming Soon" empty state.
+    const publishRes = await publishProgram(programRow.id, getTodayISO(profileData?.timezone));
+    if (publishRes.error) {
+      logger.error("Solo program publish failed", { error: publishRes.error });
+    }
 
     revalidatePath("/home");
 

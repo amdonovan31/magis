@@ -7,6 +7,12 @@ import Badge from "@/components/ui/Badge";
 import AssignToMeButton from "@/components/coach/AssignToMeButton";
 import ProgramDetailPublishBar from "@/components/coach/ProgramDetailPublishBar";
 import Link from "next/link";
+import { getTodayISO } from "@/lib/utils/date";
+import {
+  formatDateRange,
+  getProgramLifecycle,
+  lifecyclePillLabel,
+} from "@/lib/utils/program-lifecycle";
 
 export default async function ProgramDetailPage({
   params,
@@ -22,6 +28,13 @@ export default async function ProgramDetailPage({
   if (!program) notFound();
 
   const { data: { user } } = await supabase.auth.getUser();
+  const { data: viewerProfile } = user
+    ? await supabase.from("profiles").select("timezone").eq("id", user.id).single()
+    : { data: null };
+  const todayISO = getTodayISO(viewerProfile?.timezone);
+  const lifecycle = getProgramLifecycle(program, todayISO);
+  const lifecycleVariant: "success" | "warning" | "default" =
+    lifecycle === "active" ? "success" : lifecycle === "draft" ? "warning" : "default";
 
   return (
     <>
@@ -38,18 +51,16 @@ export default async function ProgramDetailPage({
           <p className="text-sm text-primary/60">{program.description}</p>
         )}
 
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Badge variant={program.is_active ? "success" : "default"}>
-              {program.is_active ? "Active" : "Inactive"}
-            </Badge>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge variant={lifecycleVariant}>{lifecyclePillLabel(lifecycle)}</Badge>
             <ProgramDetailPublishBar
               programId={program.id}
               initialStatus={program.status}
             />
-            {program.starts_on && (
+            {program.status !== "draft" && (
               <span className="text-xs text-primary/40">
-                Starts {program.starts_on}
+                {formatDateRange(program.starts_on, program.ends_on)}
               </span>
             )}
           </div>
