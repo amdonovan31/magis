@@ -10,6 +10,8 @@ interface GeneratingScreenProps {
   guidelinesId: string;
   regenerationFeedback?: string | null;
   previousProgramJson?: string | null;
+  mode?: "initial" | "progression";
+  coachInstructions?: string | null;
 }
 
 export default function GeneratingScreen({
@@ -18,6 +20,8 @@ export default function GeneratingScreen({
   guidelinesId,
   regenerationFeedback,
   previousProgramJson,
+  mode = "initial",
+  coachInstructions,
 }: GeneratingScreenProps) {
   const router = useRouter();
   const [status, setStatus] = useState<"loading" | "error">("loading");
@@ -33,6 +37,8 @@ export default function GeneratingScreen({
       if (previousProgramJson) {
         try { body.previousProgram = JSON.parse(previousProgramJson); } catch { /* ignore */ }
       }
+      if (mode === "progression") body.mode = "progression";
+      if (coachInstructions) body.coachInstructions = coachInstructions;
 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 4 * 60 * 1000); // 4 min client-side timeout
@@ -73,7 +79,7 @@ export default function GeneratingScreen({
       }
       setStatus("error");
     }
-  }, [clientId, guidelinesId, regenerationFeedback, previousProgramJson, router]);
+  }, [clientId, guidelinesId, regenerationFeedback, previousProgramJson, mode, coachInstructions, router]);
 
   const hasStarted = useRef(false);
   useEffect(() => {

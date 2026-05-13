@@ -94,7 +94,9 @@ export default async function ClientDetailPage({
 
   const activeProgram =
     programs?.find((p) => p.is_active && p.status === "published") ??
-    programs?.find((p) => p.is_active);
+    programs?.find((p) => p.status === "published");
+
+  const scheduledProgram = programs?.find((p) => p.status === "scheduled") ?? null;
 
   const todayISO = getTodayISO(profile.timezone);
 
@@ -310,6 +312,42 @@ export default async function ClientDetailPage({
             </Card>
           </Link>
         )}
+
+        {/* 1c. Scheduled program indicator OR Generate Next CTA */}
+        {scheduledProgram ? (
+          <Link href={`/programs/${scheduledProgram.id}/edit`}>
+            <Card className="active:scale-[0.98] transition-transform border border-accent/30 bg-accent/5">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-accent/70">
+                    Next Program Scheduled
+                  </p>
+                  <p className="font-semibold text-primary mt-0.5 truncate">
+                    {scheduledProgram.title}
+                  </p>
+                  <p className="text-xs text-primary/50 mt-0.5">
+                    Starts {formatShort(scheduledProgram.starts_on)} · {formatDateRange(scheduledProgram.starts_on, scheduledProgram.ends_on)}
+                  </p>
+                </div>
+                <span className="text-primary/30 text-lg">&rsaquo;</span>
+              </div>
+            </Card>
+          </Link>
+        ) : activeProgram?.status === "published" ? (
+          <Link href={`/clients/${id}/generate/next`}>
+            <Card className="active:scale-[0.98] transition-transform border border-accent/40 bg-accent/5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-accent">Generate Next Program</p>
+                  <p className="text-xs text-primary/50 mt-0.5">
+                    Build the follow-up block from prior performance
+                  </p>
+                </div>
+                <span className="text-accent text-lg">+</span>
+              </div>
+            </Card>
+          </Link>
+        ) : null}
 
         {/* 2. PR Highlights (conditional) */}
         {recentPRs.length > 0 && (

@@ -354,6 +354,118 @@ export async function publishProgram(
   return { archivedProgramName };
 }
 
+/**
+ * Schedule a program for a future start date. If startsOn is today (in the
+ * client's TZ) or earlier, immediately publish — keeps same-day swap snappy
+ * instead of forcing the user to wait for the next dashboard load to fire
+ * lazy promotion. Otherwise, set status='scheduled' and let
+ * promote_scheduled_programs flip it to published when the date arrives.
+ */
+export async function scheduleProgram(
+  programId: string,
+  startsOn: string,
+): Promise<{ error?: string; archivedProgramName?: string; scheduled?: boolean }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
+  // Resolve client's timezone for the today comparison.
+  const { data: program } = await supabase
+    .from("programs")
+    .select("client_id")
+    .eq("id", programId)
+    .eq("coach_id", user.id)
+    .single();
+  if (!program) return { error: "Program not found" };
+
+  let clientTz: string | null = null;
+  if (program.client_id) {
+    const { data: clientProfile } = await supabase
+      .from("profiles")
+      .select("timezone")
+      .eq("id", program.client_id)
+      .single();
+    clientTz = clientProfile?.timezone ?? null;
+  }
+  const todayISO = getTodayISO(clientTz);
+  const goLiveNow = startsOn <= todayISO;
+
+  const built = await buildScheduledWorkoutRows(programId, startsOn);
+  if ("error" in built) return { error: built.error };
+
+  const { data, error } = await supabase.rpc("publish_program", {
+    p_program_id: programId,
+    p_starts_on: startsOn,
+    p_scheduled_workouts: built.rows as unknown as Json,
+    p_target_status: goLiveNow ? "published" : "scheduled",
+  });
+
+  if (error) {
+    logger.error("publish_program RPC failed", { error, mode: goLiveNow ? "publish" : "schedule" });
+    return { error: error.message };
+  }
+
+  revalidatePath("/programs");
+  revalidatePath("/calendar");
+  revalidatePath("/dashboard");
+  revalidatePath("/clients");
+
+  const archivedProgramName =
+    (data as { archived_program_title?: string | null } | null)?.archived_program_title ?? undefined;
+
+  return { archivedProgramName, scheduled: !goLiveNow };
+}
+
+/**
+ * Cancel a scheduled program: revert status back to 'draft' and drop its
+ * scheduled_workouts (the trigger resets ends_on to starts_on). Leaves the
+ * program intact so the coach can edit and re-schedule. Surfaces back on the
+ * coach dashboard's "Next Program" badge for the affected client on next read.
+ */
+export async function cancelScheduledProgram(
+  programId: string,
+): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
+  const { data: program } = await supabase
+    .from("programs")
+    .select("status")
+    .eq("id", programId)
+    .eq("coach_id", user.id)
+    .single();
+  if (!program) return { error: "Program not found" };
+  if (program.status !== "scheduled") {
+    return { error: `Cannot cancel a program in '${program.status}' status` };
+  }
+
+  const { error: deleteError } = await supabase
+    .from("scheduled_workouts")
+    .delete()
+    .eq("program_id", programId);
+  if (deleteError) {
+    logger.error("Failed to delete scheduled_workouts on cancel", { error: deleteError });
+    return { error: deleteError.message };
+  }
+
+  const { error: updateError } = await supabase
+    .from("programs")
+    .update({ status: "draft" })
+    .eq("id", programId)
+    .eq("coach_id", user.id);
+  if (updateError) {
+    logger.error("Failed to revert program to draft on cancel", { error: updateError });
+    return { error: updateError.message };
+  }
+
+  revalidatePath("/programs");
+  revalidatePath("/calendar");
+  revalidatePath("/dashboard");
+  revalidatePath("/clients");
+  return {};
+}
+
 interface ScheduledWorkoutRow {
   client_id: string;
   program_id: string;

@@ -1133,6 +1133,7 @@ export type Database = {
           created_at: string
           description: string | null
           ends_on: string
+          generation_instructions: string | null
           id: string
           is_active: boolean
           pending_json: Json | null
@@ -1145,7 +1146,8 @@ export type Database = {
           coach_id: string
           created_at?: string
           description?: string | null
-          ends_on?: string
+          ends_on: string
+          generation_instructions?: string | null
           id?: string
           is_active?: boolean
           pending_json?: Json | null
@@ -1159,6 +1161,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           ends_on?: string
+          generation_instructions?: string | null
           id?: string
           is_active?: boolean
           pending_json?: Json | null
@@ -1778,11 +1781,17 @@ export type Database = {
       }
       ensure_coach_code: { Args: { target_id: string }; Returns: string }
       get_my_role: { Args: never; Returns: string }
+      promote_scheduled_programs: {
+        Args: { p_client_ids?: string[] }
+        Returns: string[]
+      }
       publish_program: {
         Args: {
+          p_generation_instructions?: string
           p_program_id: string
           p_scheduled_workouts: Json
           p_starts_on: string
+          p_target_status?: string
         }
         Returns: Json
       }

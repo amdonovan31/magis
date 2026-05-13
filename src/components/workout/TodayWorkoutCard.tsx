@@ -18,6 +18,8 @@ interface TodayWorkoutCardProps {
   endsOn?: string | null;
   daysLeft?: number;
   allCompleted?: boolean;
+  /** ISO date of the next scheduled program's starts_on, if one is queued. */
+  scheduledProgramStartsOn?: string | null;
 }
 
 function ProgramDateLine({ endsOn, daysLeft }: { endsOn: string; daysLeft: number }) {
@@ -37,18 +39,21 @@ export default function TodayWorkoutCard({
   endsOn = null,
   daysLeft = 0,
   allCompleted = false,
+  scheduledProgramStartsOn = null,
 }: TodayWorkoutCardProps) {
-  // Ended-with-no-next state: show explicitly that the program is over.
-  // PR 1 will layer "Next program starts MM/DD" copy on top.
+  // Ended-with-no-next vs ended-with-next-queued: PR 1 layers the "Next program
+  // starts MM/DD" copy on top of PR 0's bare ended state when a scheduled
+  // program exists for this client.
   if (hasProgram && programLifecycle === "ended" && endsOn) {
+    const nextLine = scheduledProgramStartsOn
+      ? `Wrapped up on ${formatShort(endsOn)}. Next program starts ${formatShort(scheduledProgramStartsOn)}.`
+      : `Wrapped up on ${formatShort(endsOn)}. Free workouts until your next program starts.`;
     return (
       <>
         <Card padding="lg" className="text-center">
           <div className="text-4xl mb-3">🏁</div>
           <h2 className="text-lg font-semibold text-primary">Your program ended</h2>
-          <p className="mt-1 text-sm text-primary/60">
-            Wrapped up on {formatShort(endsOn)}. Free workouts until your next program starts.
-          </p>
+          <p className="mt-1 text-sm text-primary/60">{nextLine}</p>
         </Card>
         <FreeWorkoutPicker activeFreeSessionId={activeFreeSessionId} />
       </>

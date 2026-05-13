@@ -7,17 +7,40 @@ import Badge from "@/components/ui/Badge";
 interface Props {
   programId: string;
   initialStatus: string;
+  priorPublishedExists?: boolean;
+  priorEndsOn?: string | null;
 }
 
-export default function ProgramDetailPublishBar({ programId, initialStatus }: Props) {
+function statusBadgeVariant(s: string): "success" | "warning" | "default" {
+  if (s === "published") return "success";
+  if (s === "scheduled") return "warning";
+  return "default";
+}
+function statusBadgeLabel(s: string): string {
+  if (s === "published") return "Published";
+  if (s === "scheduled") return "Scheduled";
+  if (s === "archived") return "Archived";
+  return "Draft";
+}
+
+export default function ProgramDetailPublishBar({
+  programId,
+  initialStatus,
+  priorPublishedExists = false,
+  priorEndsOn = null,
+}: Props) {
   const [status, setStatus] = useState(initialStatus);
 
   return (
     <>
-      <Badge variant={status === "published" ? "success" : "warning"}>
-        {status === "published" ? "Published" : "Draft"}
-      </Badge>
-      <PublishBar programId={programId} status={status} onStatusChange={setStatus} />
+      <Badge variant={statusBadgeVariant(status)}>{statusBadgeLabel(status)}</Badge>
+      <PublishBar
+        programId={programId}
+        status={status}
+        onStatusChange={setStatus}
+        priorPublishedExists={priorPublishedExists}
+        priorEndsOn={priorEndsOn}
+      />
     </>
   );
 }

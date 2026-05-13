@@ -17,7 +17,7 @@ interface ClientCardProps {
 }
 
 export default function ClientCard({ client, currentUserId, todayISO }: ClientCardProps) {
-  const { profile, activeProgram, lastSessionDate, streak, unreadNotes, intakeComplete, intakeRequested } = client;
+  const { profile, activeProgram, scheduledProgram, lastSessionDate, streak, unreadNotes, intakeComplete, intakeRequested } = client;
 
   const lifecycle = activeProgram ? getProgramLifecycle(activeProgram, todayISO) : null;
   let programDateLine: string | null = null;
@@ -31,6 +31,19 @@ export default function ClientCard({ client, currentUserId, todayISO }: ClientCa
       programDateLine = `${formatDateRange(activeProgram.starts_on, activeProgram.ends_on)} · ${left} day${left === 1 ? "" : "s"} left`;
     }
   }
+
+  // Show "Next: starts MM/DD" indicator if a scheduled program is queued.
+  // Otherwise, show the Next Program badge if the active program is within 7
+  // days of ending (or already past). The two are mutually exclusive — once
+  // scheduled, the badge resolves into the indicator.
+  const scheduledLine = scheduledProgram
+    ? `Next: starts ${formatShort(scheduledProgram.starts_on)}`
+    : null;
+  const showNextProgramBadge =
+    !scheduledProgram &&
+    !!activeProgram &&
+    activeProgram.status === "published" &&
+    daysRemaining(activeProgram.ends_on, todayISO) <= 7;
 
   return (
     <Link href={`/clients/${profile.id}`}>
@@ -59,6 +72,9 @@ export default function ClientCard({ client, currentUserId, todayISO }: ClientCa
               {programDateLine && (
                 <p className="text-xs text-primary/40 mt-0.5 truncate">{programDateLine}</p>
               )}
+              {scheduledLine && (
+                <p className="text-xs text-accent mt-0.5 truncate">{scheduledLine}</p>
+              )}
             </>
           ) : (
             <p className="text-sm text-primary/40 italic">No active program</p>
@@ -76,6 +92,9 @@ export default function ClientCard({ client, currentUserId, todayISO }: ClientCa
             <Badge variant="success">Active</Badge>
           ) : (
             <Badge variant="default">No Program</Badge>
+          )}
+          {showNextProgramBadge && (
+            <Badge variant="warning">Next Program</Badge>
           )}
           {!intakeComplete && intakeRequested && (
             <Badge variant="warning">Intake Pending</Badge>

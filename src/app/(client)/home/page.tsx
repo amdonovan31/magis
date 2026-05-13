@@ -15,6 +15,7 @@ import {
   getProgramLifecycle,
   type ProgramLifecycle,
 } from "@/lib/utils/program-lifecycle";
+import { maybePromoteScheduled } from "@/lib/actions/promotion.actions";
 import type { Profile } from "@/types/app.types";
 
 export default async function ClientHomePage() {
@@ -25,12 +26,18 @@ export default async function ClientHomePage() {
 
   if (!user) redirect("/login");
 
+  // Lazy promotion: if a scheduled program for this user has reached its
+  // starts_on (in their TZ), flip it to published and archive the prior one.
+  // Failures degrade gracefully so the home screen still renders.
+  await maybePromoteScheduled([user.id]);
+
   const [
     { data: rawProfile },
     { count: intakeCount },
     todayWorkout,
     streakData,
     { data: activeProgram },
+    { data: scheduledProgram },
     todayWeight,
     { data: activeFreeSession },
   ] = await Promise.all([
@@ -51,6 +58,14 @@ export default async function ClientHomePage() {
       .eq("client_id", user.id)
       .eq("is_active", true)
       .eq("status", "published")
+      .maybeSingle(),
+    supabase
+      .from("programs")
+      .select("id, starts_on")
+      .eq("client_id", user.id)
+      .eq("status", "scheduled")
+      .order("starts_on", { ascending: true })
+      .limit(1)
       .maybeSingle(),
     getTodayWeight(),
     supabase
@@ -128,6 +143,7 @@ export default async function ClientHomePage() {
         endsOn={endsOn}
         daysLeft={daysLeft}
         allCompleted={allCompleted}
+        scheduledProgramStartsOn={scheduledProgram?.starts_on ?? null}
       />
 
       {/* Streak card */}

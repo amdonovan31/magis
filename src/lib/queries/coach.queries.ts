@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { computeWeekStreak } from "@/lib/utils/date";
+import { maybePromoteScheduled } from "@/lib/actions/promotion.actions";
 import type { CoachDashboardData, ClientWithProgram, Profile } from "@/types/app.types";
 
 export async function getCoachDashboard(): Promise<CoachDashboardData | null> {
@@ -26,6 +27,12 @@ export async function getCoachDashboard(): Promise<CoachDashboardData | null> {
 
   if (!coach) return null;
   if (!relationships) return { coach, clients: [] };
+
+  // Lazy-promote any scheduled programs whose starts_on has arrived in the
+  // client's TZ, before reading active programs below. Failures are swallowed
+  // so the dashboard still renders with the prior published program visible.
+  const allClientIds = relationships.map((r) => r.client_id);
+  await maybePromoteScheduled(allClientIds);
 
   const viewedMap: Record<string, string> = {};
   for (const v of views ?? []) {
@@ -62,6 +69,7 @@ export async function getCoachDashboard(): Promise<CoachDashboardData | null> {
             coach_code: null,
           } as unknown as Profile,
           activeProgram: null,
+          scheduledProgram: null,
           lastSessionDate: null,
           streak: 0,
           unreadNotes: 0,
@@ -77,14 +85,26 @@ export async function getCoachDashboard(): Promise<CoachDashboardData | null> {
 
       const lastViewed = viewedMap[profile.id] ?? "1970-01-01T00:00:00Z";
 
-      const [{ data: activeProgram }, { data: recentSessions }, { count: unreadCount }, { count: intakeCount }] =
+      const [{ data: activeProgram }, { data: scheduledProgram }, { data: recentSessions }, { count: unreadCount }, { count: intakeCount }] =
         await Promise.all([
+          // Active program is published-only — scheduled programs are also
+          // is_active=true but must NOT surface as "active" to coaches. Filter
+          // explicitly on status to avoid leakage now that the queue model exists.
           supabase
             .from("programs")
             .select("*")
             .eq("client_id", profile.id)
             .eq("is_active", true)
+            .eq("status", "published")
             .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from("programs")
+            .select("*")
+            .eq("client_id", profile.id)
+            .eq("status", "scheduled")
+            .order("starts_on", { ascending: true })
             .limit(1)
             .maybeSingle(),
           supabase
@@ -116,6 +136,7 @@ export async function getCoachDashboard(): Promise<CoachDashboardData | null> {
       return {
         profile,
         activeProgram: activeProgram ?? null,
+        scheduledProgram: scheduledProgram ?? null,
         lastSessionDate,
         streak,
         unreadNotes: unreadCount ?? 0,

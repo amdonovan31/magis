@@ -47,6 +47,8 @@ interface Props {
   exercises: ExerciseOption[];
   clientName?: string | null;
   scheduledWorkouts?: ScheduledWorkoutRow[];
+  priorPublishedExists?: boolean;
+  priorEndsOn?: string | null;
 }
 
 function emptyChanges(): ProgramEditChanges {
@@ -65,6 +67,8 @@ export default function ProgramEditor({
   exercises,
   clientName,
   scheduledWorkouts = [],
+  priorPublishedExists = false,
+  priorEndsOn = null,
 }: Props) {
   const router = useRouter();
   const [program, setProgram] = useState(initialProgram);
@@ -479,6 +483,20 @@ export default function ProgramEditor({
       />
 
       <div className="flex flex-col gap-4 px-4 pt-4 pb-32">
+        {/* Initial pre-generation instructions (progression mode only).
+            Read-only reference for the regen loop — do NOT pre-populate the
+            regen feedback input with this text. */}
+        {(initialProgram as unknown as { generation_instructions?: string | null }).generation_instructions && (
+          <details className="rounded-xl border border-primary/10 bg-surface px-4 py-2 text-sm">
+            <summary className="cursor-pointer text-xs font-semibold uppercase tracking-widest text-primary/50">
+              View initial instructions
+            </summary>
+            <p className="mt-2 whitespace-pre-wrap text-sm text-primary/70">
+              {(initialProgram as unknown as { generation_instructions: string }).generation_instructions}
+            </p>
+          </details>
+        )}
+
         {/* Published edit mode banner */}
         {inEditMode && (
           <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
@@ -713,8 +731,9 @@ export default function ProgramEditor({
       {/* Program actions (not in edit mode) */}
       {!inEditMode && (
         <div className="px-4 pb-4 flex flex-col gap-3">
-          {/* Regenerate — only for draft programs assigned to a client */}
-          {status === "draft" && program.client_id && (
+          {/* Regenerate — drafts and scheduled programs assigned to a client.
+              Scheduled programs reuse the draft regen flow (per PR 1 plan). */}
+          {(status === "draft" || status === "scheduled") && program.client_id && (
             <Button
               variant="secondary"
               fullWidth
@@ -752,6 +771,8 @@ export default function ProgramEditor({
           programId={program.id}
           status={status}
           onStatusChange={setStatus}
+          priorPublishedExists={priorPublishedExists}
+          priorEndsOn={priorEndsOn}
         />
       )}
 

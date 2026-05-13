@@ -60,6 +60,7 @@ export type SetLogWithExercise = SetLog & {
 export type ClientWithProgram = {
   profile: Profile;
   activeProgram: Program | null;
+  scheduledProgram: Program | null;
   lastSessionDate: string | null;
   streak: number;
   unreadNotes: number;

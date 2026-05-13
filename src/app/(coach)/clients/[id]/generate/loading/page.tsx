@@ -7,7 +7,13 @@ export default async function GenerateLoadingPage({
   searchParams: searchParamsPromise,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ guidelinesId?: string; regenFeedback?: string; regenProgramId?: string }>;
+  searchParams: Promise<{
+    guidelinesId?: string;
+    regenFeedback?: string;
+    regenProgramId?: string;
+    mode?: string;
+    instructions?: string;
+  }>;
 }) {
   const [{ id: clientId }, searchParams] = await Promise.all([params, searchParamsPromise]);
   const supabase = await createClient();
@@ -140,13 +146,17 @@ export default async function GenerateLoadingPage({
       });
     }
 
-    // Delete the old draft program since we're regenerating (cascade deletes templates/exercises)
+    // Delete the old draft or scheduled program since we're regenerating
+    // (cascade deletes templates + exercises + scheduled_workouts).
+    // Filtering on status guards against accidentally wiping a published program.
     await supabase
       .from("programs")
       .delete()
       .eq("id", searchParams.regenProgramId)
-      .eq("status", "draft");
+      .in("status", ["draft", "scheduled"]);
   }
+
+  const mode: "initial" | "progression" = searchParams.mode === "progression" ? "progression" : "initial";
 
   return (
     <GeneratingScreen
@@ -155,6 +165,8 @@ export default async function GenerateLoadingPage({
       guidelinesId={guidelinesId}
       regenerationFeedback={searchParams.regenFeedback ?? null}
       previousProgramJson={previousProgramJson}
+      mode={mode}
+      coachInstructions={searchParams.instructions ?? null}
     />
   );
 }

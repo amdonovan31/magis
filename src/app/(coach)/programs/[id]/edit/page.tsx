@@ -43,12 +43,34 @@ export default async function EditProgramPage({
     .eq("status", "scheduled")
     .order("scheduled_date", { ascending: true });
 
+  // For Schedule-vs-Publish branching: does this client already have a
+  // currently-published program (other than this one)?
+  let priorPublishedExists = false;
+  let priorEndsOn: string | null = null;
+  if (program.client_id && program.status === "draft") {
+    const { data: prior } = await supabase
+      .from("programs")
+      .select("ends_on")
+      .eq("client_id", program.client_id)
+      .eq("status", "published")
+      .neq("id", program.id)
+      .order("ends_on", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (prior) {
+      priorPublishedExists = true;
+      priorEndsOn = prior.ends_on;
+    }
+  }
+
   return (
     <ProgramEditor
       program={program}
       exercises={exercises}
       clientName={clientName}
       scheduledWorkouts={scheduledWorkouts ?? []}
+      priorPublishedExists={priorPublishedExists}
+      priorEndsOn={priorEndsOn}
     />
   );
 }

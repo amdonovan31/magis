@@ -59,12 +59,16 @@ export async function POST(req: NextRequest) {
   let guidelinesId: string;
   let regenerationFeedback: string | undefined;
   let previousProgram: GeneratedProgram | undefined;
+  let mode: "initial" | "progression" = "initial";
+  let coachInstructions: string | undefined;
   try {
     const body = await req.json();
     clientId = body.clientId;
     guidelinesId = body.guidelinesId;
     regenerationFeedback = body.regenerationFeedback;
     previousProgram = body.previousProgram;
+    if (body.mode === "progression") mode = "progression";
+    coachInstructions = typeof body.coachInstructions === "string" ? body.coachInstructions.trim() || undefined : undefined;
     if (!clientId || !guidelinesId) throw new Error("Missing fields");
   } catch {
     return NextResponse.json(
@@ -310,6 +314,23 @@ export async function POST(req: NextRequest) {
   }
 
   // ------------------------------------------------------------------
+  // Build optional progression context (mode === "progression")
+  //
+  // Pulls the prior block's structure, aggregated logged performance, and
+  // verbatim chronological notes (with source prefixes). Adherence is
+  // computed from completed/prescribed scheduled_workouts. PAR-Q diff is
+  // intentionally NOT included — the generator already pulled current
+  // client_intake above; current PAR-Q is the right input regardless.
+  // ------------------------------------------------------------------
+  let progressionSection = "";
+  if (mode === "progression") {
+    progressionSection = await buildProgressionSection(supabase, clientId);
+  }
+  if (coachInstructions) {
+    progressionSection += `\n## Coach Instructions for This Generation\n${coachInstructions}\n`;
+  }
+
+  // ------------------------------------------------------------------
   // Build optional regeneration context
   // ------------------------------------------------------------------
   let regenerationSection = "";
@@ -334,7 +355,7 @@ ${regenerationFeedback}\n`;
   // ------------------------------------------------------------------
   const userPrompt = `${clientSection}
 ${guidelinesSection}
-${regenerationSection}EXERCISE LIBRARY (format: [★]id|name|muscle_group|equipment|movement_pattern|difficulty):
+${progressionSection}${regenerationSection}EXERCISE LIBRARY (format: [★]id|name|muscle_group|equipment|movement_pattern|difficulty):
 Exercises marked with ★ are foundational — STRONGLY prefer these. Only use unmarked (custom) exercises when no suitable ★ exercise exists for a movement pattern.
 ${exerciseListText}
 
@@ -375,6 +396,14 @@ CARDIO PROGRAMMING (only when cardio guidelines are provided):
 - Respect the coach's zone focus — if they say Zone 2, most cardio should be Zone 2.
 - Duration by zone: Zone 2 = 30-60 min, Zone 3 = 20-40 min, Zone 4-5 = 15-30 min.
 - If multiple modalities available, vary them across the week.`;
+
+  if (process.env.LOG_PROMPT === "1") {
+    logger.info("generate-program prompt", {
+      mode,
+      clientId,
+      promptPreview: userPrompt.slice(0, 4000),
+    });
+  }
 
   // ------------------------------------------------------------------
   // Call Claude API via SDK (handles timeouts properly)
@@ -478,6 +507,7 @@ CARDIO PROGRAMMING (only when cardio guidelines are provided):
         status: "draft",
         starts_on: today,
         ends_on: today,
+        generation_instructions: coachInstructions ?? null,
       })
       .select("id")
       .single();
@@ -589,4 +619,116 @@ CARDIO PROGRAMMING (only when cardio guidelines are provided):
       { status: 500 }
     );
   }
+}
+
+// =============================================================================
+// Progression-mode prompt section
+//
+// Pulls the client's prior block (most recent published, falling back to
+// archived), aggregates logged performance + notes, and renders three
+// delimited sections that Claude consumes:
+//   ## Prior Block (structure summary + inherited defaults)
+//   Adherence: line
+//   ## Prior Block Client Notes (verbatim chronological with source prefixes)
+//
+// Returns "" if no prior block exists (the caller treats that as initial
+// generation context — guidelines + intake only).
+// =============================================================================
+
+type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
+
+async function buildProgressionSection(
+  supabase: SupabaseServerClient,
+  clientId: string,
+): Promise<string> {
+  // 1. Find the prior block — most recent published, else most recent archived.
+  const { data: priorPrograms } = await supabase
+    .from("programs")
+    .select("id, title, starts_on, ends_on, status")
+    .eq("client_id", clientId)
+    .in("status", ["published", "archived"])
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  const prior = priorPrograms?.[0];
+  if (!prior) return "";
+
+  // 2. Pull the prior block's templates + exercises for structure summary, and
+  //    the scheduled_workouts for adherence + per-week breakdown.
+  const [{ data: templates }, { data: scheduled }] = await Promise.all([
+    supabase
+      .from("workout_templates")
+      .select("id, title, week_number, day_number, scheduled_days, type, exercises:workout_template_exercises(prescribed_sets, prescribed_reps, rest_seconds, exercise:exercises!exercise_id(name, muscle_group))")
+      .eq("program_id", prior.id)
+      .order("week_number", { ascending: true })
+      .order("day_number", { ascending: true }),
+    supabase
+      .from("scheduled_workouts")
+      .select("status")
+      .eq("program_id", prior.id),
+  ]);
+
+  const totalScheduled = scheduled?.length ?? 0;
+  const totalCompleted = (scheduled ?? []).filter((s) => s.status === "completed").length;
+  const adherencePct = totalScheduled === 0 ? 0 : Math.round((totalCompleted / totalScheduled) * 100);
+
+  // 3. Inherited structured defaults — week count, days/week (distinct
+  //    scheduled_days across week 1), and presence of a deload (heuristic:
+  //    a week with notably fewer prescribed sets than week 1 is treated as
+  //    deload — surface as "unknown" if we can't tell).
+  const weekNumbers = new Set<number>();
+  const week1Days = new Set<number>();
+  for (const t of templates ?? []) {
+    const wn = (t.week_number as number | null) ?? 1;
+    weekNumbers.add(wn);
+    if (wn === 1) {
+      const days = (t.scheduled_days as number[] | null) ?? [];
+      for (const d of days) week1Days.add(d);
+    }
+  }
+  const totalWeeks = weekNumbers.size || 1;
+  const daysPerWeek = week1Days.size;
+
+  // 4. Compose Prior Block summary. Keep concise — Claude has the prior
+  //    structure inline and can reference it. We skip a per-set dump to keep
+  //    the prompt under control; week 1 outline is enough as a starting point.
+  let section = `\n## Prior Block\n`;
+  section += `- Title: ${prior.title}\n`;
+  section += `- Range: ${prior.starts_on} to ${prior.ends_on}\n`;
+  section += `Defaults inherited from prior block: ${totalWeeks} weeks, ${daysPerWeek || "unknown"} day${daysPerWeek === 1 ? "" : "s"}/week. The coach may amend these via "Coach Instructions for This Generation" below.\n`;
+
+  // Per-week template outline (compact)
+  const week1 = (templates ?? []).filter((t) => (t.week_number ?? 1) === 1);
+  if (week1.length > 0) {
+    section += `\nWeek 1 outline:\n`;
+    for (const t of week1) {
+      const exs = (t.exercises as Array<{ prescribed_sets?: number | null; prescribed_reps?: string | null; exercise: { name: string | null } | null }> | null) ?? [];
+      const exList = exs
+        .map((e) => `${e.exercise?.name ?? "?"} (${e.prescribed_sets ?? "?"}x${e.prescribed_reps ?? "?"})`)
+        .join(", ");
+      section += `- ${t.title ?? "Workout"}${t.type === "cardio" ? " [cardio]" : ""}: ${exList}\n`;
+    }
+  }
+
+  // 5. Adherence flag + 0%-special-case instruction.
+  section += `\nAdherence: client completed ${totalCompleted} of ${totalScheduled} prescribed workouts (${adherencePct}%)\n`;
+  if (totalCompleted === 0) {
+    section += `Note: client did not log any sessions in the prior block — base the new block on current intake and the prior program structure only. Do not invent progression from missing data.\n`;
+  }
+
+  // 6. Verbatim chronological notes with source prefixes.
+  try {
+    const { getNotesForProgram, formatProgramNoteLine } = await import("@/lib/queries/notes.queries");
+    const notes = await getNotesForProgram(prior.id);
+    if (notes.length > 0) {
+      section += `\n## Prior Block Client Notes\n`;
+      for (const n of notes) {
+        section += `${formatProgramNoteLine(n)}\n`;
+      }
+    }
+  } catch (err) {
+    logger.error("getNotesForProgram failed in buildProgressionSection", { error: String(err), priorProgramId: prior.id });
+  }
+
+  return section;
 }

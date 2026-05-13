@@ -36,6 +36,26 @@ export default async function ProgramDetailPage({
   const lifecycleVariant: "success" | "warning" | "default" =
     lifecycle === "active" ? "success" : lifecycle === "draft" ? "warning" : "default";
 
+  // For Schedule-vs-Publish branching: does this client already have a
+  // currently-published program (other than this one)?
+  let priorPublishedExists = false;
+  let priorEndsOn: string | null = null;
+  if (program.client_id && program.status === "draft") {
+    const { data: prior } = await supabase
+      .from("programs")
+      .select("ends_on")
+      .eq("client_id", program.client_id)
+      .eq("status", "published")
+      .neq("id", program.id)
+      .order("ends_on", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (prior) {
+      priorPublishedExists = true;
+      priorEndsOn = prior.ends_on;
+    }
+  }
+
   return (
     <>
       <TopBar
@@ -57,6 +77,8 @@ export default async function ProgramDetailPage({
             <ProgramDetailPublishBar
               programId={program.id}
               initialStatus={program.status}
+              priorPublishedExists={priorPublishedExists}
+              priorEndsOn={priorEndsOn}
             />
             {program.status !== "draft" && (
               <span className="text-xs text-primary/40">
