@@ -111,15 +111,15 @@ Active/tap feedback: active:scale-[0.98] transition-transform.
 Database Conventions
 Migrations
 
-One migration file per schema change, numbered sequentially: 057_description.sql.
-Current highest migration: 056_programs_ends_on_constraints.sql.
+One migration file per schema change, numbered sequentially: 062_description.sql.
+Current highest migration: 061_promote_scheduled_programs_tz_fallback.sql.
 After adding a migration, regenerate types: npx supabase gen types typescript --local > src/types/database.types.ts (or --linked if no Docker).
 Never edit database.types.ts manually except as a temporary stub when the regen pipeline is unavailable; overwrite with a real regen at the next opportunity.
 
 Key Tables
 
 profiles — user profiles, extends Supabase auth (role, preferred_unit, onboarding_complete, timezone)
-programs — coach-created training programs (status: draft → published → archived; starts_on and ends_on are date-typed and NOT NULL)
+programs — coach-created training programs (status: draft → scheduled → published → archived; starts_on and ends_on date-typed NOT NULL; generation_instructions = per-generation coach free-text; intake_snapshot = frozen client_intake JSONB at generation time, forward-looking)
 workout_templates — days within a program (title, week_number, day_number, type: strength/cardio)
 workout_template_exercises — exercises within a template (position, sets, reps, weight, rest, notes, alternate_exercise_ids)
 scheduled_workouts — generated on publish, one row per client workout date (status: scheduled/completed/skipped/rescheduled). Mutations to this table fire a trigger that recomputes programs.ends_on from MAX(scheduled_date).
@@ -140,9 +140,11 @@ Coach creates program → status: draft, is_active: true, starts_on placeholder 
 Solo users get the same flow but generateSoloProgram (src/lib/actions/ai.actions.ts) auto-publishes immediately so they have a live program on /home.
 Coach publishes via publishProgram (src/lib/actions/program.actions.ts), which is a thin wrapper around the publish_program Postgres RPC. The RPC atomically: archives prior published programs (status='archived', is_active=false), replaces this program's scheduled_workouts (computed in TS by buildScheduledWorkoutRows and passed in as JSONB), then flips status='published'. The trigger sets ends_on inside the same transaction.
 Editing a published program still uses the apply_program_edits RPC for atomic batched changes; date changes there fire the same ends_on trigger.
-The lifecycle status is date-based: use getProgramLifecycle() from src/lib/utils/program-lifecycle.ts (states: not_started | active | ended | draft | archived) instead of hand-rolling status comparisons. The utility also anticipates a future scheduled status (PR 1).
+The lifecycle status is date-based: use getProgramLifecycle() from src/lib/utils/program-lifecycle.ts (states: not_started | active | ended | draft | archived) instead of hand-rolling status comparisons.
 A program does NOT auto-archive when ends_on passes — it stays status='published' until a new program is published. "Ended" is a display state derived from today > ends_on, not a stored status.
-Programs can also be pending_review or archived (the latter exists; the former is whitelisted but not actively used).
+Programs can also be pending_review (whitelisted, unused) or archived.
+
+End-of-program / next-program flow: a coach generates a follow-up block in "progression mode" (Generate Next Program → /clients/[id]/generate/next), which feeds Claude the prior block's structure, logged performance, adherence, and client notes. The new program is scheduled (status='scheduled') with a future starts_on rather than published immediately. promote_scheduled_programs RPC lazily flips scheduled → published when starts_on arrives in the client's timezone — called from getCoachDashboard and client home load (no cron). Cancelling a scheduled program reverts it to draft.
 
 Timezone & "today" computation
 

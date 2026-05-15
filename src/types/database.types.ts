@@ -1135,6 +1135,7 @@ export type Database = {
           ends_on: string
           generation_instructions: string | null
           id: string
+          intake_snapshot: Json | null
           is_active: boolean
           pending_json: Json | null
           starts_on: string
@@ -1149,6 +1150,7 @@ export type Database = {
           ends_on: string
           generation_instructions?: string | null
           id?: string
+          intake_snapshot?: Json | null
           is_active?: boolean
           pending_json?: Json | null
           starts_on: string
@@ -1163,6 +1165,7 @@ export type Database = {
           ends_on?: string
           generation_instructions?: string | null
           id?: string
+          intake_snapshot?: Json | null
           is_active?: boolean
           pending_json?: Json | null
           starts_on?: string

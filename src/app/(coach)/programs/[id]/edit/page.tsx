@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getProgramWithTemplates } from "@/lib/queries/program.queries";
 import { getAllExerciseNames } from "@/lib/queries/exercise.queries";
+import { getTodayISO } from "@/lib/utils/date";
 import ProgramEditor from "@/components/coach/ProgramEditor";
 
 export default async function EditProgramPage({
@@ -24,6 +25,14 @@ export default async function EditProgramPage({
   if (program.coach_id !== user.id) notFound();
 
   const exercises = await getAllExerciseNames();
+
+  // Today's date in the coach's timezone, for PublishBar's date picker.
+  const { data: coachProfile } = await supabase
+    .from("profiles")
+    .select("timezone")
+    .eq("id", user.id)
+    .single();
+  const todayISO = getTodayISO(coachProfile?.timezone);
 
   let clientName: string | null = null;
   if (program.client_id) {
@@ -71,6 +80,7 @@ export default async function EditProgramPage({
       scheduledWorkouts={scheduledWorkouts ?? []}
       priorPublishedExists={priorPublishedExists}
       priorEndsOn={priorEndsOn}
+      todayISO={todayISO}
     />
   );
 }

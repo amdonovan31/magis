@@ -79,6 +79,7 @@ export default async function ProgramDetailPage({
               initialStatus={program.status}
               priorPublishedExists={priorPublishedExists}
               priorEndsOn={priorEndsOn}
+              todayISO={todayISO}
             />
             {program.status !== "draft" && (
               <span className="text-xs text-primary/40">

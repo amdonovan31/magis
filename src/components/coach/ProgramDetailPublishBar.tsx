@@ -9,6 +9,7 @@ interface Props {
   initialStatus: string;
   priorPublishedExists?: boolean;
   priorEndsOn?: string | null;
+  todayISO: string;
 }
 
 function statusBadgeVariant(s: string): "success" | "warning" | "default" {
@@ -28,6 +29,7 @@ export default function ProgramDetailPublishBar({
   initialStatus,
   priorPublishedExists = false,
   priorEndsOn = null,
+  todayISO,
 }: Props) {
   const [status, setStatus] = useState(initialStatus);
 
@@ -40,6 +42,7 @@ export default function ProgramDetailPublishBar({
         onStatusChange={setStatus}
         priorPublishedExists={priorPublishedExists}
         priorEndsOn={priorEndsOn}
+        todayISO={todayISO}
       />
     </>
   );

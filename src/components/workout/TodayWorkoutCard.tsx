@@ -78,6 +78,22 @@ export default function TodayWorkoutCard({
   }
 
   if (!todayWorkout) {
+    if (!hasProgram && scheduledProgramStartsOn) {
+      // No published program, but a next program is queued — e.g. the prior
+      // program was unpublished, or this is the gap before a scheduled start.
+      return (
+        <>
+          <Card padding="lg" className="text-center">
+            <div className="text-4xl mb-3">🗓️</div>
+            <h2 className="text-lg font-semibold text-primary">Next program scheduled</h2>
+            <p className="mt-1 text-sm text-primary/60">
+              Starts {formatShort(scheduledProgramStartsOn)}. Free workouts until then.
+            </p>
+          </Card>
+          <FreeWorkoutPicker activeFreeSessionId={activeFreeSessionId} />
+        </>
+      );
+    }
     if (!hasProgram) {
       return (
         <>

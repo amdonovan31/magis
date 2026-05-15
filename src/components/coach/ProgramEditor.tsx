@@ -49,6 +49,7 @@ interface Props {
   scheduledWorkouts?: ScheduledWorkoutRow[];
   priorPublishedExists?: boolean;
   priorEndsOn?: string | null;
+  todayISO: string;
 }
 
 function emptyChanges(): ProgramEditChanges {
@@ -69,6 +70,7 @@ export default function ProgramEditor({
   scheduledWorkouts = [],
   priorPublishedExists = false,
   priorEndsOn = null,
+  todayISO,
 }: Props) {
   const router = useRouter();
   const [program, setProgram] = useState(initialProgram);
@@ -773,6 +775,7 @@ export default function ProgramEditor({
           onStatusChange={setStatus}
           priorPublishedExists={priorPublishedExists}
           priorEndsOn={priorEndsOn}
+          todayISO={todayISO}
         />
       )}
 

@@ -26,6 +26,13 @@ interface Props {
    * prior.ends_on + 1 day. Falls back to today when absent.
    */
   priorEndsOn?: string | null;
+  /**
+   * Today's date (YYYY-MM-DD) in the coach's timezone, computed server-side.
+   * Used for the date-picker default and min-date validation. Passed as a
+   * prop rather than computed here so it's TZ-correct (a client-side
+   * new Date().toISOString() would be UTC).
+   */
+  todayISO: string;
 }
 
 function addOneDay(iso: string): string {
@@ -40,17 +47,17 @@ export default function PublishBar({
   onStatusChange,
   priorPublishedExists = false,
   priorEndsOn = null,
+  todayISO,
 }: Props) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [startsOn, setStartsOn] = useState(() => {
     if (priorEndsOn) return addOneDay(priorEndsOn);
-    return new Date().toISOString().split("T")[0];
+    return todayISO;
   });
 
   const useScheduleFlow = priorPublishedExists && status === "draft";
-  const todayISO = new Date().toISOString().split("T")[0];
   const dateValid = startsOn >= todayISO && (!priorEndsOn || startsOn >= priorEndsOn);
 
   async function handlePublishOrSchedule() {

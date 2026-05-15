@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/utils/logger";
+import type { Json } from "@/types/database.types";
 
 // Extend Vercel serverless function timeout (Pro plan supports up to 300s)
 export const maxDuration = 300;
@@ -478,6 +479,7 @@ CARDIO PROGRAMMING (only when cardio guidelines are provided):
           0
         ),
         is_regeneration: !!regenerationFeedback,
+        is_progression: mode === "progression",
         ...(regenerationFeedback && { regeneration_feedback: regenerationFeedback }),
       },
       ai_model: "claude-sonnet-4-6",
@@ -508,6 +510,9 @@ CARDIO PROGRAMMING (only when cardio guidelines are provided):
         starts_on: today,
         ends_on: today,
         generation_instructions: coachInstructions ?? null,
+        // Forward-looking: freeze the intake row this program was generated
+        // from so a future intake-edit flow can diff PAR-Q against it.
+        intake_snapshot: (intake as unknown as Json) ?? null,
       })
       .select("id")
       .single();
@@ -658,7 +663,7 @@ async function buildProgressionSection(
   const [{ data: templates }, { data: scheduled }] = await Promise.all([
     supabase
       .from("workout_templates")
-      .select("id, title, week_number, day_number, scheduled_days, type, exercises:workout_template_exercises(prescribed_sets, prescribed_reps, rest_seconds, exercise:exercises!exercise_id(name, muscle_group))")
+      .select("id, title, week_number, day_number, scheduled_days, type, is_deload, exercises:workout_template_exercises(prescribed_sets, prescribed_reps, rest_seconds, exercise:exercises!exercise_id(name, muscle_group))")
       .eq("program_id", prior.id)
       .order("week_number", { ascending: true })
       .order("day_number", { ascending: true }),
@@ -673,11 +678,10 @@ async function buildProgressionSection(
   const adherencePct = totalScheduled === 0 ? 0 : Math.round((totalCompleted / totalScheduled) * 100);
 
   // 3. Inherited structured defaults — week count, days/week (distinct
-  //    scheduled_days across week 1), and presence of a deload (heuristic:
-  //    a week with notably fewer prescribed sets than week 1 is treated as
-  //    deload — surface as "unknown" if we can't tell).
+  //    scheduled_days across week 1), and deload weeks (from workout_templates.is_deload).
   const weekNumbers = new Set<number>();
   const week1Days = new Set<number>();
+  const deloadWeeks = new Set<number>();
   for (const t of templates ?? []) {
     const wn = (t.week_number as number | null) ?? 1;
     weekNumbers.add(wn);
@@ -685,9 +689,15 @@ async function buildProgressionSection(
       const days = (t.scheduled_days as number[] | null) ?? [];
       for (const d of days) week1Days.add(d);
     }
+    if ((t as { is_deload?: boolean }).is_deload) deloadWeeks.add(wn);
   }
   const totalWeeks = weekNumbers.size || 1;
   const daysPerWeek = week1Days.size;
+  const deloadList = Array.from(deloadWeeks).sort((a, b) => a - b);
+  const deloadText =
+    deloadList.length > 0
+      ? `deload in week ${deloadList.join(", ")}`
+      : "no deload week";
 
   // 4. Compose Prior Block summary. Keep concise — Claude has the prior
   //    structure inline and can reference it. We skip a per-set dump to keep
@@ -695,7 +705,7 @@ async function buildProgressionSection(
   let section = `\n## Prior Block\n`;
   section += `- Title: ${prior.title}\n`;
   section += `- Range: ${prior.starts_on} to ${prior.ends_on}\n`;
-  section += `Defaults inherited from prior block: ${totalWeeks} weeks, ${daysPerWeek || "unknown"} day${daysPerWeek === 1 ? "" : "s"}/week. The coach may amend these via "Coach Instructions for This Generation" below.\n`;
+  section += `Defaults inherited from prior block: ${totalWeeks} weeks, ${daysPerWeek || "unknown"} day${daysPerWeek === 1 ? "" : "s"}/week, ${deloadText}. The coach may amend these via "Coach Instructions for This Generation" below.\n`;
 
   // Per-week template outline (compact)
   const week1 = (templates ?? []).filter((t) => (t.week_number ?? 1) === 1);
@@ -716,7 +726,31 @@ async function buildProgressionSection(
     section += `Note: client did not log any sessions in the prior block — base the new block on current intake and the prior program structure only. Do not invent progression from missing data.\n`;
   }
 
-  // 6. Verbatim chronological notes with source prefixes.
+  // 6. Logged performance — what the client actually lifted. This is the
+  //    load-bearing input for auto-progression; without it Claude only sees
+  //    prescribed structure.
+  try {
+    const { getProgramPerformanceSummary } = await import("@/lib/queries/program.queries");
+    const perf = await getProgramPerformanceSummary(prior.id);
+    if (perf && perf.exercises.length > 0) {
+      section += `\n## Logged Performance\nWhat the client actually logged in the prior block (top set = heaviest weight x reps; volume = total weight x reps):\n`;
+      for (const e of perf.exercises) {
+        section += `- ${e.name}: top set ${e.topWeight} x ${e.topReps}, ${e.setCount} sets, volume ${Math.round(e.totalVolume)}${e.isPR ? " [PR this block]" : ""}\n`;
+      }
+      if (perf.cardio) {
+        const c = perf.cardio;
+        section += `- Cardio: ${c.sessionCount} sessions, ${c.totalDurationMin} min total`;
+        if (c.avgHeartRate) section += `, avg HR ${c.avgHeartRate}`;
+        if (c.totalDistance > 0) section += `, ${Math.round(c.totalDistance * 10) / 10} distance`;
+        section += `\n`;
+      }
+      section += `Progress load and volume from these logged numbers, not from the prescribed values above.\n`;
+    }
+  } catch (err) {
+    logger.error("getProgramPerformanceSummary failed in buildProgressionSection", { error: String(err), priorProgramId: prior.id });
+  }
+
+  // 7. Verbatim chronological notes with source prefixes.
   try {
     const { getNotesForProgram, formatProgramNoteLine } = await import("@/lib/queries/notes.queries");
     const notes = await getNotesForProgram(prior.id);
