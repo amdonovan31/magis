@@ -347,6 +347,7 @@ export async function publishProgram(
 
   revalidatePath("/programs");
   revalidatePath("/calendar");
+  revalidatePath("/dashboard/activity");
 
   const archivedProgramName =
     (data as { archived_program_title?: string | null } | null)?.archived_program_title ?? undefined;
@@ -405,9 +406,22 @@ export async function scheduleProgram(
     return { error: error.message };
   }
 
+  // A next program now exists for this client — clear any open
+  // end-of-program alert in the coach Activity feed (PR 2).
+  if (program.client_id) {
+    await supabase
+      .from("coach_events")
+      .update({ cleared_at: new Date().toISOString() })
+      .eq("coach_id", user.id)
+      .eq("client_id", program.client_id)
+      .eq("event_type", "end_of_program_alert")
+      .is("cleared_at", null);
+  }
+
   revalidatePath("/programs");
   revalidatePath("/calendar");
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/activity");
   revalidatePath("/clients");
 
   const archivedProgramName =
@@ -462,6 +476,7 @@ export async function cancelScheduledProgram(
   revalidatePath("/programs");
   revalidatePath("/calendar");
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/activity");
   revalidatePath("/clients");
   return {};
 }

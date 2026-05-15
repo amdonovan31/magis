@@ -480,6 +480,57 @@ export type Database = {
           },
         ]
       }
+      coach_events: {
+        Row: {
+          cleared_at: string | null
+          client_id: string
+          coach_id: string
+          created_at: string
+          event_type: string
+          id: string
+          occurred_at: string
+          payload: Json
+          source_id: string
+        }
+        Insert: {
+          cleared_at?: string | null
+          client_id: string
+          coach_id: string
+          created_at?: string
+          event_type: string
+          id?: string
+          occurred_at?: string
+          payload?: Json
+          source_id: string
+        }
+        Update: {
+          cleared_at?: string | null
+          client_id?: string
+          coach_id?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          occurred_at?: string
+          payload?: Json
+          source_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coach_events_coach_id_fkey"
+            columns: ["coach_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       coach_guidelines: {
         Row: {
           additional_notes: string | null
@@ -1784,6 +1835,10 @@ export type Database = {
       }
       ensure_coach_code: { Args: { target_id: string }; Returns: string }
       get_my_role: { Args: never; Returns: string }
+      materialize_end_of_program_alerts: {
+        Args: { p_client_ids?: string[] }
+        Returns: number
+      }
       promote_scheduled_programs: {
         Args: { p_client_ids?: string[] }
         Returns: string[]

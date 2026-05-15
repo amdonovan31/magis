@@ -111,8 +111,8 @@ Active/tap feedback: active:scale-[0.98] transition-transform.
 Database Conventions
 Migrations
 
-One migration file per schema change, numbered sequentially: 062_description.sql.
-Current highest migration: 061_promote_scheduled_programs_tz_fallback.sql.
+One migration file per schema change, numbered sequentially: 064_description.sql.
+Current highest migration: 063_materialize_end_of_program_alerts_rpc.sql.
 After adding a migration, regenerate types: npx supabase gen types typescript --local > src/types/database.types.ts (or --linked if no Docker).
 Never edit database.types.ts manually except as a temporary stub when the regen pipeline is unavailable; overwrite with a real regen at the next opportunity.
 
@@ -129,6 +129,7 @@ cardio_logs — cardio session records (duration, distance, HR, RPE, per session
 session_extra_work — bonus sets logged during template workouts
 exercises — exercise library (name, muscle_group, equipment, instructions)
 coach_client_relationships — links coaches to clients
+coach_events — shared coach-notification event log (workout_completed / end_of_program_alert / client_comment) behind the coach Activity tab; the future bell icon will read the same table. workout_completed + client_comment fired by DB triggers; end_of_program_alert materialized lazily on Activity-tab load.
 agent_activity_log — all AI-generated content gets logged here
 
 Row Level Security

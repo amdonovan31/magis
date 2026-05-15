@@ -1,6 +1,7 @@
 import { getCoachDashboard } from "@/lib/queries/coach.queries";
 import { redirect } from "next/navigation";
 import ClientCard from "@/components/coach/ClientCard";
+import DashboardTabs from "@/components/coach/DashboardTabs";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
 import TopBar from "@/components/layout/TopBar";
@@ -18,6 +19,7 @@ export default async function DashboardPage() {
   return (
     <>
     <TopBar showLogo />
+    <DashboardTabs active="clients" />
     <div className="flex flex-col gap-6 px-4 pt-4">
       {/* Header */}
       <div className="flex items-center justify-between">
