@@ -71,6 +71,8 @@ export type ClientWithProgram = {
 export type CoachDashboardData = {
   coach: Profile;
   clients: ClientWithProgram[];
+  /** Count of open attention items (end-of-program + inactive alerts). */
+  attentionCount: number;
 };
 
 // Today's workout for a client

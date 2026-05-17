@@ -2,6 +2,7 @@ import { getCoachDashboard } from "@/lib/queries/coach.queries";
 import { redirect } from "next/navigation";
 import ClientCard from "@/components/coach/ClientCard";
 import DashboardTabs from "@/components/coach/DashboardTabs";
+import AttentionBanner from "@/components/coach/AttentionBanner";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
 import TopBar from "@/components/layout/TopBar";
@@ -13,7 +14,7 @@ export default async function DashboardPage() {
   const data = await getCoachDashboard();
   if (!data) redirect("/login");
 
-  const { coach, clients } = data;
+  const { coach, clients, attentionCount } = data;
   const todayISO = getTodayISO(coach.timezone);
 
   return (
@@ -47,6 +48,9 @@ export default async function DashboardPage() {
           <p className="text-sm text-[#FAF9F6]/70">On Programs</p>
         </div>
       </div>
+
+      {/* Clients needing attention */}
+      <AttentionBanner count={attentionCount} />
 
       {/* Client list */}
       <div className="flex flex-col gap-2">

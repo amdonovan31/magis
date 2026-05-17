@@ -124,6 +124,8 @@ A coach managing 20 clients today spends roughly 10 hours a week on programming.
 | Agent Guardrail Config | Per-client rules for what the client-side AI concierge can and cannot change autonomously. Deferred until concierge is built. | Nice to Have |
 | Agent Activity Log | See every AI substitution or session change made on behalf of each client | Must Have |
 | Client List Dashboard | All clients with status, current program, last active date and streak | Must Have |
+| Coach Activity Feed | Passive log on the dashboard's Activity tab — completed workouts, clients joining/leaving, finished intakes — newest-first, widening 7→30→90 day window | Must Have |
+| Coach Attention Page | Action-needed alerts (program ending soon, client gone quiet 10+ days) split out from the Activity feed; surfaced by a "Clients needing attention" banner on the dashboard | Must Have |
 | Client Profile | Individual view with intake data, PAR-Q flags, body metrics, progress charts and coaching notes | Must Have |
 | Add / Invite Client | Invite new clients via email link to create their account and complete intake | Must Have |
 | Coach-Initiated Intake Request | Request a client to complete or update their intake form directly from the client profile | Must Have |

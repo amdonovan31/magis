@@ -24,7 +24,7 @@ export default function ActivityFeed({
           No activity in the last {sinceDays} days
         </h2>
         <p className="mt-1 text-sm text-primary/60">
-          Completed workouts, client comments, and end-of-program alerts will show up here.
+          Completed workouts, new clients, and finished intakes will show up here.
         </p>
         <Link
           href="/dashboard"

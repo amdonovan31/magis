@@ -1,6 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { computeWeekStreak } from "@/lib/utils/date";
 import { maybePromoteScheduled } from "@/lib/actions/promotion.actions";
+import {
+  maybeMaterializeEndOfProgramAlerts,
+  maybeMaterializeClientInactiveAlerts,
+} from "@/lib/actions/coach-events.actions";
 import type { CoachDashboardData, ClientWithProgram, Profile } from "@/types/app.types";
 
 export async function getCoachDashboard(): Promise<CoachDashboardData | null> {
@@ -26,13 +30,29 @@ export async function getCoachDashboard(): Promise<CoachDashboardData | null> {
     ]);
 
   if (!coach) return null;
-  if (!relationships) return { coach, clients: [] };
+  if (!relationships) return { coach, clients: [], attentionCount: 0 };
 
   // Lazy-promote any scheduled programs whose starts_on has arrived in the
   // client's TZ, before reading active programs below. Failures are swallowed
   // so the dashboard still renders with the prior published program visible.
   const allClientIds = relationships.map((r) => r.client_id);
   await maybePromoteScheduled(allClientIds);
+
+  // Materialize both alert types, then count open attention items for the
+  // "Clients needing attention" banner. Materialization failures degrade
+  // gracefully (the actions swallow them) — the count just reflects whatever
+  // is already in coach_events.
+  await Promise.all([
+    maybeMaterializeEndOfProgramAlerts(allClientIds),
+    maybeMaterializeClientInactiveAlerts(allClientIds),
+  ]);
+  const { count: attentionCountRaw } = await supabase
+    .from("coach_events")
+    .select("id", { count: "exact", head: true })
+    .eq("coach_id", user.id)
+    .in("event_type", ["end_of_program_alert", "client_inactive_alert"])
+    .is("cleared_at", null);
+  const attentionCount = attentionCountRaw ?? 0;
 
   const viewedMap: Record<string, string> = {};
   for (const v of views ?? []) {
@@ -158,7 +178,7 @@ export async function getCoachDashboard(): Promise<CoachDashboardData | null> {
     return b.lastSessionDate.localeCompare(a.lastSessionDate);
   });
 
-  return { coach, clients };
+  return { coach, clients, attentionCount };
 }
 
 export async function getCoachClients() {

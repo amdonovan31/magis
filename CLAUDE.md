@@ -111,8 +111,8 @@ Active/tap feedback: active:scale-[0.98] transition-transform.
 Database Conventions
 Migrations
 
-One migration file per schema change, numbered sequentially: 064_description.sql.
-Current highest migration: 063_materialize_end_of_program_alerts_rpc.sql.
+One migration file per schema change, numbered sequentially: 065_description.sql.
+Current highest migration: 064_coach_events_new_types.sql.
 After adding a migration, regenerate types: npx supabase gen types typescript --local > src/types/database.types.ts (or --linked if no Docker).
 Never edit database.types.ts manually except as a temporary stub when the regen pipeline is unavailable; overwrite with a real regen at the next opportunity.
 
@@ -129,7 +129,7 @@ cardio_logs — cardio session records (duration, distance, HR, RPE, per session
 session_extra_work — bonus sets logged during template workouts
 exercises — exercise library (name, muscle_group, equipment, instructions)
 coach_client_relationships — links coaches to clients
-coach_events — shared coach-notification event log (workout_completed / end_of_program_alert / client_comment) behind the coach Activity tab; the future bell icon will read the same table. workout_completed + client_comment fired by DB triggers; end_of_program_alert materialized lazily on Activity-tab load.
+coach_events — shared coach-notification event log behind the coach dashboard; the future bell icon will read the same table. Seven event types split into two read-side categories: the Activity feed (passive log: workout_completed, client_joined, client_left, client_intake_completed) and the Attention page (action-needed: end_of_program_alert, client_inactive_alert). client_comment is written but rendered on neither surface — it stays for the bell, read via the workout summary view. workout_completed / client_comment / client_joined / client_left / client_intake_completed are fired by DB triggers; end_of_program_alert + client_inactive_alert are materialized lazily on dashboard + Attention-page load (materialize_end_of_program_alerts / materialize_client_inactive_alerts RPCs). Self-coached relationships (coach_id = client_id) fire no new event types.
 agent_activity_log — all AI-generated content gets logged here
 
 Row Level Security

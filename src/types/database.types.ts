@@ -1835,6 +1835,10 @@ export type Database = {
       }
       ensure_coach_code: { Args: { target_id: string }; Returns: string }
       get_my_role: { Args: never; Returns: string }
+      materialize_client_inactive_alerts: {
+        Args: { p_client_ids?: string[] }
+        Returns: number
+      }
       materialize_end_of_program_alerts: {
         Args: { p_client_ids?: string[] }
         Returns: number
